@@ -1,5 +1,5 @@
-import { RefreshTokensTable } from './refresh-tokens-table.interface.js';
-import { UsersTable } from './users-table.interface.js';
+import { RefreshTokensTable } from './refresh-tokens-table.interface';
+import { UsersTable } from './users-table.interface';
 
 export interface Database {
   users: UsersTable;

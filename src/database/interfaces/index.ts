@@ -1,3 +1,3 @@
-export * from './database.interface.js';
-export * from './users-table.interface.js';
-export * from './refresh-tokens-table.interface.js';
+export * from './database.interface';
+export * from './users-table.interface';
+export * from './refresh-tokens-table.interface';
