@@ -1,0 +1,46 @@
+import { HttpStatus } from '@nestjs/common';
+import { ErrorHttpStatusCode } from '@nestjs/common/utils/http-error-by-code.util';
+
+export const HttpErrorCodeStringByStatusCode: Record<ErrorHttpStatusCode, string> = {
+  [HttpStatus.BAD_GATEWAY]: 'BadGateway',
+  [HttpStatus.BAD_REQUEST]: 'BadRequest',
+  [HttpStatus.CONFLICT]: 'Conflict',
+  [HttpStatus.FORBIDDEN]: 'Forbidden',
+  [HttpStatus.GATEWAY_TIMEOUT]: 'GatewayTimeout',
+  [HttpStatus.GONE]: 'Gone',
+  [HttpStatus.I_AM_A_TEAPOT]: 'ImATeapot',
+  [HttpStatus.INTERNAL_SERVER_ERROR]: 'InternalServerError',
+  [HttpStatus.METHOD_NOT_ALLOWED]: 'MethodNotAllowed',
+  [HttpStatus.NOT_ACCEPTABLE]: 'NotAcceptable',
+  [HttpStatus.NOT_FOUND]: 'NotFound',
+  [HttpStatus.NOT_IMPLEMENTED]: 'NotImplemented',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: 'PayloadTooLarge',
+  [HttpStatus.PRECONDITION_FAILED]: 'PreconditionFailed',
+  [HttpStatus.REQUEST_TIMEOUT]: 'RequestTimeout',
+  [HttpStatus.SERVICE_UNAVAILABLE]: 'ServiceUnavailable',
+  [HttpStatus.UNAUTHORIZED]: 'Unauthorized',
+  [HttpStatus.UNPROCESSABLE_ENTITY]: 'UnprocessableEntity',
+  [HttpStatus.UNSUPPORTED_MEDIA_TYPE]: 'UnsupportedMediaType',
+};
+
+export const HttpErrorMessageByStatusCode: Record<ErrorHttpStatusCode, string> = {
+  [HttpStatus.BAD_GATEWAY]: 'Bad gateway',
+  [HttpStatus.BAD_REQUEST]: 'Bad request',
+  [HttpStatus.CONFLICT]: 'Conflict',
+  [HttpStatus.FORBIDDEN]: 'Forbidden',
+  [HttpStatus.GATEWAY_TIMEOUT]: 'Gateway timeout',
+  [HttpStatus.GONE]: 'Gone',
+  [HttpStatus.I_AM_A_TEAPOT]: 'Im a teapot',
+  [HttpStatus.INTERNAL_SERVER_ERROR]: 'Internal server error',
+  [HttpStatus.METHOD_NOT_ALLOWED]: 'Method not allowed',
+  [HttpStatus.NOT_ACCEPTABLE]: 'Not acceptable',
+  [HttpStatus.NOT_FOUND]: 'Not found',
+  [HttpStatus.NOT_IMPLEMENTED]: 'Not implemented',
+  [HttpStatus.PAYLOAD_TOO_LARGE]: 'Payload too large',
+  [HttpStatus.PRECONDITION_FAILED]: 'Precondition failed',
+  [HttpStatus.REQUEST_TIMEOUT]: 'Request timeout',
+  [HttpStatus.SERVICE_UNAVAILABLE]: 'Service unavailable',
+  [HttpStatus.UNAUTHORIZED]: 'Unauthorized',
+  [HttpStatus.UNPROCESSABLE_ENTITY]: 'Unprocessable entity',
+  [HttpStatus.UNSUPPORTED_MEDIA_TYPE]: 'Unsupported media type',
+};
