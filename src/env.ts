@@ -134,6 +134,25 @@ export class Env extends BoostrapEnv {
   @IsString()
   FIREBASE_PRIVATE_KEY: string;
 
+  // MediaConvert
+
+  @IsString()
+  @IsOptional()
+  MEDIA_CONVERT_REGION?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_CONVERT_ROLE?: string;
+
+  @IsString()
+  @IsOptional()
+  MEDIA_CONVERT_QUEUE?: string;
+
+  @IsString()
+  @IsOptional()
+  @Matches('^Y|N$', 'i')
+  DISABLE_MEDIA_CONVERT?: string;
+
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {
       enableImplicitConversion: true,

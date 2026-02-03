@@ -40,6 +40,23 @@ export class CreateTokensBody {
   juryCreatorCode?: string;
 }
 
+export class UpdateUserBody {
+  @ApiPropertyOptional({ type: String, description: 'First name' })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiPropertyOptional({ type: String, description: 'Last name' })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
+  @ApiPropertyOptional({ type: String, description: 'S3 key for uploaded profile picture' })
+  @IsString()
+  @IsOptional()
+  pictureS3Key?: string;
+}
+
 export class RevokeTokensBody {
   @ApiProperty({ description: 'refreshToken' })
   @IsString()

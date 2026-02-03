@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpStatus, Post, Query, Req, Version } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpStatus, Patch, Post, Query, Req, Version } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
@@ -6,8 +6,8 @@ import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AuthApiService } from './auth-api.service';
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody } from './request.dto';
-import { AuthSessionResponse, AuthUserResponse } from './response.dto';
+import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody } from './request.dto';
+import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse } from './response.dto';
 
 @ApiTags('auth')
 @ApiBearerAuth('JWT')
@@ -53,5 +53,34 @@ export class AuthApiController {
   @Get('user')
   async getUser(@Req() req: Request & { user: AuthUser }): Promise<AuthUserResponse> {
     return this.service.getUser(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Update the authenticated user' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: AuthUserResponse,
+  })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Patch('user')
+  async updateUser(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: UpdateUserBody,
+  ): Promise<AuthUserResponse> {
+    return this.service.updateUser(req, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get a presigned URL for uploading a profile picture' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: PictureUploadUrlResponse,
+  })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('user/picture-upload-url')
+  async getUploadPictureUrl(
+    @Req() req: Request & { user: AuthUser },
+  ): Promise<PictureUploadUrlResponse> {
+    return this.service.getUploadPictureUrl(req);
   }
 }

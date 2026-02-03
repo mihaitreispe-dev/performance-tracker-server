@@ -35,5 +35,5 @@ COPY --from=build /usr/app/tsconfig.build.json /usr/app/tsconfig.build.json
 COPY --from=build /usr/app/src/database/interfaces /usr/app/src/database/interfaces
 COPY --from=build /usr/app/src/database/migrations /usr/app/src/database/migrations
 COPY --from=build /usr/app/src/database/seeds /usr/app/src/database/seeds
-EXPOSE 3000
+EXPOSE 5100
 CMD ["yarn", "start:build"]

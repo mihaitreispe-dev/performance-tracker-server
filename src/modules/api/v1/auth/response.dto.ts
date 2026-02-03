@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { IsArray, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { UserRole } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 import { TokenType } from 'src/modules/auth/types/token-type';
@@ -27,6 +28,11 @@ class AuthUserDTO {
   @IsUrl()
   @IsOptional()
   picture?: string | null;
+
+  @ApiProperty({ type: [String], enum: UserRole })
+  @IsArray()
+  @IsString({ each: true })
+  roles: UserRole[];
 }
 
 class AuthSessionDTO {
@@ -69,4 +75,25 @@ export class AuthUserResponse extends ItemResponse<AuthUserDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: AuthUserDTO;
+}
+
+class PictureUploadUrlDTO {
+  @ApiProperty()
+  @IsString()
+  uploadUrl: string;
+
+  @ApiProperty()
+  @IsString()
+  key: string;
+
+  @ApiProperty()
+  @IsString()
+  bucket: string;
+}
+
+export class PictureUploadUrlResponse extends ItemResponse<PictureUploadUrlDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: PictureUploadUrlDTO;
 }

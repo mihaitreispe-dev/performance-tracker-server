@@ -11,7 +11,7 @@ export class BootstrapConfigService {
   }
 
   get apiV1Port(): number {
-    return this.configService.get('API_V1_PORT') ?? 3000;
+    return this.configService.get('API_V1_PORT') ?? 5100;
   }
 
   get cronModuleEnabled(): boolean {

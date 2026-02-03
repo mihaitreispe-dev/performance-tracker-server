@@ -7,6 +7,7 @@ import { AuthModule } from 'src/modules/auth/auth.module';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 
 import { AuthApiModule } from './auth/auth-api.module';
+import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
@@ -18,6 +19,7 @@ import { IndexApiModule } from './index/index-api.module';
     IndexApiModule.register(),
     AuthModule.register(),
     AuthApiModule.register(),
+    ExercisesApiModule.register(),
   ],
   providers: [
     {

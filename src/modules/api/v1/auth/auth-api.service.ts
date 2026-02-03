@@ -13,9 +13,10 @@ import { FirebaseService } from 'src/modules/firebase/firebase.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { v4 as uuidv4 } from 'uuid';
 
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody } from './request.dto';
-import { AuthSessionResponse, AuthUserResponse } from './response.dto';
+import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody } from './request.dto';
+import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse } from './response.dto';
 
 @Injectable()
 export class AuthApiService {
@@ -185,6 +186,57 @@ export class AuthApiService {
           user.picture_s3_bucket,
           user.picture_s3_key,
         ),
+        roles: user.roles,
+      },
+    };
+  }
+
+  async getUploadPictureUrl(req: Request & { user: AuthUser }): Promise<PictureUploadUrlResponse> {
+    const bucket = this.s3Service.uploadBucket;
+    const key = `users/${req.user.id}/picture/${uuidv4()}.jpg`;
+    const uploadUrl = await this.s3Service.getSignedUrlPUT({
+      bucket,
+      key,
+      contentType: 'image/*',
+    });
+    return { data: { uploadUrl, key, bucket } };
+  }
+
+  async updateUser(req: Request & { user: AuthUser }, body: UpdateUserBody): Promise<AuthUserResponse> {
+    const user = await this.userRepo.findById(req.user.id);
+    if (!user) {
+      throw new NotFoundException();
+    }
+
+    const firstName = body.firstName !== undefined ? body.firstName : user.first_name;
+    const lastName = body.lastName !== undefined ? body.lastName : user.last_name;
+    const displayName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+    const update: Record<string, any> = {
+      first_name: firstName,
+      last_name: lastName,
+      display_name: displayName || user.display_name,
+    };
+
+    if (body.pictureS3Key) {
+      update.picture_s3_bucket = this.s3Service.uploadBucket;
+      update.picture_s3_key = body.pictureS3Key;
+    }
+
+    const updated = await this.userRepo.updateById(user.id, update);
+    return {
+      data: {
+        id: updated.id,
+        displayName: updated.display_name,
+        firstName: updated.first_name,
+        lastName: updated.last_name,
+        picture: await getUserPictureUrl(
+          this.configService,
+          this.s3Service,
+          updated.picture_s3_bucket,
+          updated.picture_s3_key,
+        ),
+        roles: updated.roles,
       },
     };
   }

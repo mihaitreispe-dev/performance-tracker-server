@@ -131,4 +131,22 @@ export class AppConfigService {
   get firebasePrivateKey(): string {
     return this.configService.get('FIREBASE_PRIVATE_KEY')!;
   }
+
+  // MediaConvert
+
+  get mediaConvertRegion(): string {
+    return this.configService.get('MEDIA_CONVERT_REGION') ?? this.s3Region;
+  }
+
+  get mediaConvertRole(): string {
+    return this.configService.get('MEDIA_CONVERT_ROLE') ?? '';
+  }
+
+  get mediaConvertQueue(): string {
+    return this.configService.get('MEDIA_CONVERT_QUEUE') ?? '';
+  }
+
+  get disableMediaConvert(): boolean {
+    return this.configService.get('DISABLE_MEDIA_CONVERT') === 'Y';
+  }
 }

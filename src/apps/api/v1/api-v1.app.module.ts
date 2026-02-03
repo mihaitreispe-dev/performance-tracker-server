@@ -25,7 +25,7 @@ import { DatabaseModule } from 'src/modules/database/database.module';
 export class ApiV1AppModule {}
 
 export async function bootstrap(opts?: { port: number }) {
-  const { port = 3000 } = opts ?? {};
+  const { port = 5100 } = opts ?? {};
   const app = await NestFactory.create(ApiV1AppModule, {
     bodyParser: false,
     logger: new RootLogger({ prefix: 'APIV1', logLevels: ['debug', 'error', 'log', 'verbose', 'warn'] }),
