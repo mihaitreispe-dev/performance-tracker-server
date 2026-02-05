@@ -24,7 +24,8 @@
     "migrate:list": "kysely migrate:list",
     "migrate:make": "kysely migrate:make",
     "seed": "kysely seed",
-    "seed:make": "kysely seed:make"
+    "seed:make": "kysely seed:make",
+    "cli": "ts-node -r tsconfig-paths/register src/cli.ts"
   },
   "dependencies": {
     "@aws-sdk/client-mediaconvert": "^3.981.0",
@@ -56,6 +57,7 @@
     "kysely-codegen": "^0.19.0",
     "kysely-ctl": "^0.20.0",
     "lodash": "^4.17.23",
+    "nestjs-console": "^10.0.0",
     "nestjs-kysely": "^3.1.2",
     "pg": "^8.18.0",
     "reflect-metadata": "^0.2.2",

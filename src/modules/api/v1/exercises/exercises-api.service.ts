@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
-import { Exercise, ExerciseStatus, ExerciseVisibility, UserRole } from 'src/database/interfaces';
+import { Exercise, ExerciseImage, ExerciseStatus, ExerciseVisibility, UserRole } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppAccessControlService } from 'src/modules/app-access-control/app-access-control.service';
@@ -8,22 +8,31 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
+import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
 import { v4 as uuidv4 } from 'uuid';
 
 import { CreateExerciseBody, ExerciseIdParam, ListExercisesQuery, UpdateExerciseBody } from './request.dto';
 import {
+  EquipmentDTO,
   ExerciseDTO,
+  ExerciseImageDTO,
   ExerciseListResponse,
   ExerciseResponse,
   ExerciseUploadUrlResponse,
   MediaAssetDTO,
+  MuscleGroupDTO,
 } from './response.dto';
 
 @Injectable()
 export class ExercisesApiService {
   constructor(
     private readonly exerciseRepo: ExerciseRepository,
+    private readonly equipmentRepo: EquipmentRepository,
+    private readonly muscleGroupRepo: MuscleGroupRepository,
+    private readonly exerciseImageRepo: ExerciseImageRepository,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
     private readonly accessControlService: AppAccessControlService,
@@ -80,6 +89,8 @@ export class ExercisesApiService {
       name: body.name,
       description: body.description ?? null,
       cues: body.cues ?? [],
+      category: body.category ?? null,
+      level: body.level ?? null,
       visibility: body.visibility ?? ExerciseVisibility.PRIVATE,
       user_id: req.user.id,
       video_s3_bucket: videoS3Key ? this.s3Service.uploadBucket : null,
@@ -87,6 +98,27 @@ export class ExercisesApiService {
       video_mime_type: body.videoMimeType ?? null,
       status: videoS3Key ? ExerciseStatus.UPLOAD_PENDING : ExerciseStatus.DRAFT,
     });
+
+    // Link equipment
+    if (body.equipmentIds && body.equipmentIds.length > 0) {
+      for (const equipmentId of body.equipmentIds) {
+        await this.equipmentRepo.linkToExercise(exercise.id, equipmentId);
+      }
+    }
+
+    // Link primary muscle groups
+    if (body.primaryMuscleGroupIds && body.primaryMuscleGroupIds.length > 0) {
+      for (const muscleGroupId of body.primaryMuscleGroupIds) {
+        await this.muscleGroupRepo.linkToExercise(exercise.id, muscleGroupId, true);
+      }
+    }
+
+    // Link secondary muscle groups
+    if (body.secondaryMuscleGroupIds && body.secondaryMuscleGroupIds.length > 0) {
+      for (const muscleGroupId of body.secondaryMuscleGroupIds) {
+        await this.muscleGroupRepo.linkToExercise(exercise.id, muscleGroupId, false);
+      }
+    }
 
     return { data: await this.mapExerciseToDTO(exercise) };
   }
@@ -103,6 +135,8 @@ export class ExercisesApiService {
     if (body.name !== undefined) update.name = body.name;
     if (body.description !== undefined) update.description = body.description;
     if (body.cues !== undefined) update.cues = body.cues;
+    if (body.category !== undefined) update.category = body.category;
+    if (body.level !== undefined) update.level = body.level;
     if (body.visibility !== undefined) update.visibility = body.visibility;
 
     if (body.videoMimeType !== undefined) {
@@ -118,6 +152,42 @@ export class ExercisesApiService {
     }
 
     const exercise = await this.exerciseRepo.updateById(id, update);
+
+    // Update equipment links if provided
+    if (body.equipmentIds !== undefined) {
+      // Remove existing links
+      const existingEquipment = await this.equipmentRepo.findByExerciseId(id);
+      for (const eq of existingEquipment) {
+        await this.equipmentRepo.unlinkFromExercise(id, eq.id);
+      }
+      // Add new links
+      for (const equipmentId of body.equipmentIds) {
+        await this.equipmentRepo.linkToExercise(id, equipmentId);
+      }
+    }
+
+    // Update primary muscle group links if provided
+    if (body.primaryMuscleGroupIds !== undefined) {
+      const existingPrimary = await this.muscleGroupRepo.findPrimaryByExerciseId(id);
+      for (const mg of existingPrimary) {
+        await this.muscleGroupRepo.unlinkFromExercise(id, mg.id);
+      }
+      for (const muscleGroupId of body.primaryMuscleGroupIds) {
+        await this.muscleGroupRepo.linkToExercise(id, muscleGroupId, true);
+      }
+    }
+
+    // Update secondary muscle group links if provided
+    if (body.secondaryMuscleGroupIds !== undefined) {
+      const existingSecondary = await this.muscleGroupRepo.findSecondaryByExerciseId(id);
+      for (const mg of existingSecondary) {
+        await this.muscleGroupRepo.unlinkFromExercise(id, mg.id);
+      }
+      for (const muscleGroupId of body.secondaryMuscleGroupIds) {
+        await this.muscleGroupRepo.linkToExercise(id, muscleGroupId, false);
+      }
+    }
+
     return { data: await this.mapExerciseToDTO(exercise) };
   }
 
@@ -189,22 +259,55 @@ export class ExercisesApiService {
   }
 
   private async mapExerciseToDTO(exercise: Exercise): Promise<ExerciseDTO> {
-    const assets = await this.buildMediaAssets(exercise);
-    const picture = await this.getPictureUrl(exercise);
+    const [assets, picture, equipmentList, primaryMuscles, secondaryMuscles, exerciseImages] = await Promise.all([
+      this.buildMediaAssets(exercise),
+      this.getPictureUrl(exercise),
+      this.equipmentRepo.findByExerciseId(exercise.id),
+      this.muscleGroupRepo.findPrimaryByExerciseId(exercise.id),
+      this.muscleGroupRepo.findSecondaryByExerciseId(exercise.id),
+      this.exerciseImageRepo.findByExerciseId(exercise.id),
+    ]);
+
+    const equipment: EquipmentDTO[] = equipmentList.map((e) => ({ id: e.id, name: e.name }));
+    const primaryMusclesDTOs: MuscleGroupDTO[] = primaryMuscles.map((m) => ({ id: m.id, name: m.name }));
+    const secondaryMusclesDTOs: MuscleGroupDTO[] = secondaryMuscles.map((m) => ({ id: m.id, name: m.name }));
+    const images: ExerciseImageDTO[] = await Promise.all(exerciseImages.map((img) => this.mapExerciseImageToDTO(img)));
 
     return {
       id: exercise.id,
       name: exercise.name,
       description: exercise.description,
       cues: exercise.cues,
+      category: exercise.category,
+      level: exercise.level,
       visibility: exercise.visibility,
       status: exercise.status,
       userId: exercise.user_id,
-      picture,
+      picture: picture ?? images[0]?.url ?? null,
+      images,
       assets,
+      equipment,
+      primaryMuscles: primaryMusclesDTOs,
+      secondaryMuscles: secondaryMusclesDTOs,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
     };
+  }
+
+  private async mapExerciseImageToDTO(image: ExerciseImage): Promise<ExerciseImageDTO> {
+    const url = await this.getImageUrl(image.s3_bucket, image.s3_key);
+    return {
+      id: image.id,
+      url,
+      position: image.position,
+    };
+  }
+
+  private async getImageUrl(bucket: string, key: string): Promise<string> {
+    if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
+      return await this.s3Service.getCloudFrontSignedUrlGET({ key });
+    }
+    return await this.s3Service.getSignedUrlGET({ bucket, key });
   }
 
   private async buildMediaAssets(exercise: Exercise): Promise<MediaAssetDTO[]> {

@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
-import { ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
+import { ExerciseLevel, ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
 
 export class MediaAssetDTO {
   @ApiProperty()
@@ -25,6 +25,44 @@ export class MediaAssetDTO {
   mimeType: string;
 }
 
+export class EquipmentDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+}
+
+export class MuscleGroupDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  isPrimary?: boolean;
+}
+
+export class ExerciseImageDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsUrl()
+  url: string;
+
+  @ApiProperty()
+  position: number;
+}
+
 export class ExerciseDTO {
   @ApiProperty()
   @IsUUID()
@@ -44,6 +82,16 @@ export class ExerciseDTO {
   @IsString({ each: true })
   cues: string[];
 
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  category?: string | null;
+
+  @ApiPropertyOptional({ enum: ExerciseLevel })
+  @IsEnumString(ExerciseLevel)
+  @IsOptional()
+  level?: ExerciseLevel | null;
+
   @ApiProperty({ enum: ExerciseVisibility })
   @IsEnumString(ExerciseVisibility)
   visibility: ExerciseVisibility;
@@ -61,10 +109,30 @@ export class ExerciseDTO {
   @IsOptional()
   picture?: string | null;
 
+  @ApiProperty({ type: [ExerciseImageDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  images: ExerciseImageDTO[];
+
   @ApiProperty({ type: [MediaAssetDTO] })
   @IsArray()
   @ValidateNested({ each: true })
   assets: MediaAssetDTO[];
+
+  @ApiProperty({ type: [EquipmentDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  equipment: EquipmentDTO[];
+
+  @ApiProperty({ type: [MuscleGroupDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  primaryMuscles: MuscleGroupDTO[];
+
+  @ApiProperty({ type: [MuscleGroupDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  secondaryMuscles: MuscleGroupDTO[];
 
   @ApiProperty()
   @IsString()

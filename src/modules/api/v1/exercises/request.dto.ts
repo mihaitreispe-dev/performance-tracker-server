@@ -1,10 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
-import { SearchableQuery } from 'src/lib/http/dto/page-request.dto';
+import { ExerciseLevel, ExerciseVisibility } from 'src/database/interfaces';
 import { type SortOptions, SortParam } from 'src/lib/http/decorators/sort-param';
+import { SearchableQuery } from 'src/lib/http/dto/page-request.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
-import { ExerciseVisibility } from 'src/database/interfaces';
 
 import { ExerciseSortField } from './types';
 
@@ -13,6 +12,16 @@ export class ListExercisesQuery extends SearchableQuery {
   @IsEnumString(ExerciseVisibility)
   @IsOptional()
   visibility?: ExerciseVisibility;
+
+  @ApiPropertyOptional({ type: String, description: 'Filter by category' })
+  @IsString()
+  @IsOptional()
+  category?: string;
+
+  @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Filter by level' })
+  @IsEnumString(ExerciseLevel)
+  @IsOptional()
+  level?: ExerciseLevel;
 
   @SortParam(ExerciseSortField)
   sort?: SortOptions<'name' | 'created_at' | 'updated_at'>;
@@ -34,6 +43,16 @@ export class CreateExerciseBody {
   @IsOptional()
   cues?: string[];
 
+  @ApiPropertyOptional({ type: String, description: 'Exercise category' })
+  @IsString()
+  @IsOptional()
+  category?: string;
+
+  @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Exercise level' })
+  @IsEnumString(ExerciseLevel)
+  @IsOptional()
+  level?: ExerciseLevel;
+
   @ApiPropertyOptional({ enum: ExerciseVisibility, description: 'Visibility (private/public)' })
   @IsEnumString(ExerciseVisibility)
   @IsOptional()
@@ -43,6 +62,24 @@ export class CreateExerciseBody {
   @IsString()
   @IsOptional()
   videoMimeType?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Equipment IDs to link' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  equipmentIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Primary muscle group IDs' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  primaryMuscleGroupIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Secondary muscle group IDs' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  secondaryMuscleGroupIds?: string[];
 }
 
 export class UpdateExerciseBody {
@@ -62,6 +99,16 @@ export class UpdateExerciseBody {
   @IsOptional()
   cues?: string[];
 
+  @ApiPropertyOptional({ type: String, description: 'Exercise category' })
+  @IsString()
+  @IsOptional()
+  category?: string;
+
+  @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Exercise level' })
+  @IsEnumString(ExerciseLevel)
+  @IsOptional()
+  level?: ExerciseLevel;
+
   @ApiPropertyOptional({ enum: ExerciseVisibility, description: 'Visibility (private/public)' })
   @IsEnumString(ExerciseVisibility)
   @IsOptional()
@@ -71,6 +118,24 @@ export class UpdateExerciseBody {
   @IsString()
   @IsOptional()
   videoMimeType?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Equipment IDs to link (replaces existing)' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  equipmentIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Primary muscle group IDs (replaces existing)' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  primaryMuscleGroupIds?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Secondary muscle group IDs (replaces existing)' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  secondaryMuscleGroupIds?: string[];
 }
 
 export class ExerciseIdParam {

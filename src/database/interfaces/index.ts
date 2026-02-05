@@ -2,3 +2,8 @@ export * from './database.interface';
 export * from './users-table.interface';
 export * from './refresh-tokens-table.interface';
 export * from './exercises-table.interface';
+export * from './equipment-table.interface';
+export * from './exercise-equipment-table.interface';
+export * from './muscle-groups-table.interface';
+export * from './exercise-muscle-groups-table.interface';
+export * from './exercise-images-table.interface';

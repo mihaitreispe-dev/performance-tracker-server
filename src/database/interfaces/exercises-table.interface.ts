@@ -7,6 +7,12 @@ export enum ExerciseVisibility {
   PUBLIC = 'public',
 }
 
+export enum ExerciseLevel {
+  BEGINNER = 'beginner',
+  INTERMEDIATE = 'intermediate',
+  ADVANCED = 'advanced',
+}
+
 export enum ExerciseStatus {
   DRAFT = 'draft',
   UPLOAD_PENDING = 'upload_pending',
@@ -29,6 +35,8 @@ export interface ExercisesTable {
   video_s3_bucket: string | null;
   video_s3_key: string | null;
   video_mime_type: string | null;
+  category: string | null;
+  level: ExerciseLevel | null;
   status: ExerciseStatus;
   media_convert_job_id: string | null;
   created_at: Generated<Timestamp>;
