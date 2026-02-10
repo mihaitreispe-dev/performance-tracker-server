@@ -7,10 +7,13 @@ import { AuthModule } from 'src/modules/auth/auth.module';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 
 import { AuthApiModule } from './auth/auth-api.module';
+import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
+import { WorkoutsApiModule } from './workouts/workouts-api.module';
+import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules-api.module';
 
 @Module({
   imports: [
@@ -20,6 +23,9 @@ import { IndexApiModule } from './index/index-api.module';
     AuthModule.register(),
     AuthApiModule.register(),
     ExercisesApiModule.register(),
+    WorkoutsApiModule.register(),
+    WorkoutSchedulesApiModule.register(),
+    CardioCategoriesApiModule.register(),
   ],
   providers: [
     {
@@ -31,6 +37,7 @@ import { IndexApiModule } from './index/index-api.module';
       provide: APP_PIPE,
       useValue: new ValidationPipe({
         always: true,
+        transform: true,
         exceptionFactory: (errors) => new UnprocessableEntityException(validationErrorFactory(errors)),
       }),
     },
