@@ -3,6 +3,7 @@ import { type Request } from 'express';
 import { CardioMetricType, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-load.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
@@ -13,8 +14,10 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
-import { AnalyticsPeriod, PeriodSummaryQuery, WeeklySummaryQuery } from './request.dto';
+import { AnalyticsPeriod, PeriodSummaryQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery } from './request.dto';
 import {
+  CurrentTrainingLoadDTO,
+  CurrentTrainingLoadResponse,
   DailyActivityDTO,
   DailyWorkoutDTO,
   HRZonesSummaryDTO,
@@ -27,6 +30,9 @@ import {
   RouteAnalyticsDTO,
   SetSummaryDTO,
   SplitDTO,
+  TrainingLoadDTO,
+  TrainingLoadHistoryDTO,
+  TrainingLoadHistoryResponse,
   WeeklySummaryDTO,
   WeeklySummaryResponse,
   WorkoutAnalyticsDTO,
@@ -47,6 +53,7 @@ export class AnalyticsApiService {
     private readonly exerciseRepository: ExerciseRepository,
     private readonly userSettingsRepository: UserSettingsRepository,
     private readonly muscleGroupRepository: MuscleGroupRepository,
+    private readonly dailyTrainingLoadRepository: DailyTrainingLoadRepository,
   ) {}
 
   async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
@@ -739,6 +746,405 @@ export class AnalyticsApiService {
       totalVolume: Math.round(totalVolume),
       totalSets,
       totalReps,
+    };
+  }
+
+  // ==================== Training Load Methods ====================
+
+  async getCurrentTrainingLoad(req: Request & { user: AuthUser }): Promise<CurrentTrainingLoadResponse> {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    // Calculate and store training load for recent days if needed
+    await this.updateTrainingLoadHistory(req.user.id, 35); // 28 days + buffer
+
+    // Get the 7-day (acute) and 28-day (chronic) loads
+    const acutePeriodStart = new Date(today);
+    acutePeriodStart.setDate(today.getDate() - 6);
+    acutePeriodStart.setHours(0, 0, 0, 0);
+
+    const chronicPeriodStart = new Date(today);
+    chronicPeriodStart.setDate(today.getDate() - 27);
+    chronicPeriodStart.setHours(0, 0, 0, 0);
+
+    const recentLoads = await this.dailyTrainingLoadRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        dateFrom: chronicPeriodStart,
+        dateTo: today,
+      },
+      sort: [{ field: 'date', direction: 'desc' }],
+    });
+
+    // Calculate exponentially weighted averages
+    const { acuteLoad, chronicLoad, workoutsLast7Days, workoutsLast28Days } = this.calculateWeightedLoads(
+      recentLoads,
+      today,
+    );
+
+    // Need minimum data for meaningful metrics
+    // At least 3 workouts in 28 days and some chronic load buildup
+    const hasEnoughData = workoutsLast28Days >= 3 && chronicLoad > 0;
+
+    // Calculate ACWR
+    let acwr: number | null = null;
+    let acwrStatus: 'optimal' | 'caution' | 'high_risk' | 'low' | 'no_data' = 'no_data';
+
+    if (hasEnoughData) {
+      acwr = Math.round((acuteLoad / chronicLoad) * 100) / 100;
+
+      if (acwr >= 0.8 && acwr <= 1.3) {
+        acwrStatus = 'optimal';
+      } else if (acwr > 1.3 && acwr <= 1.5) {
+        acwrStatus = 'caution';
+      } else if (acwr > 1.5) {
+        acwrStatus = 'high_risk';
+      } else {
+        acwrStatus = 'low';
+      }
+    }
+
+    // Calculate form scores using PMC (Performance Management Chart) model
+    // Fitness = CTL (Chronic Training Load)
+    // Fatigue = ATL (Acute Training Load)
+    // Form = TSB (Training Stress Balance) = CTL - ATL (as percentage of chronic)
+    const fitnessScore = Math.round(chronicLoad * 10) / 10;
+    const fatigueScore = Math.round(acuteLoad * 10) / 10;
+    // Use relative form score (percentage-based) for better scaling
+    const formScore = chronicLoad > 0
+      ? Math.round(((chronicLoad - acuteLoad) / chronicLoad) * 100) / 10  // -10 to +10 range typically
+      : 0;
+
+    // Form status based on ACWR (more reliable than absolute form score)
+    let formStatus: 'fresh' | 'neutral' | 'fatigued' | 'no_data' = 'no_data';
+    if (hasEnoughData && acwr !== null) {
+      if (acwr < 0.8) {
+        // Low training load relative to fitness - well rested
+        formStatus = 'fresh';
+      } else if (acwr <= 1.3) {
+        // Optimal zone - balanced
+        formStatus = 'neutral';
+      } else if (acwr <= 1.5) {
+        // Elevated but manageable
+        formStatus = 'neutral';
+      } else {
+        // High acute load relative to fitness - fatigued
+        formStatus = 'fatigued';
+      }
+    } else if (workoutsLast28Days > 0 && workoutsLast28Days < 3) {
+      // Building baseline - show as neutral rather than no_data
+      formStatus = 'neutral';
+      acwrStatus = 'optimal'; // Don't alarm new users
+    }
+
+    const data: CurrentTrainingLoadDTO = {
+      date: today.toISOString().split('T')[0],
+      acuteLoad: Math.round(acuteLoad * 10) / 10,
+      chronicLoad: Math.round(chronicLoad * 10) / 10,
+      acwr,
+      acwrStatus,
+      fatigueScore,
+      fitnessScore,
+      formScore,
+      formStatus,
+      workoutsLast7Days,
+      workoutsLast28Days,
+    };
+
+    return { data };
+  }
+
+  async getTrainingLoadHistory(
+    req: Request & { user: AuthUser },
+    query: TrainingLoadHistoryQuery,
+  ): Promise<TrainingLoadHistoryResponse> {
+    const days = query.days || 90;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const periodStart = new Date(today);
+    periodStart.setDate(today.getDate() - days + 1);
+    periodStart.setHours(0, 0, 0, 0);
+
+    // Update training load history
+    await this.updateTrainingLoadHistory(req.user.id, days + 28);
+
+    // Fetch stored data
+    const loads = await this.dailyTrainingLoadRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        dateFrom: periodStart,
+        dateTo: today,
+      },
+      sort: [{ field: 'date', direction: 'asc' }],
+    });
+
+    const history: TrainingLoadDTO[] = loads.map((load) => ({
+      date: load.date instanceof Date ? load.date.toISOString().split('T')[0] : String(load.date).split('T')[0],
+      dailyLoad: Number.parseFloat(load.daily_load),
+      acuteLoad: Number.parseFloat(load.acute_load),
+      chronicLoad: Number.parseFloat(load.chronic_load),
+      acwr: load.acwr ? Number.parseFloat(load.acwr) : null,
+      fatigueScore: load.fatigue_score ? Number.parseFloat(load.fatigue_score) : null,
+      fitnessScore: load.fitness_score ? Number.parseFloat(load.fitness_score) : null,
+      formScore: load.form_score ? Number.parseFloat(load.form_score) : null,
+      hrLoadContribution: load.hr_load_contribution ? Number.parseFloat(load.hr_load_contribution) : 0,
+      durationLoadContribution: load.duration_load_contribution
+        ? Number.parseFloat(load.duration_load_contribution)
+        : 0,
+      volumeLoadContribution: load.volume_load_contribution ? Number.parseFloat(load.volume_load_contribution) : 0,
+      workoutCount: load.workout_count,
+    }));
+
+    const data: TrainingLoadHistoryDTO = { history };
+    return { data };
+  }
+
+  private async updateTrainingLoadHistory(userId: string, daysBack: number): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - daysBack + 1);
+
+    // Get existing data dates
+    const existingDates = new Set(
+      await this.dailyTrainingLoadRepository.getDaysWithData(userId, startDate, today),
+    );
+
+    // Get user settings for HR zones
+    const settings = await this.userSettingsRepository.findByUserId(userId);
+    const hrZones = settings?.hr_zones;
+
+    // Fetch all executions in the period
+    const executions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId,
+        completedDateFrom: startDate,
+        completedDateTo: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1),
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'asc' }],
+    });
+
+    // Group executions by date
+    const executionsByDate = new Map<string, WorkoutExecution[]>();
+    for (const execution of executions) {
+      const completedAt =
+        execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
+      const dateKey = completedAt.toISOString().split('T')[0];
+      const existing = executionsByDate.get(dateKey) ?? [];
+      existing.push(execution);
+      executionsByDate.set(dateKey, existing);
+    }
+
+    // Process each day
+    const current = new Date(startDate);
+    const allDailyLoads: Array<{ date: string; dailyLoad: number }> = [];
+
+    while (current <= today) {
+      const dateKey = current.toISOString().split('T')[0];
+      const dayExecutions = executionsByDate.get(dateKey) ?? [];
+
+      // Calculate daily load for this day
+      const { hrLoad, durationLoad, volumeLoad } = await this.calculateDailyLoad(dayExecutions, hrZones);
+      const dailyLoad = hrLoad + durationLoad + volumeLoad;
+
+      allDailyLoads.push({ date: dateKey, dailyLoad });
+      current.setDate(current.getDate() + 1);
+    }
+
+    // Calculate rolling averages and save
+    for (let i = 0; i < allDailyLoads.length; i++) {
+      const { date, dailyLoad } = allDailyLoads[i];
+      const dayExecutions = executionsByDate.get(date) ?? [];
+
+      // Calculate acute load (7-day exponentially weighted)
+      let acuteLoad = 0;
+      let acuteWeight = 0;
+      for (let j = Math.max(0, i - 6); j <= i; j++) {
+        const daysAgo = i - j;
+        const weight = Math.exp(-daysAgo / 7);
+        acuteLoad += allDailyLoads[j].dailyLoad * weight;
+        acuteWeight += weight;
+      }
+      acuteLoad = acuteWeight > 0 ? acuteLoad / acuteWeight : 0;
+
+      // Calculate chronic load (28-day exponentially weighted)
+      let chronicLoad = 0;
+      let chronicWeight = 0;
+      for (let j = Math.max(0, i - 27); j <= i; j++) {
+        const daysAgo = i - j;
+        const weight = Math.exp(-daysAgo / 28);
+        chronicLoad += allDailyLoads[j].dailyLoad * weight;
+        chronicWeight += weight;
+      }
+      chronicLoad = chronicWeight > 0 ? chronicLoad / chronicWeight : 0;
+
+      // Calculate ACWR
+      const acwr = chronicLoad > 0 ? acuteLoad / chronicLoad : null;
+
+      // Calculate PMC scores
+      const fitnessScore = chronicLoad;
+      const fatigueScore = acuteLoad;
+      // Use relative form score (percentage-based) for better scaling
+      const formScore = chronicLoad > 0
+        ? ((chronicLoad - acuteLoad) / chronicLoad) * 10  // -10 to +10 range typically
+        : 0;
+
+      // Calculate load contributions
+      const { hrLoad, durationLoad, volumeLoad } = await this.calculateDailyLoad(dayExecutions, hrZones);
+
+      // Only update if data doesn't exist or if it's a recent day (last 7 days need refresh)
+      const dateObj = new Date(date);
+      const daysFromToday = Math.floor((today.getTime() - dateObj.getTime()) / (24 * 60 * 60 * 1000));
+      const needsUpdate = !existingDates.has(date) || daysFromToday <= 7;
+
+      if (needsUpdate) {
+        await this.dailyTrainingLoadRepository.upsert({
+          user_id: userId,
+          date: new Date(date),
+          daily_load: dailyLoad,
+          acute_load: acuteLoad,
+          chronic_load: chronicLoad,
+          acwr,
+          fatigue_score: fatigueScore,
+          fitness_score: fitnessScore,
+          form_score: formScore,
+          hr_load_contribution: hrLoad,
+          duration_load_contribution: durationLoad,
+          volume_load_contribution: volumeLoad,
+          workout_count: dayExecutions.length,
+        });
+      }
+    }
+  }
+
+  private async calculateDailyLoad(
+    executions: WorkoutExecution[],
+    hrZones?: { maxHr: number; zones: Array<{ zone: number; minPct: number; maxPct: number }> } | null,
+  ): Promise<{ hrLoad: number; durationLoad: number; volumeLoad: number }> {
+    let hrLoad = 0;
+    let durationLoad = 0;
+    let volumeLoad = 0;
+
+    for (const execution of executions) {
+      const durationMinutes = (execution.duration_seconds ?? 0) / 60;
+
+      // HR-based load (TRIMP-like)
+      if (hrZones) {
+        const hrMetrics = await this.cardioMetricsRepository.findMany({
+          filter: { workoutExecutionId: execution.id, metricType: CardioMetricType.HEART_RATE },
+          sort: [{ field: 'recorded_at', direction: 'asc' }],
+        });
+
+        if (hrMetrics.length > 1) {
+          for (let i = 0; i < hrMetrics.length - 1; i++) {
+            const current = hrMetrics[i];
+            const next = hrMetrics[i + 1];
+
+            const currentTime =
+              current.recorded_at instanceof Date
+                ? current.recorded_at.getTime()
+                : new Date(String(current.recorded_at)).getTime();
+            const nextTime =
+              next.recorded_at instanceof Date
+                ? next.recorded_at.getTime()
+                : new Date(String(next.recorded_at)).getTime();
+
+            const segmentMinutes = (nextTime - currentTime) / 1000 / 60;
+            if (segmentMinutes > 0 && segmentMinutes < 5) {
+              const hr = Number.parseFloat(current.value);
+              const hrPct = (hr / hrZones.maxHr) * 100;
+
+              // Zone factor: higher zones = higher load
+              let zoneFactor = 1;
+              for (const zone of hrZones.zones) {
+                if (hrPct >= zone.minPct && hrPct < zone.maxPct) {
+                  zoneFactor = zone.zone;
+                  break;
+                }
+              }
+
+              hrLoad += segmentMinutes * zoneFactor;
+            }
+          }
+        }
+      }
+
+      // Duration-based load (for workouts without HR data or as baseline)
+      if (hrLoad === 0 && durationMinutes > 0) {
+        // Use duration with a base intensity factor
+        durationLoad += durationMinutes * 1.5; // Base factor for unknown intensity
+      }
+
+      // Volume-based load from strength training
+      // Use a formula that scales reasonably with cardio:
+      // - A typical strength workout (20 sets, moderate weight) should equal ~30-60 min cardio
+      // - Use sqrt scaling to prevent huge weights from dominating
+      const setCompletions = await this.setCompletionRepository.findMany({
+        filter: { workoutExecutionId: execution.id },
+      });
+
+      for (const set of setCompletions) {
+        if (!set.skipped && set.actual_reps) {
+          const reps = set.actual_reps;
+          const load = set.actual_load ? Number.parseFloat(set.actual_load) : 0;
+          const rpe = set.rpe ?? 6; // Default RPE if not provided
+
+          if (load > 0) {
+            // Weighted set: sqrt(reps * load) provides reasonable scaling
+            // 10 reps × 100kg = sqrt(1000) ≈ 31.6, × RPE factor (0.6-1.0) ≈ 19-32 per set
+            // 20 sets ≈ 380-640 total, comparable to 30-60 min zone 2-3 cardio
+            volumeLoad += Math.sqrt(reps * load) * (rpe / 10);
+          } else {
+            // Bodyweight set: just use reps with RPE
+            // 15 reps bodyweight at RPE 7 = 15 * 0.7 = 10.5 per set
+            volumeLoad += reps * (rpe / 10) * 0.5;
+          }
+        }
+      }
+    }
+
+    return { hrLoad, durationLoad, volumeLoad };
+  }
+
+  private calculateWeightedLoads(
+    recentLoads: Array<{ date: Date; daily_load: string; workout_count: number }>,
+    referenceDate: Date,
+  ): { acuteLoad: number; chronicLoad: number; workoutsLast7Days: number; workoutsLast28Days: number } {
+    let acuteLoad = 0;
+    let acuteWeight = 0;
+    let chronicLoad = 0;
+    let chronicWeight = 0;
+    let workoutsLast7Days = 0;
+    let workoutsLast28Days = 0;
+
+    for (const load of recentLoads) {
+      const loadDate = load.date instanceof Date ? load.date : new Date(String(load.date));
+      const daysAgo = Math.floor((referenceDate.getTime() - loadDate.getTime()) / (24 * 60 * 60 * 1000));
+      const dailyLoad = Number.parseFloat(load.daily_load);
+
+      if (daysAgo <= 6) {
+        const weight = Math.exp(-daysAgo / 7);
+        acuteLoad += dailyLoad * weight;
+        acuteWeight += weight;
+        workoutsLast7Days += load.workout_count;
+      }
+
+      if (daysAgo <= 27) {
+        const weight = Math.exp(-daysAgo / 28);
+        chronicLoad += dailyLoad * weight;
+        chronicWeight += weight;
+        workoutsLast28Days += load.workout_count;
+      }
+    }
+
+    return {
+      acuteLoad: acuteWeight > 0 ? acuteLoad / acuteWeight : 0,
+      chronicLoad: chronicWeight > 0 ? chronicLoad / chronicWeight : 0,
+      workoutsLast7Days,
+      workoutsLast28Days,
     };
   }
 }

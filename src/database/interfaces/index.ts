@@ -27,3 +27,4 @@ export * from './user-settings-table.interface';
 export * from './workout-file-imports-table.interface';
 export * from './workout-plans-table.interface';
 export * from './workout-plan-items-table.interface';
+export * from './daily-training-loads-table.interface';

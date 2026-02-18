@@ -5,8 +5,14 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AnalyticsApiService } from './analytics-api.service';
-import { PeriodSummaryQuery, WeeklySummaryQuery, WorkoutAnalyticsParam } from './request.dto';
-import { PeriodSummaryResponse, WeeklySummaryResponse, WorkoutAnalyticsResponse } from './response.dto';
+import { PeriodSummaryQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery, WorkoutAnalyticsParam } from './request.dto';
+import {
+  CurrentTrainingLoadResponse,
+  PeriodSummaryResponse,
+  TrainingLoadHistoryResponse,
+  WeeklySummaryResponse,
+  WorkoutAnalyticsResponse,
+} from './response.dto';
 
 @ApiTags('analytics')
 @ApiBearerAuth('JWT')
@@ -49,5 +55,28 @@ export class AnalyticsApiController {
     @Query() query: PeriodSummaryQuery,
   ): Promise<PeriodSummaryResponse> {
     return this.service.getPeriodSummary(req, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get current training load and fatigue score' })
+  @ApiResponse({ status: HttpStatus.OK, type: CurrentTrainingLoadResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('training-load')
+  async getCurrentTrainingLoad(
+    @Req() req: Request & { user: AuthUser },
+  ): Promise<CurrentTrainingLoadResponse> {
+    return this.service.getCurrentTrainingLoad(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get training load history for time graphs' })
+  @ApiResponse({ status: HttpStatus.OK, type: TrainingLoadHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('training-load/history')
+  async getTrainingLoadHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: TrainingLoadHistoryQuery,
+  ): Promise<TrainingLoadHistoryResponse> {
+    return this.service.getTrainingLoadHistory(req, query);
   }
 }

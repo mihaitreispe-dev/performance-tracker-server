@@ -387,3 +387,131 @@ export class PeriodSummaryResponse extends ItemResponse<PeriodSummaryDTO> {
   @ValidateNested()
   declare data: PeriodSummaryDTO;
 }
+
+// Training Load
+
+export class TrainingLoadDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Daily training load (TRIMP-like score)' })
+  @IsNumber()
+  dailyLoad: number;
+
+  @ApiProperty({ description: 'Acute load (7-day rolling average)' })
+  @IsNumber()
+  acuteLoad: number;
+
+  @ApiProperty({ description: 'Chronic load (28-day rolling average)' })
+  @IsNumber()
+  chronicLoad: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Acute:Chronic Workload Ratio' })
+  @IsNumber()
+  @IsOptional()
+  acwr?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Fatigue score (0-100)' })
+  @IsNumber()
+  @IsOptional()
+  fatigueScore?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Fitness score (chronic training load)' })
+  @IsNumber()
+  @IsOptional()
+  fitnessScore?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Form score (fitness - fatigue)' })
+  @IsNumber()
+  @IsOptional()
+  formScore?: number | null;
+
+  @ApiProperty({ description: 'Load contribution from HR zones' })
+  @IsNumber()
+  hrLoadContribution: number;
+
+  @ApiProperty({ description: 'Load contribution from duration' })
+  @IsNumber()
+  durationLoadContribution: number;
+
+  @ApiProperty({ description: 'Load contribution from strength volume' })
+  @IsNumber()
+  volumeLoadContribution: number;
+
+  @ApiProperty({ description: 'Number of workouts on this day' })
+  @IsNumber()
+  workoutCount: number;
+}
+
+export class CurrentTrainingLoadDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Current acute load (7-day)' })
+  @IsNumber()
+  acuteLoad: number;
+
+  @ApiProperty({ description: 'Current chronic load (28-day)' })
+  @IsNumber()
+  chronicLoad: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Acute:Chronic Workload Ratio' })
+  @IsNumber()
+  @IsOptional()
+  acwr?: number | null;
+
+  @ApiProperty({ description: 'ACWR status: optimal, caution, high_risk, low' })
+  @IsString()
+  acwrStatus: 'optimal' | 'caution' | 'high_risk' | 'low' | 'no_data';
+
+  @ApiPropertyOptional({ type: Number, description: 'Fatigue score (acute load weighted)' })
+  @IsNumber()
+  @IsOptional()
+  fatigueScore?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Fitness score (chronic load weighted)' })
+  @IsNumber()
+  @IsOptional()
+  fitnessScore?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Form score (fitness - fatigue, higher is better)' })
+  @IsNumber()
+  @IsOptional()
+  formScore?: number | null;
+
+  @ApiProperty({ description: 'Form status: fresh, neutral, fatigued' })
+  @IsString()
+  formStatus: 'fresh' | 'neutral' | 'fatigued' | 'no_data';
+
+  @ApiProperty({ description: 'Total workouts in last 7 days' })
+  @IsNumber()
+  workoutsLast7Days: number;
+
+  @ApiProperty({ description: 'Total workouts in last 28 days' })
+  @IsNumber()
+  workoutsLast28Days: number;
+}
+
+export class CurrentTrainingLoadResponse extends ItemResponse<CurrentTrainingLoadDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: CurrentTrainingLoadDTO;
+}
+
+export class TrainingLoadHistoryDTO {
+  @ApiProperty({ type: [TrainingLoadDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrainingLoadDTO)
+  history: TrainingLoadDTO[];
+}
+
+export class TrainingLoadHistoryResponse extends ItemResponse<TrainingLoadHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: TrainingLoadHistoryDTO;
+}

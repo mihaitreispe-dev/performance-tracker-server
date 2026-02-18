@@ -1,4 +1,5 @@
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
+import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
 import { CardioStepGroupsTable } from './cardio-step-groups-table.interface';
@@ -56,4 +57,5 @@ export interface Database {
   workout_file_imports: WorkoutFileImportsTable;
   workout_plans: WorkoutPlansTable;
   workout_plan_items: WorkoutPlanItemsTable;
+  daily_training_loads: DailyTrainingLoadsTable;
 }

@@ -40,3 +40,13 @@ export class WorkoutAnalyticsParam {
   @IsUUID()
   executionId: string;
 }
+
+export class TrainingLoadHistoryQuery {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of days to include in history (default 90)',
+    example: 90,
+  })
+  @IsOptional()
+  days?: number;
+}
