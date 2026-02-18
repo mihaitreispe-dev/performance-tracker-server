@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsNumber, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
 import { UserRole } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -96,4 +97,52 @@ export class PictureUploadUrlResponse extends ItemResponse<PictureUploadUrlDTO> 
   @IsObject({ always: true })
   @ValidateNested()
   declare data: PictureUploadUrlDTO;
+}
+
+// User Settings DTOs
+
+class HRZoneConfigDTO {
+  @ApiProperty()
+  @IsNumber()
+  zone: number;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty()
+  @IsNumber()
+  minPct: number;
+
+  @ApiProperty()
+  @IsNumber()
+  maxPct: number;
+}
+
+class HRZonesSettingsDTO {
+  @ApiProperty()
+  @IsNumber()
+  maxHr: number;
+
+  @ApiProperty({ type: [HRZoneConfigDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HRZoneConfigDTO)
+  zones: HRZoneConfigDTO[];
+}
+
+class UserSettingsDTO {
+  @ApiPropertyOptional({ type: HRZonesSettingsDTO, nullable: true })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => HRZonesSettingsDTO)
+  @IsOptional()
+  hrZones?: HRZonesSettingsDTO | null;
+}
+
+export class UserSettingsResponse extends ItemResponse<UserSettingsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: UserSettingsDTO;
 }

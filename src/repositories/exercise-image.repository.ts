@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import { Database, ExerciseImage, NewExerciseImage } from 'src/database/interfaces';
 
 @Injectable()

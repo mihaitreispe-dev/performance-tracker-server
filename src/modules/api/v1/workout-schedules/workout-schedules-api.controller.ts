@@ -16,16 +16,14 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+
 import {
   CreateWorkoutScheduleBody,
   ListWorkoutSchedulesQuery,
   UpdateWorkoutScheduleBody,
   WorkoutScheduleIdParam,
 } from './request.dto';
-import {
-  WorkoutScheduleListResponse,
-  WorkoutScheduleResponse,
-} from './response.dto';
+import { WorkoutScheduleListResponse, WorkoutScheduleResponse } from './response.dto';
 import { WorkoutSchedulesApiService } from './workout-schedules-api.service';
 
 @ApiTags('workout-schedules')
@@ -93,10 +91,7 @@ export class WorkoutSchedulesApiController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
-  async delete(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: WorkoutScheduleIdParam,
-  ): Promise<void> {
+  async delete(@Req() req: Request & { user: AuthUser }, @Param() params: WorkoutScheduleIdParam): Promise<void> {
     return this.service.delete(req, params.id);
   }
 }

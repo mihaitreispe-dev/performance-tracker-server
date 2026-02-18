@@ -1,19 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { Workout, WorkoutSchedule } from 'src/database/interfaces';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
-import { WorkoutScheduleRepository, WorkoutScheduleFilter, WorkoutScheduleSort } from 'src/repositories/workout-schedule.repository';
+import { Workout, WorkoutExecution, WorkoutSchedule } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import {
-  CreateWorkoutScheduleBody,
-  ListWorkoutSchedulesQuery,
-  UpdateWorkoutScheduleBody,
-} from './request.dto';
+  WorkoutScheduleFilter,
+  WorkoutScheduleRepository,
+  WorkoutScheduleSort,
+} from 'src/repositories/workout-schedule.repository';
+
+import { CreateWorkoutScheduleBody, ListWorkoutSchedulesQuery, UpdateWorkoutScheduleBody } from './request.dto';
 import {
+  ExecutionSummaryDTO,
+  WorkoutInfoDTO,
   WorkoutScheduleDTO,
   WorkoutScheduleListResponse,
   WorkoutScheduleResponse,
-  WorkoutInfoDTO,
 } from './response.dto';
 
 @Injectable()
@@ -21,6 +25,8 @@ export class WorkoutSchedulesApiService {
   constructor(
     private readonly workoutScheduleRepository: WorkoutScheduleRepository,
     private readonly workoutRepository: WorkoutRepository,
+    private readonly workoutExecutionRepository: WorkoutExecutionRepository,
+    private readonly workoutRouteRepository: WorkoutRouteRepository,
   ) {}
 
   async list(
@@ -52,9 +58,7 @@ export class WorkoutSchedulesApiService {
 
     // Fetch all workouts for the schedules
     const workoutIds = [...new Set(schedules.map((s) => s.workout_id))];
-    const workouts = await Promise.all(
-      workoutIds.map((id) => this.workoutRepository.findById(id)),
-    );
+    const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepository.findById(id)));
     const workoutMap = new Map<string, Workout>();
     for (const workout of workouts) {
       if (workout) {
@@ -62,8 +66,19 @@ export class WorkoutSchedulesApiService {
       }
     }
 
+    // Fetch execution data if requested
+    let executionMap = new Map<string, ExecutionSummaryDTO>();
+    if (query.includeExecution) {
+      const scheduleIds = schedules.map((s) => s.id);
+      executionMap = await this.getExecutionSummaries(scheduleIds);
+    }
+
     const data = schedules.map((schedule) =>
-      this.mapScheduleToDTO(schedule, workoutMap.get(schedule.workout_id)!),
+      this.mapScheduleToDTO(
+        schedule,
+        workoutMap.get(schedule.workout_id)!,
+        query.includeExecution ? executionMap.get(schedule.id) : undefined,
+      ),
     );
 
     return {
@@ -74,10 +89,62 @@ export class WorkoutSchedulesApiService {
     };
   }
 
-  async getById(
-    req: Request & { user: AuthUser },
-    id: string,
-  ): Promise<WorkoutScheduleResponse> {
+  private async getExecutionSummaries(scheduleIds: string[]): Promise<Map<string, ExecutionSummaryDTO>> {
+    const result = new Map<string, ExecutionSummaryDTO>();
+    if (scheduleIds.length === 0) return result;
+
+    // Fetch executions for all schedule IDs
+    const executions = await Promise.all(
+      scheduleIds.map((id) =>
+        this.workoutExecutionRepository.findMany({
+          filter: { workoutScheduleId: id },
+          limit: 1,
+          sort: [{ field: 'started_at', direction: 'desc' }],
+        }),
+      ),
+    );
+
+    // Flatten and get route data
+    const executionList: WorkoutExecution[] = [];
+    for (const execs of executions) {
+      if (execs.length > 0) {
+        executionList.push(execs[0]);
+      }
+    }
+
+    // Fetch routes for all executions
+    const routes = await Promise.all(executionList.map((e) => this.workoutRouteRepository.findByExecutionId(e.id)));
+
+    // Build the map
+    for (let i = 0; i < executionList.length; i++) {
+      const execution = executionList[i];
+      const route = routes[i];
+
+      if (!execution.workout_schedule_id) continue;
+
+      const distanceMeters = route ? Number.parseFloat(route.total_distance_meters) : null;
+      const durationSeconds = execution.duration_seconds ?? null;
+
+      let paceSecondsPerKm: number | null = null;
+      if (distanceMeters && durationSeconds && distanceMeters > 0) {
+        paceSecondsPerKm = Math.round((durationSeconds / distanceMeters) * 1000);
+      }
+
+      const startedAt =
+        execution.started_at instanceof Date ? execution.started_at.toISOString() : String(execution.started_at);
+
+      result.set(execution.workout_schedule_id, {
+        durationSeconds,
+        distanceMeters,
+        paceSecondsPerKm,
+        startedAt,
+      });
+    }
+
+    return result;
+  }
+
+  async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutScheduleResponse> {
     const schedule = await this.workoutScheduleRepository.findById(id);
     if (!schedule) {
       throw new NotFoundException('Workout schedule not found');
@@ -94,10 +161,7 @@ export class WorkoutSchedulesApiService {
     return { data: this.mapScheduleToDTO(schedule, workout) };
   }
 
-  async create(
-    req: Request & { user: AuthUser },
-    body: CreateWorkoutScheduleBody,
-  ): Promise<WorkoutScheduleResponse> {
+  async create(req: Request & { user: AuthUser }, body: CreateWorkoutScheduleBody): Promise<WorkoutScheduleResponse> {
     // Verify workout exists and belongs to user
     const workout = await this.workoutRepository.findById(body.workoutId);
     if (!workout) {
@@ -134,13 +198,11 @@ export class WorkoutSchedulesApiService {
       updateData.scheduled_date = new Date(body.scheduledDate);
     }
     if (body.completed !== undefined) {
+      // Use current date/time for completion timestamp (when user actually marks it complete)
       updateData.completed_at = body.completed ? new Date() : null;
     }
 
-    const updatedSchedule = await this.workoutScheduleRepository.updateById(
-      id,
-      updateData as any,
-    );
+    const updatedSchedule = await this.workoutScheduleRepository.updateById(id, updateData as any);
 
     const workout = await this.workoutRepository.findById(updatedSchedule.workout_id);
     if (!workout) {
@@ -150,10 +212,7 @@ export class WorkoutSchedulesApiService {
     return { data: this.mapScheduleToDTO(updatedSchedule, workout) };
   }
 
-  async delete(
-    req: Request & { user: AuthUser },
-    id: string,
-  ): Promise<void> {
+  async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
     const schedule = await this.workoutScheduleRepository.findById(id);
     if (!schedule) {
       throw new NotFoundException('Workout schedule not found');
@@ -165,7 +224,11 @@ export class WorkoutSchedulesApiService {
     await this.workoutScheduleRepository.deleteById(id);
   }
 
-  private mapScheduleToDTO(schedule: WorkoutSchedule, workout: Workout): WorkoutScheduleDTO {
+  private mapScheduleToDTO(
+    schedule: WorkoutSchedule,
+    workout: Workout,
+    execution?: ExecutionSummaryDTO,
+  ): WorkoutScheduleDTO {
     const workoutInfo: WorkoutInfoDTO = {
       id: workout.id,
       name: workout.name,
@@ -174,20 +237,19 @@ export class WorkoutSchedulesApiService {
       type: workout.type,
     };
 
-    const scheduledDate = schedule.scheduled_date instanceof Date
-      ? schedule.scheduled_date.toISOString().split('T')[0]
-      : String(schedule.scheduled_date);
+    const scheduledDate =
+      schedule.scheduled_date instanceof Date
+        ? schedule.scheduled_date.toISOString().split('T')[0]
+        : String(schedule.scheduled_date);
     const completedAt = schedule.completed_at
-      ? (schedule.completed_at instanceof Date
-          ? schedule.completed_at.toISOString()
-          : String(schedule.completed_at))
+      ? schedule.completed_at instanceof Date
+        ? schedule.completed_at.toISOString()
+        : String(schedule.completed_at)
       : null;
-    const createdAt = schedule.created_at instanceof Date
-      ? schedule.created_at.toISOString()
-      : String(schedule.created_at);
-    const updatedAt = schedule.updated_at instanceof Date
-      ? schedule.updated_at.toISOString()
-      : String(schedule.updated_at);
+    const createdAt =
+      schedule.created_at instanceof Date ? schedule.created_at.toISOString() : String(schedule.created_at);
+    const updatedAt =
+      schedule.updated_at instanceof Date ? schedule.updated_at.toISOString() : String(schedule.updated_at);
 
     return {
       id: schedule.id,
@@ -195,6 +257,7 @@ export class WorkoutSchedulesApiService {
       workout: workoutInfo,
       scheduledDate,
       completedAt,
+      execution: execution ?? undefined,
       createdAt,
       updatedAt,
     };

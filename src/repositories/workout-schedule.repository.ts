@@ -104,6 +104,13 @@ export class WorkoutScheduleRepository {
     return this.db.insertInto('workout_schedules').values(data).returningAll().executeTakeFirstOrThrow();
   }
 
+  async createMany(data: NewWorkoutSchedule[]): Promise<WorkoutSchedule[]> {
+    if (data.length === 0) {
+      return [];
+    }
+    return this.db.insertInto('workout_schedules').values(data).returningAll().execute();
+  }
+
   async updateById(id: string, data: WorkoutScheduleUpdate): Promise<WorkoutSchedule> {
     return this.db
       .updateTable('workout_schedules')

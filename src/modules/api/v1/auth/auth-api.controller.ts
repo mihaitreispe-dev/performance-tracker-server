@@ -6,8 +6,8 @@ import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AuthApiService } from './auth-api.service';
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody } from './request.dto';
-import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse } from './response.dto';
+import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody, UpdateUserSettingsBody } from './request.dto';
+import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse, UserSettingsResponse } from './response.dto';
 
 @ApiTags('auth')
 @ApiBearerAuth('JWT')
@@ -63,10 +63,7 @@ export class AuthApiController {
   })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Patch('user')
-  async updateUser(
-    @Req() req: Request & { user: AuthUser },
-    @Body() body: UpdateUserBody,
-  ): Promise<AuthUserResponse> {
+  async updateUser(@Req() req: Request & { user: AuthUser }, @Body() body: UpdateUserBody): Promise<AuthUserResponse> {
     return this.service.updateUser(req, body);
   }
 
@@ -78,9 +75,34 @@ export class AuthApiController {
   })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post('user/picture-upload-url')
-  async getUploadPictureUrl(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<PictureUploadUrlResponse> {
+  async getUploadPictureUrl(@Req() req: Request & { user: AuthUser }): Promise<PictureUploadUrlResponse> {
     return this.service.getUploadPictureUrl(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get user settings' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: UserSettingsResponse,
+  })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('user/settings')
+  async getUserSettings(@Req() req: Request & { user: AuthUser }): Promise<UserSettingsResponse> {
+    return this.service.getUserSettings(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Update user settings' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: UserSettingsResponse,
+  })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Patch('user/settings')
+  async updateUserSettings(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: UpdateUserSettingsBody,
+  ): Promise<UserSettingsResponse> {
+    return this.service.updateUserSettings(req, body);
   }
 }

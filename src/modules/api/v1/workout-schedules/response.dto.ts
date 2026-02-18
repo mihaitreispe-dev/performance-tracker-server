@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { WorkoutDifficulty, WorkoutType } from 'src/database/interfaces';
-import { IsEnumString } from 'src/lib/validators/is-enum-string';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
+import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
 export class WorkoutInfoDTO {
   @ApiProperty()
@@ -28,6 +28,25 @@ export class WorkoutInfoDTO {
   type: WorkoutType;
 }
 
+export class ExecutionSummaryDTO {
+  @ApiPropertyOptional({ type: Number, description: 'Duration in seconds' })
+  @IsOptional()
+  durationSeconds?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Total distance in meters' })
+  @IsOptional()
+  distanceMeters?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Average pace in seconds per km' })
+  @IsOptional()
+  paceSecondsPerKm?: number | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Workout execution start time' })
+  @IsString()
+  @IsOptional()
+  startedAt?: string | null;
+}
+
 export class WorkoutScheduleDTO {
   @ApiProperty()
   @IsUUID()
@@ -50,6 +69,12 @@ export class WorkoutScheduleDTO {
   @IsString()
   @IsOptional()
   completedAt?: string | null;
+
+  @ApiPropertyOptional({ type: ExecutionSummaryDTO, description: 'Execution summary when includeExecution=true' })
+  @IsObject()
+  @ValidateNested()
+  @IsOptional()
+  execution?: ExecutionSummaryDTO | null;
 
   @ApiProperty()
   @IsString()

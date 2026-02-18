@@ -149,4 +149,48 @@ export class AppConfigService {
   get disableMediaConvert(): boolean {
     return this.configService.get('DISABLE_MEDIA_CONVERT') === 'Y';
   }
+
+  // Generic getter for optional config
+
+  get<K extends keyof Env>(key: K): Env[K] | undefined {
+    return this.configService.get(key);
+  }
+
+  // Strava
+
+  get stravaClientId(): string | undefined {
+    return this.configService.get('STRAVA_CLIENT_ID');
+  }
+
+  get stravaClientSecret(): string | undefined {
+    return this.configService.get('STRAVA_CLIENT_SECRET');
+  }
+
+  get stravaRedirectUri(): string | undefined {
+    return this.configService.get('STRAVA_REDIRECT_URI');
+  }
+
+  get stravaWebhookVerifyToken(): string | undefined {
+    return this.configService.get('STRAVA_WEBHOOK_VERIFY_TOKEN');
+  }
+
+  // Garmin
+
+  get garminConsumerKey(): string | undefined {
+    return this.configService.get('GARMIN_CONSUMER_KEY');
+  }
+
+  get garminConsumerSecret(): string | undefined {
+    return this.configService.get('GARMIN_CONSUMER_SECRET');
+  }
+
+  get garminRedirectUri(): string | undefined {
+    return this.configService.get('GARMIN_REDIRECT_URI');
+  }
+
+  // Google Maps
+
+  get googleMapsApiKey(): string | undefined {
+    return this.configService.get('GOOGLE_MAPS_API_KEY');
+  }
 }

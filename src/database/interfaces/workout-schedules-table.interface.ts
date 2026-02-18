@@ -1,4 +1,5 @@
 import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+
 import { Timestamp } from './timestamp';
 
 export interface WorkoutSchedulesTable {
@@ -7,6 +8,7 @@ export interface WorkoutSchedulesTable {
   workout_id: string;
   scheduled_date: Date;
   completed_at: Timestamp | null;
+  workout_plan_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

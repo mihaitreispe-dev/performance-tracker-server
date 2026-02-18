@@ -1,0 +1,544 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { type Request } from 'express';
+import {
+  CardioMetric,
+  GeoJSONLineString,
+  RouteMarker,
+  SetCompletion,
+  Workout,
+  WorkoutExecution,
+  WorkoutExecutionSource,
+  WorkoutRoute,
+  WorkoutSchedule,
+} from 'src/database/interfaces';
+import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
+import {
+  WorkoutExecutionFilter,
+  WorkoutExecutionRepository,
+  WorkoutExecutionSort,
+} from 'src/repositories/workout-execution.repository';
+import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+
+import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
+import {
+  BatchUploadMetricsBody,
+  CompleteSetBody,
+  ListMetricsQuery,
+  ListSetCompletionsQuery,
+  ListWorkoutExecutionsQuery,
+  StartWorkoutExecutionBody,
+  UpdateWorkoutExecutionBody,
+  UploadRouteBody,
+} from './request.dto';
+import {
+  BatchUploadMetricsResponse,
+  CardioMetricDTO,
+  CardioMetricListResponse,
+  RouteMarkerDTO,
+  SetCompletionDTO,
+  SetCompletionListResponse,
+  SetCompletionResponse,
+  WorkoutExecutionDTO,
+  WorkoutExecutionListResponse,
+  WorkoutExecutionResponse,
+  WorkoutRouteDTO,
+  WorkoutRouteResponse,
+} from './response.dto';
+
+@Injectable()
+export class WorkoutExecutionsApiService {
+  constructor(
+    private readonly workoutExecutionRepository: WorkoutExecutionRepository,
+    private readonly setCompletionRepository: SetCompletionRepository,
+    private readonly cardioMetricsRepository: CardioMetricsRepository,
+    private readonly workoutRouteRepository: WorkoutRouteRepository,
+    private readonly workoutScheduleRepository: WorkoutScheduleRepository,
+    private readonly workoutRepository: WorkoutRepository,
+  ) {}
+
+  // Workout Executions
+
+  async list(
+    req: Request & { user: AuthUser },
+    query: ListWorkoutExecutionsQuery,
+  ): Promise<WorkoutExecutionListResponse> {
+    const filter: WorkoutExecutionFilter = {
+      userId: req.user.id,
+      workoutScheduleId: query.workoutScheduleId,
+      source: query.source,
+      dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
+      dateTo: query.dateTo ? new Date(query.dateTo) : undefined,
+      completed: query.completed,
+    };
+
+    const sort: WorkoutExecutionSort[] | undefined = query.sort?.map((s) => ({
+      field: s.field as 'started_at' | 'completed_at' | 'created_at' | 'updated_at',
+      direction: s.direction,
+    }));
+
+    const [executions, totalCount] = await Promise.all([
+      this.workoutExecutionRepository.findMany({
+        filter,
+        sort,
+        offset: query.offset,
+        limit: query.limit ?? 50,
+      }),
+      this.workoutExecutionRepository.countMany(filter),
+    ]);
+
+    // Fetch workouts for executions that have schedule IDs
+    const scheduleIds = [
+      ...new Set(executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!)),
+    ];
+    const scheduleMap = new Map<string, WorkoutSchedule>();
+    const workoutMap = new Map<string, Workout>();
+
+    if (scheduleIds.length > 0) {
+      const schedules = await Promise.all(scheduleIds.map((id) => this.workoutScheduleRepository.findById(id)));
+      for (const schedule of schedules) {
+        if (schedule) {
+          scheduleMap.set(schedule.id, schedule);
+        }
+      }
+
+      const workoutIds = [...new Set([...scheduleMap.values()].map((s) => s.workout_id))];
+      const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepository.findById(id)));
+      for (const workout of workouts) {
+        if (workout) {
+          workoutMap.set(workout.id, workout);
+        }
+      }
+    }
+
+    const data = executions.map((execution) => {
+      const schedule = execution.workout_schedule_id ? scheduleMap.get(execution.workout_schedule_id) : undefined;
+      const workout = schedule ? workoutMap.get(schedule.workout_id) : undefined;
+      return this.mapExecutionToDTO(execution, workout);
+    });
+
+    return {
+      data,
+      offset: query.offset,
+      limit: query.limit,
+      totalCount,
+    };
+  }
+
+  async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutExecutionResponse> {
+    const execution = await this.workoutExecutionRepository.findById(id);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    let workout: Workout | undefined;
+    if (execution.workout_schedule_id) {
+      const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
+      if (schedule) {
+        workout = await this.workoutRepository.findById(schedule.workout_id);
+      }
+    }
+
+    return { data: this.mapExecutionToDTO(execution, workout) };
+  }
+
+  async start(req: Request & { user: AuthUser }, body: StartWorkoutExecutionBody): Promise<WorkoutExecutionResponse> {
+    // Verify schedule exists and belongs to user
+    const schedule = await this.workoutScheduleRepository.findById(body.workoutScheduleId);
+    if (!schedule) {
+      throw new NotFoundException('Workout schedule not found');
+    }
+    if (schedule.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied to this workout schedule');
+    }
+
+    const execution = await this.workoutExecutionRepository.create({
+      user_id: req.user.id,
+      workout_schedule_id: body.workoutScheduleId,
+      started_at: body.startedAt ? new Date(body.startedAt) : new Date(),
+      source: WorkoutExecutionSource.MANUAL,
+      notes: body.notes ?? null,
+    });
+
+    const workout = await this.workoutRepository.findById(schedule.workout_id);
+
+    return { data: this.mapExecutionToDTO(execution, workout) };
+  }
+
+  async update(
+    req: Request & { user: AuthUser },
+    id: string,
+    body: UpdateWorkoutExecutionBody,
+  ): Promise<WorkoutExecutionResponse> {
+    const execution = await this.workoutExecutionRepository.findById(id);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (body.completedAt !== undefined) {
+      updateData.completed_at = new Date(body.completedAt);
+    }
+    if (body.durationSeconds !== undefined) {
+      updateData.duration_seconds = body.durationSeconds;
+    }
+    if (body.notes !== undefined) {
+      updateData.notes = body.notes;
+    }
+
+    const updatedExecution = await this.workoutExecutionRepository.updateById(id, updateData as any);
+
+    // Also mark the schedule as completed if the execution is completed
+    if (body.completedAt && updatedExecution.workout_schedule_id) {
+      await this.workoutScheduleRepository.updateById(updatedExecution.workout_schedule_id, {
+        completed_at: new Date(body.completedAt),
+      });
+    }
+
+    let workout: Workout | undefined;
+    if (updatedExecution.workout_schedule_id) {
+      const schedule = await this.workoutScheduleRepository.findById(updatedExecution.workout_schedule_id);
+      if (schedule) {
+        workout = await this.workoutRepository.findById(schedule.workout_id);
+      }
+    }
+
+    return { data: this.mapExecutionToDTO(updatedExecution, workout) };
+  }
+
+  async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
+    const execution = await this.workoutExecutionRepository.findById(id);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    await this.workoutExecutionRepository.deleteById(id);
+  }
+
+  // Set Completions
+
+  async completeSet(
+    req: Request & { user: AuthUser },
+    executionId: string,
+    body: CompleteSetBody,
+  ): Promise<SetCompletionResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Check if set completion already exists
+    const existing = await this.setCompletionRepository.findByExecutionAndSet(
+      executionId,
+      body.exerciseInstanceId,
+      body.setNumber,
+    );
+
+    let setCompletion: SetCompletion;
+    if (existing) {
+      // Update existing
+      setCompletion = await this.setCompletionRepository.updateById(existing.id, {
+        actual_reps: body.actualReps ?? null,
+        actual_load: body.actualLoad?.toString() ?? null,
+        actual_time_seconds: body.actualTimeSeconds ?? null,
+        rpe: body.rpe ?? null,
+        skipped: body.skipped ?? false,
+        notes: body.notes ?? null,
+        completed_at: new Date(),
+      });
+    } else {
+      // Create new
+      setCompletion = await this.setCompletionRepository.create({
+        workout_execution_id: executionId,
+        exercise_instance_id: body.exerciseInstanceId,
+        set_number: body.setNumber,
+        actual_reps: body.actualReps ?? null,
+        actual_load: body.actualLoad?.toString() ?? null,
+        actual_time_seconds: body.actualTimeSeconds ?? null,
+        rpe: body.rpe ?? null,
+        completed_at: new Date(),
+        skipped: body.skipped ?? false,
+        notes: body.notes ?? null,
+      });
+    }
+
+    return { data: this.mapSetCompletionToDTO(setCompletion) };
+  }
+
+  async listSetCompletions(
+    req: Request & { user: AuthUser },
+    executionId: string,
+    query: ListSetCompletionsQuery,
+  ): Promise<SetCompletionListResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const setCompletions = await this.setCompletionRepository.findMany({
+      filter: {
+        workoutExecutionId: executionId,
+        exerciseInstanceId: query.exerciseInstanceId,
+      },
+      sort: [{ field: 'set_number', direction: 'asc' }],
+    });
+
+    return {
+      data: setCompletions.map((sc) => this.mapSetCompletionToDTO(sc)),
+    };
+  }
+
+  // Cardio Metrics
+
+  async uploadMetrics(
+    req: Request & { user: AuthUser },
+    executionId: string,
+    body: BatchUploadMetricsBody,
+  ): Promise<BatchUploadMetricsResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (body.metrics.length === 0) {
+      return { count: 0 };
+    }
+
+    const metricsToCreate = body.metrics.map((m) => ({
+      workout_execution_id: executionId,
+      metric_type: m.metricType,
+      recorded_at: new Date(m.recordedAt),
+      value: m.value.toString(),
+      unit: m.unit,
+    }));
+
+    const created = await this.cardioMetricsRepository.createMany(metricsToCreate);
+    return { count: created.length };
+  }
+
+  async listMetrics(
+    req: Request & { user: AuthUser },
+    executionId: string,
+    query: ListMetricsQuery,
+  ): Promise<CardioMetricListResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const metrics = await this.cardioMetricsRepository.findMany({
+      filter: {
+        workoutExecutionId: executionId,
+        metricType: query.metricType,
+      },
+    });
+
+    return {
+      data: metrics.map((m) => this.mapCardioMetricToDTO(m)),
+    };
+  }
+
+  // Routes
+
+  async uploadRoute(
+    req: Request & { user: AuthUser },
+    executionId: string,
+    body: UploadRouteBody,
+  ): Promise<WorkoutRouteResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Check if route already exists
+    const existingRoute = await this.workoutRouteRepository.findByExecutionId(executionId);
+    if (existingRoute) {
+      throw new BadRequestException('Route already exists for this execution');
+    }
+
+    const route = await this.workoutRouteRepository.create({
+      workout_execution_id: executionId,
+      route_geojson: body.routeGeojson as GeoJSONLineString,
+      total_distance_meters: body.totalDistanceMeters.toString(),
+      elevation_gain_meters: body.elevationGainMeters?.toString() ?? null,
+      elevation_loss_meters: body.elevationLossMeters?.toString() ?? null,
+    });
+
+    let markers: RouteMarker[] = [];
+    if (body.markers && body.markers.length > 0) {
+      const markersToCreate = body.markers.map((m) => ({
+        workout_route_id: route.id,
+        marker_type: m.markerType,
+        marker_number: m.markerNumber,
+        latitude: m.latitude.toString(),
+        longitude: m.longitude.toString(),
+        elevation_meters: m.elevationMeters?.toString() ?? null,
+        recorded_at: new Date(m.recordedAt),
+        split_time_seconds: m.splitTimeSeconds,
+        cumulative_time_seconds: m.cumulativeTimeSeconds,
+        avg_heart_rate: m.avgHeartRate ?? null,
+        avg_pace_seconds_per_km: m.avgPaceSecondsPerKm ?? null,
+      }));
+      markers = await this.workoutRouteRepository.createMarkers(markersToCreate);
+    }
+
+    return { data: this.mapWorkoutRouteToDTO(route, markers) };
+  }
+
+  async getRoute(req: Request & { user: AuthUser }, executionId: string): Promise<WorkoutRouteResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const route = await this.workoutRouteRepository.findByExecutionId(executionId);
+    if (!route) {
+      throw new NotFoundException('Route not found for this execution');
+    }
+
+    const markers = await this.workoutRouteRepository.findMarkersByRouteId(route.id);
+
+    return { data: this.mapWorkoutRouteToDTO(route, markers) };
+  }
+
+  // Mappers
+
+  private mapExecutionToDTO(execution: WorkoutExecution, workout?: Workout): WorkoutExecutionDTO {
+    const startedAt =
+      execution.started_at instanceof Date ? execution.started_at.toISOString() : String(execution.started_at);
+    const completedAt = execution.completed_at
+      ? execution.completed_at instanceof Date
+        ? execution.completed_at.toISOString()
+        : String(execution.completed_at)
+      : null;
+    const createdAt =
+      execution.created_at instanceof Date ? execution.created_at.toISOString() : String(execution.created_at);
+    const updatedAt =
+      execution.updated_at instanceof Date ? execution.updated_at.toISOString() : String(execution.updated_at);
+
+    let workoutInfo: WorkoutInfoDTO | null = null;
+    if (workout) {
+      workoutInfo = {
+        id: workout.id,
+        name: workout.name,
+        description: workout.description,
+        difficulty: workout.difficulty,
+        type: workout.type,
+      };
+    }
+
+    return {
+      id: execution.id,
+      userId: execution.user_id,
+      workoutScheduleId: execution.workout_schedule_id,
+      workout: workoutInfo,
+      startedAt,
+      completedAt,
+      durationSeconds: execution.duration_seconds,
+      source: execution.source,
+      externalId: execution.external_id,
+      notes: execution.notes,
+      createdAt,
+      updatedAt,
+    };
+  }
+
+  private mapSetCompletionToDTO(sc: SetCompletion): SetCompletionDTO {
+    const completedAt = sc.completed_at instanceof Date ? sc.completed_at.toISOString() : String(sc.completed_at);
+    const createdAt = sc.created_at instanceof Date ? sc.created_at.toISOString() : String(sc.created_at);
+
+    return {
+      id: sc.id,
+      workoutExecutionId: sc.workout_execution_id,
+      exerciseInstanceId: sc.exercise_instance_id,
+      setNumber: sc.set_number,
+      actualReps: sc.actual_reps,
+      actualLoad: sc.actual_load ? Number.parseFloat(sc.actual_load) : null,
+      actualTimeSeconds: sc.actual_time_seconds,
+      rpe: sc.rpe,
+      completedAt,
+      skipped: sc.skipped,
+      notes: sc.notes,
+      createdAt,
+    };
+  }
+
+  private mapCardioMetricToDTO(m: CardioMetric): CardioMetricDTO {
+    const recordedAt = m.recorded_at instanceof Date ? m.recorded_at.toISOString() : String(m.recorded_at);
+    const createdAt = m.created_at instanceof Date ? m.created_at.toISOString() : String(m.created_at);
+
+    return {
+      id: m.id,
+      workoutExecutionId: m.workout_execution_id,
+      metricType: m.metric_type,
+      recordedAt,
+      value: Number.parseFloat(m.value),
+      unit: m.unit,
+      createdAt,
+    };
+  }
+
+  private mapRouteMarkerToDTO(marker: RouteMarker): RouteMarkerDTO {
+    const recordedAt =
+      marker.recorded_at instanceof Date ? marker.recorded_at.toISOString() : String(marker.recorded_at);
+
+    return {
+      id: marker.id,
+      markerType: marker.marker_type,
+      markerNumber: marker.marker_number,
+      latitude: Number.parseFloat(marker.latitude),
+      longitude: Number.parseFloat(marker.longitude),
+      elevationMeters: marker.elevation_meters ? Number.parseFloat(marker.elevation_meters) : null,
+      recordedAt,
+      splitTimeSeconds: marker.split_time_seconds,
+      cumulativeTimeSeconds: marker.cumulative_time_seconds,
+      avgHeartRate: marker.avg_heart_rate,
+      avgPaceSecondsPerKm: marker.avg_pace_seconds_per_km,
+    };
+  }
+
+  private mapWorkoutRouteToDTO(route: WorkoutRoute, markers: RouteMarker[]): WorkoutRouteDTO {
+    const createdAt = route.created_at instanceof Date ? route.created_at.toISOString() : String(route.created_at);
+
+    return {
+      id: route.id,
+      workoutExecutionId: route.workout_execution_id,
+      routeGeojson: route.route_geojson as any,
+      totalDistanceMeters: Number.parseFloat(route.total_distance_meters),
+      elevationGainMeters: route.elevation_gain_meters ? Number.parseFloat(route.elevation_gain_meters) : null,
+      elevationLossMeters: route.elevation_loss_meters ? Number.parseFloat(route.elevation_loss_meters) : null,
+      markers: markers.map((m) => this.mapRouteMarkerToDTO(m)),
+      createdAt,
+    };
+  }
+}

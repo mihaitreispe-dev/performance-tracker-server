@@ -4,8 +4,8 @@ import { ConsoleModule } from 'nestjs-console';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
-import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 

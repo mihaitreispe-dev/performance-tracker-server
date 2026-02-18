@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
 import { GrantType } from './types';
@@ -66,4 +67,52 @@ export class RevokeTokensBody {
   @IsString()
   @IsOptional()
   fcmToken?: string;
+}
+
+// HR Zones Configuration
+
+export class HRZoneConfigInput {
+  @ApiProperty({ description: 'Zone number (1-5)' })
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  zone: number;
+
+  @ApiProperty({ description: 'Zone name (e.g., Recovery, Aerobic)' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Minimum percentage of max HR' })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  minPct: number;
+
+  @ApiProperty({ description: 'Maximum percentage of max HR' })
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  maxPct: number;
+}
+
+export class HRZonesSettingsInput {
+  @ApiProperty({ description: 'Maximum heart rate' })
+  @IsNumber()
+  @Min(100)
+  @Max(250)
+  maxHr: number;
+
+  @ApiProperty({ type: [HRZoneConfigInput], description: 'Heart rate zone configurations' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HRZoneConfigInput)
+  zones: HRZoneConfigInput[];
+}
+
+export class UpdateUserSettingsBody {
+  @ApiPropertyOptional({ type: HRZonesSettingsInput, description: 'Heart rate zones configuration' })
+  @ValidateNested()
+  @Type(() => HRZonesSettingsInput)
+  @IsOptional()
+  hrZones?: HRZonesSettingsInput | null;
 }

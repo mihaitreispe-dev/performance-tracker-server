@@ -6,14 +6,19 @@ import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.intercepto
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 
+import { AnalyticsApiModule } from './analytics/analytics-api.module';
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
-import { WorkoutsApiModule } from './workouts/workouts-api.module';
+import { IntegrationsApiModule } from './integrations/integrations-api.module';
+import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
+import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file-imports-api.module';
+import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
 import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules-api.module';
+import { WorkoutsApiModule } from './workouts/workouts-api.module';
 
 @Module({
   imports: [
@@ -25,7 +30,12 @@ import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules
     ExercisesApiModule.register(),
     WorkoutsApiModule.register(),
     WorkoutSchedulesApiModule.register(),
+    WorkoutExecutionsApiModule.register(),
+    WorkoutFileImportsApiModule.register(),
     CardioCategoriesApiModule.register(),
+    AnalyticsApiModule.register(),
+    IntegrationsApiModule.register(),
+    WorkoutPlansApiModule.register(),
   ],
   providers: [
     {

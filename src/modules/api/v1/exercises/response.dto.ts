@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { ExerciseLevel, ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
-import { ExerciseLevel, ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
 
 export class MediaAssetDTO {
   @ApiProperty()

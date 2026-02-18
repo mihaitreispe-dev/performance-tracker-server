@@ -1,4 +1,47 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
+
+# Git
 .git
+.gitignore
+
+# Environment files
 .env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Misc
+.DS_Store
+*.pem
+*.key

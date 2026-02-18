@@ -264,7 +264,10 @@ export class WorkoutItemBody {
   @IsOptional()
   stepType?: CardioStepType;
 
-  @ApiPropertyOptional({ enum: CardioStepMode, description: 'Cardio step mode: duration or distance (for cardio_step type)' })
+  @ApiPropertyOptional({
+    enum: CardioStepMode,
+    description: 'Cardio step mode: duration or distance (for cardio_step type)',
+  })
   @IsEnumString(CardioStepMode)
   @IsOptional()
   cardioStepMode?: CardioStepMode;
@@ -294,7 +297,10 @@ export class WorkoutItemBody {
   hrMax?: number;
 
   // cardio_step_group fields
-  @ApiPropertyOptional({ type: [CardioStepBody], description: 'Cardio steps in the group (for cardio_step_group type)' })
+  @ApiPropertyOptional({
+    type: [CardioStepBody],
+    description: 'Cardio steps in the group (for cardio_step_group type)',
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CardioStepBody)

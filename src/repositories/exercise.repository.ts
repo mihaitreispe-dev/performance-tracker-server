@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { Database, Exercise, ExerciseStatus, ExerciseUpdate, ExerciseVisibility, NewExercise } from 'src/database/interfaces';
+import {
+  Database,
+  Exercise,
+  ExerciseStatus,
+  ExerciseUpdate,
+  ExerciseVisibility,
+  NewExercise,
+} from 'src/database/interfaces';
 import parseSQLArray from 'src/lib/util/parse-sql-array';
 
 export interface ExerciseFilter {

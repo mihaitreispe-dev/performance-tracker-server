@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, Version } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Version,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
@@ -32,10 +45,7 @@ export class WorkoutsApiController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
   @Get(':id')
-  async getById(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: WorkoutIdParam,
-  ): Promise<WorkoutResponse> {
+  async getById(@Req() req: Request & { user: AuthUser }, @Param() params: WorkoutIdParam): Promise<WorkoutResponse> {
     return this.service.getById(req, params.id);
   }
 
@@ -44,10 +54,7 @@ export class WorkoutsApiController {
   @ApiResponse({ status: HttpStatus.CREATED, type: WorkoutResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post()
-  async create(
-    @Req() req: Request & { user: AuthUser },
-    @Body() body: CreateWorkoutBody,
-  ): Promise<WorkoutResponse> {
+  async create(@Req() req: Request & { user: AuthUser }, @Body() body: CreateWorkoutBody): Promise<WorkoutResponse> {
     return this.service.create(req, body);
   }
 
@@ -72,10 +79,7 @@ export class WorkoutsApiController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id')
-  async delete(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: WorkoutIdParam,
-  ): Promise<void> {
+  async delete(@Req() req: Request & { user: AuthUser }, @Param() params: WorkoutIdParam): Promise<void> {
     return this.service.delete(req, params.id);
   }
 }

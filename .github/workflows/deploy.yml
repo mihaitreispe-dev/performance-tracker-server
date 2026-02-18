@@ -1,0 +1,209 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ vars.APP_URL }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH }}
+
+            # Pull latest code
+            git pull origin main
+
+            # Login to GitHub Container Registry
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull the latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Create .env file from secrets
+            cat > .env << 'EOF'
+            # Apps
+            API_V1_MODULE_ENABLED=Y
+            API_V1_PORT=5100
+            CRON_MODULE_ENABLED=Y
+            API_V1_URL=${{ vars.API_V1_URL }}
+
+            # Auth
+            JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
+            JWT_ACCESS_TOKEN_EXPIRY=${{ vars.JWT_ACCESS_TOKEN_EXPIRY }}
+            JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET }}
+            JWT_REFRESH_TOKEN_EXPIRY=${{ vars.JWT_REFRESH_TOKEN_EXPIRY }}
+
+            # Database
+            DB_HOST=${{ vars.DB_HOST }}
+            DB_PORT=${{ vars.DB_PORT }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ vars.DB_NAME }}
+            DB_SSL=${{ vars.DB_SSL }}
+
+            # AWS
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+
+            # S3
+            S3_ENDPOINT=${{ vars.S3_ENDPOINT }}
+            S3_REGION=${{ vars.S3_REGION }}
+            S3_UPLOAD_BUCKET=${{ vars.S3_UPLOAD_BUCKET }}
+            S3_CONTENT_BUCKET=${{ vars.S3_CONTENT_BUCKET }}
+
+            # CDN
+            CDN_URL=${{ vars.CDN_URL }}
+            DISABLE_CDN=${{ vars.DISABLE_CDN }}
+
+            # CloudFront
+            CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID }}
+            CLOUDFRONT_PRIVATE_KEY=${{ secrets.CLOUDFRONT_PRIVATE_KEY }}
+
+            # MediaConvert
+            MEDIA_CONVERT_REGION=${{ vars.MEDIA_CONVERT_REGION }}
+            MEDIA_CONVERT_ROLE=${{ vars.MEDIA_CONVERT_ROLE }}
+            MEDIA_CONVERT_QUEUE=${{ vars.MEDIA_CONVERT_QUEUE }}
+            DISABLE_MEDIA_CONVERT=${{ vars.DISABLE_MEDIA_CONVERT }}
+
+            # Firebase
+            FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID }}
+            FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }}
+            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
+
+            # Strava
+            STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID }}
+            STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET }}
+            STRAVA_REDIRECT_URI=${{ vars.STRAVA_REDIRECT_URI }}
+            STRAVA_WEBHOOK_VERIFY_TOKEN=${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN }}
+
+            # Garmin
+            GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY }}
+            GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET }}
+            GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI }}
+
+            # Google Maps
+            GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+            # Docker
+            DOCKER_REGISTRY=${{ env.REGISTRY }}
+            DOCKER_IMAGE_NAME=${{ env.IMAGE_NAME }}
+            DOCKER_TAG=latest
+            EOF
+
+            # Run migrations
+            docker-compose -f docker-compose.yml -f docker-compose.prod.yml --profile migrate up migrate
+
+            # Deploy with zero-downtime
+            docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps api
+
+            # Clean up old images
+            docker image prune -f
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            # Wait for the service to be healthy
+            sleep 30
+
+            # Check if API is responding
+            curl -f ${{ vars.API_V1_URL }}/health || exit 1
+
+            echo "Deployment successful!"
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy]
+    if: always()
+
+    steps:
+      - name: Deployment Status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "Deployment completed successfully!"
+          else
+            echo "Deployment failed!"
+            exit 1
+          fi

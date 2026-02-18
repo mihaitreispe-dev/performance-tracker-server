@@ -3,6 +3,9 @@ export const s3Keys = {
     exercise: ({ visitorId, filename }: { visitorId: string; filename: string }) => ({
       video: `exercises/${visitorId}/${filename}`,
     }),
+    workoutImport: ({ userId, filename }: { userId: string; filename: string }) => ({
+      file: `workout-imports/${userId}/${filename}`,
+    }),
   },
   content: {
     exercise: ({ userId, exerciseId }: { userId: string; exerciseId: string }) => {

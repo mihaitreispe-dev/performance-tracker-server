@@ -45,8 +45,7 @@ export class Env extends BoostrapEnv {
   JWT_REFRESH_TOKEN_SECRET: string;
 
   @IsString()
-  @IsOptional()
-  JWT_REFRESH_TOKEN_EXPIRY?: string;
+  JWT_REFRESH_TOKEN_EXPIRY: string;
 
   // Database
 
@@ -97,12 +96,10 @@ export class Env extends BoostrapEnv {
   // Swagger
 
   @IsString()
-  @IsOptional()
-  SWAGGER_USERNAME?: string;
+  SWAGGER_USERNAME: string;
 
   @IsString()
-  @IsOptional()
-  SWAGGER_PASSWORD?: string;
+  SWAGGER_PASSWORD: string;
 
   // CDN
 
@@ -110,18 +107,16 @@ export class Env extends BoostrapEnv {
   CDN_URL: string;
 
   @IsString()
-  @IsOptional()
-  DISABLE_CDN?: string;
+  @Matches('^Y|N$', 'i')
+  DISABLE_CDN: string;
 
   // CloudFront
 
   @IsString()
-  @IsOptional()
-  CLOUDFRONT_KEY_PAIR_ID?: string;
+  CLOUDFRONT_KEY_PAIR_ID: string;
 
   @IsString()
-  @IsOptional()
-  CLOUDFRONT_PRIVATE_KEY?: string;
+  CLOUDFRONT_PRIVATE_KEY: string;
 
   // Firebase
 
@@ -137,21 +132,50 @@ export class Env extends BoostrapEnv {
   // MediaConvert
 
   @IsString()
-  @IsOptional()
-  MEDIA_CONVERT_REGION?: string;
+  MEDIA_CONVERT_REGION: string;
 
   @IsString()
-  @IsOptional()
-  MEDIA_CONVERT_ROLE?: string;
+  MEDIA_CONVERT_ROLE: string;
 
   @IsString()
-  @IsOptional()
-  MEDIA_CONVERT_QUEUE?: string;
+  MEDIA_CONVERT_QUEUE: string;
 
   @IsString()
-  @IsOptional()
   @Matches('^Y|N$', 'i')
-  DISABLE_MEDIA_CONVERT?: string;
+  DISABLE_MEDIA_CONVERT: string;
+
+  // Strava Integration
+
+  @IsString()
+  STRAVA_CLIENT_ID: string;
+
+  @IsString()
+  STRAVA_CLIENT_SECRET: string;
+
+  @IsString()
+  STRAVA_REDIRECT_URI: string;
+
+  @IsString()
+  STRAVA_WEBHOOK_VERIFY_TOKEN: string;
+
+  // Garmin Integration
+
+  @IsString()
+  @IsOptional()
+  GARMIN_CONSUMER_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  GARMIN_CONSUMER_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  GARMIN_REDIRECT_URI?: string;
+
+  // Google Maps
+
+  @IsString()
+  GOOGLE_MAPS_API_KEY: string;
 
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {

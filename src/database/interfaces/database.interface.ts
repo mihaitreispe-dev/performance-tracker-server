@@ -1,4 +1,5 @@
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
+import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
 import { CardioStepGroupsTable } from './cardio-step-groups-table.interface';
 import { CardioStepsTable } from './cardio-steps-table.interface';
@@ -12,8 +13,17 @@ import { ExerciseMuscleGroupsTable } from './exercise-muscle-groups-table.interf
 import { ExercisesTable } from './exercises-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { RefreshTokensTable } from './refresh-tokens-table.interface';
+import { RouteMarkersTable } from './route-markers-table.interface';
+import { SetCompletionsTable } from './set-completions-table.interface';
+import { UserIntegrationsTable } from './user-integrations-table.interface';
+import { UserSettingsTable } from './user-settings-table.interface';
 import { UsersTable } from './users-table.interface';
+import { WorkoutExecutionsTable } from './workout-executions-table.interface';
+import { WorkoutFileImportsTable } from './workout-file-imports-table.interface';
 import { WorkoutItemsTable } from './workout-items-table.interface';
+import { WorkoutPlanItemsTable } from './workout-plan-items-table.interface';
+import { WorkoutPlansTable } from './workout-plans-table.interface';
+import { WorkoutRoutesTable } from './workout-routes-table.interface';
 import { WorkoutSchedulesTable } from './workout-schedules-table.interface';
 import { WorkoutsTable } from './workouts-table.interface';
 
@@ -32,8 +42,18 @@ export interface Database {
   workouts: WorkoutsTable;
   workout_items: WorkoutItemsTable;
   workout_schedules: WorkoutSchedulesTable;
+  workout_executions: WorkoutExecutionsTable;
+  set_completions: SetCompletionsTable;
   cardio_categories: CardioCategoriesTable;
+  cardio_metrics: CardioMetricsTable;
   cardio_steps: CardioStepsTable;
   cardio_step_groups: CardioStepGroupsTable;
   cardio_step_group_items: CardioStepGroupItemsTable;
+  workout_routes: WorkoutRoutesTable;
+  route_markers: RouteMarkersTable;
+  user_integrations: UserIntegrationsTable;
+  user_settings: UserSettingsTable;
+  workout_file_imports: WorkoutFileImportsTable;
+  workout_plans: WorkoutPlansTable;
+  workout_plan_items: WorkoutPlanItemsTable;
 }

@@ -13,10 +13,11 @@ import { FirebaseService } from 'src/modules/firebase/firebase.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody } from './request.dto';
-import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse } from './response.dto';
+import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody, UpdateUserSettingsBody } from './request.dto';
+import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse, UserSettingsResponse } from './response.dto';
 
 @Injectable()
 export class AuthApiService {
@@ -28,6 +29,7 @@ export class AuthApiService {
     private readonly configService: AppConfigService,
     private readonly userRepo: UserRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
+    private readonly userSettingsRepo: UserSettingsRepository,
   ) {}
 
   async createTokens(
@@ -252,5 +254,29 @@ export class AuthApiService {
       default:
         return providerId;
     }
+  }
+
+  async getUserSettings(req: Request & { user: AuthUser }): Promise<UserSettingsResponse> {
+    const settings = await this.userSettingsRepo.findByUserId(req.user.id);
+    return {
+      data: {
+        hrZones: settings?.hr_zones ?? null,
+      },
+    };
+  }
+
+  async updateUserSettings(req: Request & { user: AuthUser }, body: UpdateUserSettingsBody): Promise<UserSettingsResponse> {
+    const updateData: Record<string, unknown> = {};
+
+    if (body.hrZones !== undefined) {
+      updateData.hr_zones = body.hrZones;
+    }
+
+    const settings = await this.userSettingsRepo.upsert(req.user.id, updateData);
+    return {
+      data: {
+        hrZones: settings.hr_zones ?? null,
+      },
+    };
   }
 }
