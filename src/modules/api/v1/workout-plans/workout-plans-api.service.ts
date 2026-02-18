@@ -6,6 +6,7 @@ import { WorkoutPlanRepository, WorkoutPlanSort } from 'src/repositories/workout
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+import { WorkoutItemRepository } from 'src/repositories/workout-item.repository';
 
 import {
   ActivatePlanBody,
@@ -33,6 +34,7 @@ export class WorkoutPlansApiService {
     private readonly workoutPlanItemRepo: WorkoutPlanItemRepository,
     private readonly workoutRepo: WorkoutRepository,
     private readonly workoutScheduleRepo: WorkoutScheduleRepository,
+    private readonly workoutItemRepo: WorkoutItemRepository,
   ) {}
 
   async list(req: Request & { user: AuthUser }, query: ListWorkoutPlansQuery): Promise<WorkoutPlanListResponse> {
@@ -86,7 +88,18 @@ export class WorkoutPlansApiService {
       }
     }
 
-    const itemDTOs = items.map((item) => this.mapItemToDTO(item, workoutMap.get(item.workout_id)));
+    // Fetch exercise counts for each workout
+    const exerciseCountMap = new Map<string, number>();
+    await Promise.all(
+      workoutIds.map(async (wid) => {
+        const count = await this.workoutItemRepo.countMany({ workoutId: wid });
+        exerciseCountMap.set(wid, count);
+      }),
+    );
+
+    const itemDTOs = items.map((item) =>
+      this.mapItemToDTO(item, workoutMap.get(item.workout_id), exerciseCountMap.get(item.workout_id) ?? 0),
+    );
 
     return { data: this.mapPlanWithItemsToDTO(plan, itemDTOs) };
   }
@@ -182,7 +195,9 @@ export class WorkoutPlansApiService {
       day_of_week: body.dayOfWeek,
     });
 
-    return { data: this.mapItemToDTO(item, workout) };
+    const exerciseCount = await this.workoutItemRepo.countMany({ workoutId: workout.id });
+
+    return { data: this.mapItemToDTO(item, workout, exerciseCount) };
   }
 
   async removeItem(req: Request & { user: AuthUser }, planId: string, itemId: string): Promise<void> {
@@ -266,7 +281,7 @@ export class WorkoutPlansApiService {
     };
   }
 
-  private mapItemToDTO(item: WorkoutPlanItem, workout?: Workout): WorkoutPlanItemDTO {
+  private mapItemToDTO(item: WorkoutPlanItem, workout?: Workout, exerciseCount = 0): WorkoutPlanItemDTO {
     const createdAt = item.created_at instanceof Date ? item.created_at.toISOString() : String(item.created_at);
 
     const workoutInfo: WorkoutInfoForPlanDTO = workout
@@ -274,11 +289,17 @@ export class WorkoutPlansApiService {
           id: workout.id,
           name: workout.name,
           description: workout.description,
+          type: workout.type,
+          difficulty: workout.difficulty,
+          exerciseCount,
         }
       : {
           id: item.workout_id,
           name: 'Unknown',
           description: null,
+          type: 'custom',
+          difficulty: 'moderate',
+          exerciseCount: 0,
         };
 
     return {

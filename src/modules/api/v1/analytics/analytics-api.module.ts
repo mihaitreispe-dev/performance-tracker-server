@@ -4,6 +4,7 @@ import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-loa
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
+import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -35,6 +36,7 @@ export class AnalyticsApiModule {
           UserSettingsRepository,
           MuscleGroupRepository,
           DailyTrainingLoadRepository,
+          PersonalRecordRepository,
         ],
         controllers: [AnalyticsApiController],
       };

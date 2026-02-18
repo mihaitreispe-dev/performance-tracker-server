@@ -7,6 +7,7 @@ import {
   NewDailyTrainingLoad,
   UpdateDailyTrainingLoad,
 } from 'src/database/interfaces';
+import { formatDateToYMD } from 'src/lib/util';
 
 interface FindManyFilter {
   userId: string;
@@ -33,7 +34,7 @@ export class DailyTrainingLoadRepository {
   }
 
   async findByUserAndDate(userId: string, date: Date): Promise<DailyTrainingLoad | undefined> {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatDateToYMD(date);
     return this.db
       .selectFrom('daily_training_loads')
       .selectAll()
@@ -49,12 +50,12 @@ export class DailyTrainingLoadRepository {
       .where('user_id', '=', options.filter.userId);
 
     if (options.filter.dateFrom) {
-      const dateFromStr = options.filter.dateFrom.toISOString().split('T')[0];
+      const dateFromStr = formatDateToYMD(options.filter.dateFrom);
       query = query.where(sql`date::text`, '>=', dateFromStr);
     }
 
     if (options.filter.dateTo) {
-      const dateToStr = options.filter.dateTo.toISOString().split('T')[0];
+      const dateToStr = formatDateToYMD(options.filter.dateTo);
       query = query.where(sql`date::text`, '<=', dateToStr);
     }
 
@@ -133,8 +134,8 @@ export class DailyTrainingLoadRepository {
   }
 
   async getDaysWithData(userId: string, dateFrom: Date, dateTo: Date): Promise<string[]> {
-    const dateFromStr = dateFrom.toISOString().split('T')[0];
-    const dateToStr = dateTo.toISOString().split('T')[0];
+    const dateFromStr = formatDateToYMD(dateFrom);
+    const dateToStr = formatDateToYMD(dateTo);
 
     const results = await this.db
       .selectFrom('daily_training_loads')

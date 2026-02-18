@@ -1,12 +1,14 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { CardioMetricType, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
+import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-load.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
+import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -14,7 +16,7 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
-import { AnalyticsPeriod, PeriodSummaryQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery } from './request.dto';
+import { AnalyticsPeriod, PeriodSummaryQuery, StrengthProgressionQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery } from './request.dto';
 import {
   CurrentTrainingLoadDTO,
   CurrentTrainingLoadResponse,
@@ -27,9 +29,23 @@ import {
   MuscleGroupVolumeDTO,
   PeriodSummaryDTO,
   PeriodSummaryResponse,
+  RaceDataSourceDTO,
+  RacePredictionDTO,
+  RacePredictionsDTO,
+  RacePredictionsResponse,
   RouteAnalyticsDTO,
   SetSummaryDTO,
   SplitDTO,
+  StreakDayDTO,
+  StreakDTO,
+  StreakResponse,
+  StreakWeekDTO,
+  StrengthDataPointDTO,
+  StrengthProgressionDTO,
+  StrengthProgressionResponse,
+  TrackedExerciseDTO,
+  TrackedExercisesDTO,
+  TrackedExercisesResponse,
   TrainingLoadDTO,
   TrainingLoadHistoryDTO,
   TrainingLoadHistoryResponse,
@@ -54,6 +70,7 @@ export class AnalyticsApiService {
     private readonly userSettingsRepository: UserSettingsRepository,
     private readonly muscleGroupRepository: MuscleGroupRepository,
     private readonly dailyTrainingLoadRepository: DailyTrainingLoadRepository,
+    private readonly personalRecordRepository: PersonalRecordRepository,
   ) {}
 
   async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
@@ -283,7 +300,25 @@ export class AnalyticsApiService {
   }
 
   async getPeriodSummary(req: Request & { user: AuthUser }, query: PeriodSummaryQuery): Promise<PeriodSummaryResponse> {
-    const { periodStart, periodEnd } = this.calculatePeriodDates(query.period);
+    // Use custom date range if provided, otherwise use period-based calculation
+    let periodStart: Date;
+    let periodEnd: Date;
+
+    if (query.dateFrom && query.dateTo) {
+      periodStart = new Date(query.dateFrom);
+      periodEnd = new Date(query.dateTo);
+      // Set periodEnd to end of day
+      periodEnd.setHours(23, 59, 59, 999);
+    } else if (query.period) {
+      const dates = this.calculatePeriodDates(query.period);
+      periodStart = dates.periodStart;
+      periodEnd = dates.periodEnd;
+    } else {
+      // Default to last 7 days
+      const dates = this.calculatePeriodDates('7d');
+      periodStart = dates.periodStart;
+      periodEnd = dates.periodEnd;
+    }
 
     // Fetch executions for the period - filter by completion date, not start date
     const executions = await this.workoutExecutionRepository.findMany({
@@ -880,7 +915,7 @@ export class AnalyticsApiService {
     });
 
     const history: TrainingLoadDTO[] = loads.map((load) => ({
-      date: load.date instanceof Date ? load.date.toISOString().split('T')[0] : String(load.date).split('T')[0],
+      date: load.date instanceof Date ? formatDateToYMD(load.date) : String(load.date).split('T')[0],
       dailyLoad: Number.parseFloat(load.daily_load),
       acuteLoad: Number.parseFloat(load.acute_load),
       chronicLoad: Number.parseFloat(load.chronic_load),
@@ -932,7 +967,7 @@ export class AnalyticsApiService {
     for (const execution of executions) {
       const completedAt =
         execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
-      const dateKey = completedAt.toISOString().split('T')[0];
+      const dateKey = formatDateToYMD(completedAt);
       const existing = executionsByDate.get(dateKey) ?? [];
       existing.push(execution);
       executionsByDate.set(dateKey, existing);
@@ -1146,5 +1181,628 @@ export class AnalyticsApiService {
       workoutsLast7Days,
       workoutsLast28Days,
     };
+  }
+
+  // ==================== Streak Methods ====================
+
+  async getStreak(req: Request & { user: AuthUser }): Promise<StreakResponse> {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    // Get Monday of current week
+    const dayOfWeek = today.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const currentWeekStart = new Date(today);
+    currentWeekStart.setDate(today.getDate() + diffToMonday);
+    currentWeekStart.setHours(0, 0, 0, 0);
+
+    // Go back far enough to calculate longest streak (1 year)
+    const lookbackStart = new Date(currentWeekStart);
+    lookbackStart.setDate(lookbackStart.getDate() - 365);
+
+    // Fetch all completed executions
+    const executions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        completedDateFrom: lookbackStart,
+        completedDateTo: today,
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'asc' }],
+    });
+
+    // Get workout types for each execution
+    const workoutTypesMap = await this.getWorkoutTypesForExecutions(executions);
+
+    // Group executions by week (Monday-based)
+    const executionsByWeek = new Map<string, WorkoutExecution[]>();
+    const executionsByDate = new Map<string, { execution: WorkoutExecution; type: WorkoutType }[]>();
+
+    for (const execution of executions) {
+      const completedAt =
+        execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
+      const dateKey = formatDateToYMD(completedAt);
+
+      // Group by date
+      const dateList = executionsByDate.get(dateKey) ?? [];
+      dateList.push({
+        execution,
+        type: workoutTypesMap.get(execution.id) ?? WorkoutType.CUSTOM,
+      });
+      executionsByDate.set(dateKey, dateList);
+
+      // Get week start for this execution
+      const execDayOfWeek = completedAt.getDay();
+      const execDiffToMonday = execDayOfWeek === 0 ? -6 : 1 - execDayOfWeek;
+      const weekStart = new Date(completedAt);
+      weekStart.setDate(completedAt.getDate() + execDiffToMonday);
+      const weekKey = formatDateToYMD(weekStart);
+
+      const weekList = executionsByWeek.get(weekKey) ?? [];
+      weekList.push(execution);
+      executionsByWeek.set(weekKey, weekList);
+    }
+
+    // Calculate streaks - a week counts if it has 3+ workouts
+    const weekStartDates: string[] = [];
+    const current = new Date(lookbackStart);
+    while (current <= currentWeekStart) {
+      weekStartDates.push(formatDateToYMD(current));
+      current.setDate(current.getDate() + 7);
+    }
+
+    // Calculate current streak and longest streak
+    let currentStreakWeeks = 0;
+    let longestStreakWeeks = 0;
+    let tempStreak = 0;
+
+    // Process weeks from oldest to newest
+    for (const weekKey of weekStartDates) {
+      const weekExecutions = executionsByWeek.get(weekKey) ?? [];
+      const countsTowardStreak = weekExecutions.length >= 3;
+
+      if (countsTowardStreak) {
+        tempStreak++;
+        if (tempStreak > longestStreakWeeks) {
+          longestStreakWeeks = tempStreak;
+        }
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    // Current streak: count backwards from current week
+    // Current week might still be in progress, so we start from last complete week
+    const lastWeekStart = new Date(currentWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+    for (let i = weekStartDates.length - 2; i >= 0; i--) {
+      const weekKey = weekStartDates[i];
+      const weekExecutions = executionsByWeek.get(weekKey) ?? [];
+      if (weekExecutions.length >= 3) {
+        currentStreakWeeks++;
+      } else {
+        break;
+      }
+    }
+
+    // Check if current week is on track
+    const currentWeekKey = formatDateToYMD(currentWeekStart);
+    const currentWeekExecutions = executionsByWeek.get(currentWeekKey) ?? [];
+    const currentWeekWorkouts = currentWeekExecutions.length;
+
+    // Days remaining in current week
+    const todayDayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+    const daysRemaining = 7 - todayDayOfWeek;
+
+    // Current week on track if already has 3+ or can still reach 3
+    const currentWeekOnTrack = currentWeekWorkouts >= 3 || (currentWeekWorkouts + daysRemaining >= 3);
+    const workoutsNeededThisWeek = Math.max(0, 3 - currentWeekWorkouts);
+
+    // If current week already qualifies, add it to current streak
+    if (currentWeekWorkouts >= 3) {
+      currentStreakWeeks++;
+    }
+
+    // Build last 4 weeks breakdown
+    const weeks: StreakWeekDTO[] = [];
+
+    for (let weekOffset = 0; weekOffset < 4; weekOffset++) {
+      const weekStart = new Date(currentWeekStart);
+      weekStart.setDate(weekStart.getDate() - weekOffset * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      const weekKey = formatDateToYMD(weekStart);
+      const weekExecutions = executionsByWeek.get(weekKey) ?? [];
+
+      const days: StreakDayDTO[] = [];
+
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(dayDate.getDate() + dayOffset);
+        const dateKey = formatDateToYMD(dayDate);
+
+        const dayExecutions = executionsByDate.get(dateKey) ?? [];
+        const hasWorkout = dayExecutions.length > 0;
+        const workoutType = hasWorkout ? dayExecutions[0].type : null;
+
+        const isPast = dayDate < today && dayDate.toDateString() !== today.toDateString();
+        const isToday = dayDate.toDateString() === today.toDateString();
+
+        days.push({
+          date: dateKey,
+          dayOfWeek: dayOffset + 1, // 1 = Monday
+          hasWorkout,
+          workoutType,
+          isPast,
+          isToday,
+        });
+      }
+
+      weeks.push({
+        weekNumber: weekOffset,
+        weekStart: weekKey,
+        weekEnd: formatDateToYMD(weekEnd),
+        workoutCount: weekExecutions.length,
+        countsTowardStreak: weekExecutions.length >= 3,
+        days,
+      });
+    }
+
+    const data: StreakDTO = {
+      currentStreakWeeks,
+      longestStreakWeeks,
+      totalWorkouts: executions.length,
+      currentWeekOnTrack,
+      workoutsNeededThisWeek,
+      weeks,
+    };
+
+    return { data };
+  }
+
+  // ==================== Race Predictions Methods ====================
+
+  // Race distances in meters
+  private readonly RACE_DISTANCES = [
+    { id: '5k', name: '5K', meters: 5000 },
+    { id: '10k', name: '10K', meters: 10000 },
+    { id: 'half_marathon', name: 'Half Marathon', meters: 21097.5 },
+    { id: 'marathon', name: 'Marathon', meters: 42195 },
+  ];
+
+  async getRacePredictions(req: Request & { user: AuthUser }): Promise<RacePredictionsResponse> {
+    // Try to find the best data source for predictions
+    const dataSource = await this.findBestRaceDataSource(req.user.id);
+
+    if (!dataSource) {
+      const data: RacePredictionsDTO = {
+        predictions: [],
+        dataSource: {
+          sourceType: 'recent_run',
+          distanceMeters: 0,
+          timeSeconds: 0,
+          achievedAt: new Date().toISOString(),
+          description: null,
+        },
+        hasData: false,
+        message: 'No running data available. Complete a run with GPS tracking or achieve a running PR to see predictions.',
+      };
+      return { data };
+    }
+
+    // Calculate predictions using Riegel's formula: T2 = T1 × (D2/D1)^1.06
+    const predictions: RacePredictionDTO[] = this.RACE_DISTANCES.map((race) => {
+      const predictedTimeSeconds = this.predictRaceTime(
+        dataSource.distanceMeters,
+        dataSource.timeSeconds,
+        race.meters,
+      );
+
+      const paceSecondsPerKm = predictedTimeSeconds / (race.meters / 1000);
+
+      // Calculate confidence based on how close the source distance is to the target
+      const distanceRatio = Math.min(dataSource.distanceMeters, race.meters) /
+                           Math.max(dataSource.distanceMeters, race.meters);
+      const confidence = Math.round(distanceRatio * 100);
+
+      return {
+        raceId: race.id,
+        raceName: race.name,
+        distanceMeters: race.meters,
+        predictedTimeSeconds: Math.round(predictedTimeSeconds),
+        predictedTimeFormatted: this.formatRaceTime(predictedTimeSeconds),
+        paceSecondsPerKm: Math.round(paceSecondsPerKm),
+        paceFormatted: this.formatPace(paceSecondsPerKm),
+        confidence,
+      };
+    });
+
+    const data: RacePredictionsDTO = {
+      predictions,
+      dataSource,
+      hasData: true,
+      message: null,
+    };
+
+    return { data };
+  }
+
+  private async findBestRaceDataSource(userId: string): Promise<RaceDataSourceDTO | null> {
+    // Priority 1: Use existing running PRs (fastest times for known distances)
+    const prRecordTypes = [
+      { type: 'fastest_5k', distance: 5000, name: '5K PR' },
+      { type: 'fastest_10k', distance: 10000, name: '10K PR' },
+      { type: 'fastest_half_marathon', distance: 21097.5, name: 'Half Marathon PR' },
+      { type: 'fastest_marathon', distance: 42195, name: 'Marathon PR' },
+      { type: 'fastest_1k', distance: 1000, name: '1K PR' },
+    ];
+
+    const prs = await this.personalRecordRepository.findMany({
+      userId,
+      category: 'cardio_distance',
+    });
+
+    // Find the best PR to use (prefer longer distances as they're more reliable)
+    for (const prDef of prRecordTypes) {
+      const pr = prs.find((p) => p.record_type === prDef.type);
+      if (pr) {
+        const achievedAt = pr.achieved_at instanceof Date
+          ? pr.achieved_at.toISOString()
+          : String(pr.achieved_at);
+
+        return {
+          sourceType: 'personal_record',
+          distanceMeters: prDef.distance,
+          timeSeconds: Number.parseFloat(pr.value),
+          achievedAt,
+          description: prDef.name,
+        };
+      }
+    }
+
+    // Priority 2: Use recent runs with route data
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentExecutions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId,
+        completedDateFrom: thirtyDaysAgo,
+        completedDateTo: new Date(),
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'desc' }],
+    });
+
+    // Find the best recent run (longest distance with route data)
+    let bestRun: { distance: number; time: number; date: Date } | null = null;
+
+    for (const execution of recentExecutions) {
+      // Check if this is a running workout
+      const workoutType = await this.getWorkoutTypeForExecution(execution);
+      if (workoutType !== WorkoutType.RUN && workoutType !== WorkoutType.CARDIO) {
+        continue;
+      }
+
+      const route = await this.workoutRouteRepository.findByExecutionId(execution.id);
+      if (!route || !execution.duration_seconds) continue;
+
+      const distance = Number.parseFloat(route.total_distance_meters);
+      const time = execution.duration_seconds;
+
+      // Only use runs of at least 1km
+      if (distance < 1000) continue;
+
+      // Prefer longer distances
+      if (!bestRun || distance > bestRun.distance) {
+        const completedAt = execution.completed_at instanceof Date
+          ? execution.completed_at
+          : new Date(String(execution.completed_at));
+
+        bestRun = { distance, time, date: completedAt };
+      }
+    }
+
+    if (bestRun) {
+      return {
+        sourceType: 'recent_run',
+        distanceMeters: bestRun.distance,
+        timeSeconds: bestRun.time,
+        achievedAt: bestRun.date.toISOString(),
+        description: `${(bestRun.distance / 1000).toFixed(2)} km run`,
+      };
+    }
+
+    return null;
+  }
+
+  private async getWorkoutTypeForExecution(execution: WorkoutExecution): Promise<WorkoutType> {
+    if (execution.workout_schedule_id) {
+      const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
+      if (schedule) {
+        const workout = await this.workoutRepository.findById(schedule.workout_id);
+        if (workout) {
+          return workout.type;
+        }
+      }
+    }
+    return this.inferWorkoutTypeFromNotes(execution.notes);
+  }
+
+  /**
+   * Riegel's formula for race time prediction
+   * T2 = T1 × (D2/D1)^1.06
+   *
+   * This is the most widely used formula for predicting race times.
+   * The exponent 1.06 accounts for the fact that pace slows as distance increases.
+   */
+  private predictRaceTime(knownDistance: number, knownTime: number, targetDistance: number): number {
+    const exponent = 1.06;
+    return knownTime * Math.pow(targetDistance / knownDistance, exponent);
+  }
+
+  private formatRaceTime(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.round(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  private formatPace(secondsPerKm: number): string {
+    const minutes = Math.floor(secondsPerKm / 60);
+    const secs = Math.round(secondsPerKm % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')} /km`;
+  }
+
+  // ==================== Strength Progression Methods ====================
+
+  async getStrengthProgression(
+    req: Request & { user: AuthUser },
+    exerciseId: string,
+    query: StrengthProgressionQuery,
+  ): Promise<StrengthProgressionResponse> {
+    const days = query.days || 90;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Get exercise info
+    const exercise = await this.exerciseRepository.findById(exerciseId);
+    if (!exercise) {
+      throw new NotFoundException('Exercise not found');
+    }
+
+    // Get all completed workout executions for the user in the period
+    const executions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        completedDateFrom: startDate,
+        completedDateTo: new Date(),
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'asc' }],
+    });
+
+    // For each execution, get set completions for this exercise
+    const dataPointsMap = new Map<string, {
+      sets: Array<{ weight: number; reps: number; rpe: number | null }>;
+      date: Date;
+    }>();
+
+    for (const execution of executions) {
+      // Get all set completions for this execution
+      const setCompletions = await this.setCompletionRepository.findMany({
+        filter: { workoutExecutionId: execution.id, skipped: false },
+      });
+
+      // Get exercise instance IDs that match our exercise
+      const exerciseInstanceIds = new Set<string>();
+      for (const sc of setCompletions) {
+        const instance = await this.exerciseInstanceRepository.findById(sc.exercise_instance_id);
+        if (instance && instance.exercise_id === exerciseId) {
+          exerciseInstanceIds.add(sc.exercise_instance_id);
+        }
+      }
+
+      if (exerciseInstanceIds.size === 0) continue;
+
+      // Filter set completions to only those for our exercise
+      const relevantSets = setCompletions.filter((sc) => exerciseInstanceIds.has(sc.exercise_instance_id));
+      if (relevantSets.length === 0) continue;
+
+      const completedAt = execution.completed_at instanceof Date
+        ? execution.completed_at
+        : new Date(String(execution.completed_at));
+      const dateKey = formatDateToYMD(completedAt);
+
+      const existing = dataPointsMap.get(dateKey) || { sets: [], date: completedAt };
+
+      for (const set of relevantSets) {
+        if (set.actual_reps && set.actual_load) {
+          existing.sets.push({
+            weight: Number.parseFloat(set.actual_load),
+            reps: set.actual_reps,
+            rpe: set.rpe,
+          });
+        }
+      }
+
+      if (existing.sets.length > 0) {
+        dataPointsMap.set(dateKey, existing);
+      }
+    }
+
+    // Convert to data points
+    const dataPoints: StrengthDataPointDTO[] = [];
+
+    for (const [date, { sets }] of dataPointsMap) {
+      if (sets.length === 0) continue;
+
+      const maxWeight = Math.max(...sets.map((s) => s.weight));
+      const maxReps = Math.max(...sets.map((s) => s.reps));
+      const bestSetVolume = Math.max(...sets.map((s) => s.weight * s.reps));
+      const totalVolume = sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+      const totalSets = sets.length;
+
+      // Calculate estimated 1RM using Brzycki formula: 1RM = weight × (36 / (37 - reps))
+      // Use the set with the highest estimated 1RM
+      const estimated1RM = Math.max(
+        ...sets.map((s) => {
+          if (s.reps >= 37) return s.weight; // Cap at 36 reps
+          return s.weight * (36 / (37 - s.reps));
+        }),
+      );
+
+      const rpesWithValue = sets.filter((s) => s.rpe !== null).map((s) => s.rpe!);
+      const avgRpe = rpesWithValue.length > 0
+        ? Math.round((rpesWithValue.reduce((a, b) => a + b, 0) / rpesWithValue.length) * 10) / 10
+        : null;
+
+      dataPoints.push({
+        date,
+        maxWeight: Math.round(maxWeight * 100) / 100,
+        maxReps,
+        bestSetVolume: Math.round(bestSetVolume * 100) / 100,
+        totalVolume: Math.round(totalVolume * 100) / 100,
+        totalSets,
+        estimated1RM: Math.round(estimated1RM * 100) / 100,
+        avgRpe,
+      });
+    }
+
+    // Sort by date
+    dataPoints.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Calculate progress percentages
+    let weightProgressPercent: number | null = null;
+    let e1rmProgressPercent: number | null = null;
+
+    if (dataPoints.length >= 2) {
+      const first = dataPoints[0];
+      const last = dataPoints[dataPoints.length - 1];
+
+      if (first.maxWeight > 0) {
+        weightProgressPercent = Math.round(((last.maxWeight - first.maxWeight) / first.maxWeight) * 1000) / 10;
+      }
+      if (first.estimated1RM > 0) {
+        e1rmProgressPercent = Math.round(((last.estimated1RM - first.estimated1RM) / first.estimated1RM) * 1000) / 10;
+      }
+    }
+
+    const data: StrengthProgressionDTO = {
+      exerciseId,
+      exerciseName: exercise.name,
+      weightUnit: 'kg',
+      dataPoints,
+      totalSessions: dataPoints.length,
+      weightProgressPercent,
+      e1rmProgressPercent,
+    };
+
+    return { data };
+  }
+
+  async getTrackedExercises(req: Request & { user: AuthUser }): Promise<TrackedExercisesResponse> {
+    // Get all completed workout executions for the user
+    const executions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'desc' }],
+    });
+
+    // Track exercises with their stats
+    const exerciseStats = new Map<string, {
+      exerciseId: string;
+      exerciseName: string;
+      sessionCount: number;
+      lastSessionDate: Date;
+      maxWeight: number;
+    }>();
+
+    for (const execution of executions) {
+      // Get all set completions for this execution
+      const setCompletions = await this.setCompletionRepository.findMany({
+        filter: { workoutExecutionId: execution.id, skipped: false },
+      });
+
+      // Get unique exercise IDs from instances
+      const instanceExerciseMap = new Map<string, string>();
+      for (const sc of setCompletions) {
+        if (!instanceExerciseMap.has(sc.exercise_instance_id)) {
+          const instance = await this.exerciseInstanceRepository.findById(sc.exercise_instance_id);
+          if (instance) {
+            instanceExerciseMap.set(sc.exercise_instance_id, instance.exercise_id);
+          }
+        }
+      }
+
+      // Group sets by exercise
+      const exerciseSets = new Map<string, typeof setCompletions>();
+      for (const sc of setCompletions) {
+        const exerciseId = instanceExerciseMap.get(sc.exercise_instance_id);
+        if (!exerciseId) continue;
+
+        const existing = exerciseSets.get(exerciseId) || [];
+        existing.push(sc);
+        exerciseSets.set(exerciseId, existing);
+      }
+
+      const completedAt = execution.completed_at instanceof Date
+        ? execution.completed_at
+        : new Date(String(execution.completed_at));
+
+      for (const [exerciseId, sets] of exerciseSets) {
+        const existing = exerciseStats.get(exerciseId);
+
+        // Only count if there's at least one weighted set
+        const weightedSets = sets.filter((s) => s.actual_load && Number.parseFloat(s.actual_load) > 0);
+        if (weightedSets.length === 0) continue;
+
+        const sessionMaxWeight = Math.max(...weightedSets.map((s) => Number.parseFloat(s.actual_load!)));
+
+        if (existing) {
+          existing.sessionCount += 1;
+          if (completedAt > existing.lastSessionDate) {
+            existing.lastSessionDate = completedAt;
+          }
+          if (sessionMaxWeight > existing.maxWeight) {
+            existing.maxWeight = sessionMaxWeight;
+          }
+        } else {
+          const exercise = await this.exerciseRepository.findById(exerciseId);
+          if (exercise) {
+            exerciseStats.set(exerciseId, {
+              exerciseId,
+              exerciseName: exercise.name,
+              sessionCount: 1,
+              lastSessionDate: completedAt,
+              maxWeight: sessionMaxWeight,
+            });
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by session count
+    const exercises: TrackedExerciseDTO[] = Array.from(exerciseStats.values())
+      .map((stats) => ({
+        exerciseId: stats.exerciseId,
+        exerciseName: stats.exerciseName,
+        sessionCount: stats.sessionCount,
+        lastSessionDate: formatDateToYMD(stats.lastSessionDate),
+        currentMaxWeight: stats.maxWeight > 0 ? Math.round(stats.maxWeight * 100) / 100 : null,
+      }))
+      .sort((a, b) => b.sessionCount - a.sessionCount);
+
+    const data: TrackedExercisesDTO = { exercises };
+    return { data };
   }
 }

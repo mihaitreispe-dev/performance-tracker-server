@@ -18,6 +18,18 @@ export class WorkoutInfoForPlanDTO {
   @IsString()
   @IsOptional()
   description?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  type: string;
+
+  @ApiProperty()
+  @IsString()
+  difficulty: string;
+
+  @ApiProperty()
+  @IsInt()
+  exerciseCount: number;
 }
 
 export class WorkoutPlanItemDTO {

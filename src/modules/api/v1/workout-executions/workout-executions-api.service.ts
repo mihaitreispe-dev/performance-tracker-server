@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import {
   CardioMetric,
@@ -22,6 +22,8 @@ import {
 } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+
+import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
 
 import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
@@ -51,6 +53,8 @@ import {
 
 @Injectable()
 export class WorkoutExecutionsApiService {
+  private readonly logger = new Logger(WorkoutExecutionsApiService.name);
+
   constructor(
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
     private readonly setCompletionRepository: SetCompletionRepository,
@@ -58,6 +62,7 @@ export class WorkoutExecutionsApiService {
     private readonly workoutRouteRepository: WorkoutRouteRepository,
     private readonly workoutScheduleRepository: WorkoutScheduleRepository,
     private readonly workoutRepository: WorkoutRepository,
+    private readonly personalRecordsDetectionService: PersonalRecordsDetectionService,
   ) {}
 
   // Workout Executions
@@ -201,6 +206,13 @@ export class WorkoutExecutionsApiService {
     if (body.completedAt && updatedExecution.workout_schedule_id) {
       await this.workoutScheduleRepository.updateById(updatedExecution.workout_schedule_id, {
         completed_at: new Date(body.completedAt),
+      });
+    }
+
+    // Trigger PR detection asynchronously when workout is completed
+    if (body.completedAt) {
+      this.personalRecordsDetectionService.detectAndStorePRs(id, req.user.id).catch((error) => {
+        this.logger.error(`Failed to detect PRs for execution ${id}:`, error);
       });
     }
 

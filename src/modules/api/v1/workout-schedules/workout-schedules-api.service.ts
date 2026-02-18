@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { Workout, WorkoutExecution, WorkoutSchedule } from 'src/database/interfaces';
+import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -239,7 +240,7 @@ export class WorkoutSchedulesApiService {
 
     const scheduledDate =
       schedule.scheduled_date instanceof Date
-        ? schedule.scheduled_date.toISOString().split('T')[0]
+        ? formatDateToYMD(schedule.scheduled_date)
         : String(schedule.scheduled_date);
     const completedAt = schedule.completed_at
       ? schedule.completed_at instanceof Date

@@ -515,3 +515,303 @@ export class TrainingLoadHistoryResponse extends ItemResponse<TrainingLoadHistor
   @ValidateNested()
   declare data: TrainingLoadHistoryDTO;
 }
+
+// Streak
+
+export class StreakDayDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Day of week (1=Mon, 7=Sun)' })
+  @IsNumber()
+  dayOfWeek: number;
+
+  @ApiProperty({ description: 'Whether a workout was completed on this day' })
+  @IsBoolean()
+  hasWorkout: boolean;
+
+  @ApiPropertyOptional({ enum: WorkoutType, description: 'Type of workout if completed' })
+  @IsEnumString(WorkoutType)
+  @IsOptional()
+  workoutType?: WorkoutType | null;
+
+  @ApiProperty({ description: 'Whether this day is in the past' })
+  @IsBoolean()
+  isPast: boolean;
+
+  @ApiProperty({ description: 'Whether this day is today' })
+  @IsBoolean()
+  isToday: boolean;
+}
+
+export class StreakWeekDTO {
+  @ApiProperty({ description: 'Week number (0 = current week, 1 = last week, etc.)' })
+  @IsNumber()
+  weekNumber: number;
+
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  weekStart: string;
+
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  weekEnd: string;
+
+  @ApiProperty({ description: 'Number of workouts completed this week' })
+  @IsNumber()
+  workoutCount: number;
+
+  @ApiProperty({ description: 'Whether this week counts toward the streak (3+ workouts)' })
+  @IsBoolean()
+  countsTowardStreak: boolean;
+
+  @ApiProperty({ type: [StreakDayDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StreakDayDTO)
+  days: StreakDayDTO[];
+}
+
+export class StreakDTO {
+  @ApiProperty({ description: 'Current streak in weeks' })
+  @IsNumber()
+  currentStreakWeeks: number;
+
+  @ApiProperty({ description: 'Longest streak ever in weeks' })
+  @IsNumber()
+  longestStreakWeeks: number;
+
+  @ApiProperty({ description: 'Total workouts completed all time' })
+  @IsNumber()
+  totalWorkouts: number;
+
+  @ApiProperty({ description: 'Whether current week is on track (3+ workouts or potential to reach 3)' })
+  @IsBoolean()
+  currentWeekOnTrack: boolean;
+
+  @ApiProperty({ description: 'Workouts needed this week to maintain streak' })
+  @IsNumber()
+  workoutsNeededThisWeek: number;
+
+  @ApiProperty({ type: [StreakWeekDTO], description: 'Last 4 weeks breakdown' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StreakWeekDTO)
+  weeks: StreakWeekDTO[];
+}
+
+export class StreakResponse extends ItemResponse<StreakDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: StreakDTO;
+}
+
+// Race Predictions
+
+export class RacePredictionDTO {
+  @ApiProperty({ description: 'Race distance identifier' })
+  @IsString()
+  raceId: string;
+
+  @ApiProperty({ description: 'Race name (e.g., "5K", "Half Marathon")' })
+  @IsString()
+  raceName: string;
+
+  @ApiProperty({ description: 'Race distance in meters' })
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiProperty({ description: 'Predicted time in seconds' })
+  @IsNumber()
+  predictedTimeSeconds: number;
+
+  @ApiProperty({ description: 'Predicted time formatted (HH:MM:SS or MM:SS)' })
+  @IsString()
+  predictedTimeFormatted: string;
+
+  @ApiProperty({ description: 'Predicted pace in seconds per kilometer' })
+  @IsNumber()
+  paceSecondsPerKm: number;
+
+  @ApiProperty({ description: 'Predicted pace formatted (MM:SS /km)' })
+  @IsString()
+  paceFormatted: string;
+
+  @ApiPropertyOptional({ type: Number, description: 'Confidence level 0-100 based on data quality' })
+  @IsNumber()
+  @IsOptional()
+  confidence?: number | null;
+}
+
+export class RaceDataSourceDTO {
+  @ApiProperty({ description: 'Source type: personal_record or recent_run' })
+  @IsString()
+  sourceType: 'personal_record' | 'recent_run';
+
+  @ApiProperty({ description: 'Distance used for prediction (meters)' })
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiProperty({ description: 'Time achieved at this distance (seconds)' })
+  @IsNumber()
+  timeSeconds: number;
+
+  @ApiProperty({ description: 'Date when this was achieved' })
+  @IsString()
+  achievedAt: string;
+
+  @ApiPropertyOptional({ type: String, description: 'Description of the source' })
+  @IsString()
+  @IsOptional()
+  description?: string | null;
+}
+
+export class RacePredictionsDTO {
+  @ApiProperty({ type: [RacePredictionDTO], description: 'Predicted times for various race distances' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RacePredictionDTO)
+  predictions: RacePredictionDTO[];
+
+  @ApiProperty({ type: RaceDataSourceDTO, description: 'Data source used for predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RaceDataSourceDTO)
+  dataSource: RaceDataSourceDTO;
+
+  @ApiProperty({ description: 'Whether sufficient data exists for predictions' })
+  @IsBoolean()
+  hasData: boolean;
+
+  @ApiPropertyOptional({ type: String, description: 'Message when no data available' })
+  @IsString()
+  @IsOptional()
+  message?: string | null;
+}
+
+export class RacePredictionsResponse extends ItemResponse<RacePredictionsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: RacePredictionsDTO;
+}
+
+// Strength Progression
+
+export class StrengthDataPointDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Max weight lifted on this date' })
+  @IsNumber()
+  maxWeight: number;
+
+  @ApiProperty({ description: 'Max reps in a single set on this date' })
+  @IsNumber()
+  maxReps: number;
+
+  @ApiProperty({ description: 'Best set volume (weight × reps)' })
+  @IsNumber()
+  bestSetVolume: number;
+
+  @ApiProperty({ description: 'Total volume for the exercise on this date' })
+  @IsNumber()
+  totalVolume: number;
+
+  @ApiProperty({ description: 'Total sets completed' })
+  @IsNumber()
+  totalSets: number;
+
+  @ApiProperty({ description: 'Estimated 1RM using Brzycki formula' })
+  @IsNumber()
+  estimated1RM: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Average RPE for the session' })
+  @IsNumber()
+  @IsOptional()
+  avgRpe?: number | null;
+}
+
+export class StrengthProgressionDTO {
+  @ApiProperty()
+  @IsUUID()
+  exerciseId: string;
+
+  @ApiProperty()
+  @IsString()
+  exerciseName: string;
+
+  @ApiProperty({ description: 'Unit for weight values' })
+  @IsString()
+  weightUnit: string;
+
+  @ApiProperty({ type: [StrengthDataPointDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StrengthDataPointDTO)
+  dataPoints: StrengthDataPointDTO[];
+
+  @ApiProperty({ description: 'Total number of sessions with this exercise' })
+  @IsNumber()
+  totalSessions: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Percentage improvement in max weight' })
+  @IsNumber()
+  @IsOptional()
+  weightProgressPercent?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Percentage improvement in estimated 1RM' })
+  @IsNumber()
+  @IsOptional()
+  e1rmProgressPercent?: number | null;
+}
+
+export class StrengthProgressionResponse extends ItemResponse<StrengthProgressionDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: StrengthProgressionDTO;
+}
+
+// Exercise list for strength tracking
+
+export class TrackedExerciseDTO {
+  @ApiProperty()
+  @IsUUID()
+  exerciseId: string;
+
+  @ApiProperty()
+  @IsString()
+  exerciseName: string;
+
+  @ApiProperty({ description: 'Number of sessions with this exercise' })
+  @IsNumber()
+  sessionCount: number;
+
+  @ApiProperty({ description: 'Date of last session' })
+  @IsString()
+  lastSessionDate: string;
+
+  @ApiPropertyOptional({ type: Number, description: 'Current max weight' })
+  @IsNumber()
+  @IsOptional()
+  currentMaxWeight?: number | null;
+}
+
+export class TrackedExercisesDTO {
+  @ApiProperty({ type: [TrackedExerciseDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrackedExerciseDTO)
+  exercises: TrackedExerciseDTO[];
+}
+
+export class TrackedExercisesResponse extends ItemResponse<TrackedExercisesDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: TrackedExercisesDTO;
+}

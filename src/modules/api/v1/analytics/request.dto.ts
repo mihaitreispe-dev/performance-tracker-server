@@ -26,13 +26,32 @@ export class WeeklySummaryQuery {
 }
 
 export class PeriodSummaryQuery {
-  @ApiProperty({
+  @ApiPropertyOptional({
     enum: AnalyticsPeriod,
-    description: 'Period to summarize',
+    description: 'Period to summarize (ignored if dateFrom/dateTo provided)',
     example: AnalyticsPeriod.SEVEN_DAYS,
   })
   @IsEnumString(AnalyticsPeriod)
-  period: AnalyticsPeriod;
+  @IsOptional()
+  period?: AnalyticsPeriod;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date',
+    description: 'Custom start date (YYYY-MM-DD)',
+  })
+  @IsDateString()
+  @IsOptional()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date',
+    description: 'Custom end date (YYYY-MM-DD)',
+  })
+  @IsDateString()
+  @IsOptional()
+  dateTo?: string;
 }
 
 export class WorkoutAnalyticsParam {
@@ -45,6 +64,22 @@ export class TrainingLoadHistoryQuery {
   @ApiPropertyOptional({
     type: Number,
     description: 'Number of days to include in history (default 90)',
+    example: 90,
+  })
+  @IsOptional()
+  days?: number;
+}
+
+export class StrengthProgressionParam {
+  @ApiProperty({ description: 'Exercise ID' })
+  @IsUUID()
+  exerciseId: string;
+}
+
+export class StrengthProgressionQuery {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of days to include (default 90)',
     example: 90,
   })
   @IsOptional()

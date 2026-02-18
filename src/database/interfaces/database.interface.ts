@@ -13,6 +13,8 @@ import { ExerciseInstancesTable } from './exercise-instances-table.interface';
 import { ExerciseMuscleGroupsTable } from './exercise-muscle-groups-table.interface';
 import { ExercisesTable } from './exercises-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
+import { PersonalRecordHistoryTable } from './personal-record-history-table.interface';
+import { PersonalRecordsTable } from './personal-records-table.interface';
 import { RefreshTokensTable } from './refresh-tokens-table.interface';
 import { RouteMarkersTable } from './route-markers-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
@@ -58,4 +60,6 @@ export interface Database {
   workout_plans: WorkoutPlansTable;
   workout_plan_items: WorkoutPlanItemsTable;
   daily_training_loads: DailyTrainingLoadsTable;
+  personal_records: PersonalRecordsTable;
+  personal_record_history: PersonalRecordHistoryTable;
 }
