@@ -1,10 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { CardioMetricType, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
+import { CardioMetricType, ExecutionWeather, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-load.repository';
+import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
@@ -22,6 +23,7 @@ import {
   CurrentTrainingLoadResponse,
   DailyActivityDTO,
   DailyWorkoutDTO,
+  ExecutionWeatherDTO,
   HRZonesSummaryDTO,
   HRZoneStatDTO,
   MetricSummaryDTO,
@@ -71,6 +73,7 @@ export class AnalyticsApiService {
     private readonly muscleGroupRepository: MuscleGroupRepository,
     private readonly dailyTrainingLoadRepository: DailyTrainingLoadRepository,
     private readonly personalRecordRepository: PersonalRecordRepository,
+    private readonly executionWeatherRepository: ExecutionWeatherRepository,
   ) {}
 
   async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
@@ -284,6 +287,10 @@ export class AnalyticsApiService {
         : String(execution.completed_at)
       : null;
 
+    // Get weather data if available
+    const weatherData = await this.executionWeatherRepository.findByExecutionId(executionId);
+    const weather = weatherData ? this.mapWeatherToDTO(weatherData) : null;
+
     const analytics: WorkoutAnalyticsDTO = {
       executionId: execution.id,
       workoutName,
@@ -294,9 +301,32 @@ export class AnalyticsApiService {
       metricsSummary,
       setsSummary,
       route,
+      weather,
     };
 
     return { data: analytics };
+  }
+
+  private mapWeatherToDTO(weather: ExecutionWeather): ExecutionWeatherDTO {
+    const recordedAt =
+      weather.recorded_at instanceof Date ? weather.recorded_at.toISOString() : String(weather.recorded_at);
+
+    return {
+      temperatureCelsius: weather.temperature_celsius ? Number.parseFloat(weather.temperature_celsius) : null,
+      feelsLikeCelsius: weather.feels_like_celsius ? Number.parseFloat(weather.feels_like_celsius) : null,
+      humidityPercent: weather.humidity_percent,
+      windSpeedKmh: weather.wind_speed_kmh ? Number.parseFloat(weather.wind_speed_kmh) : null,
+      windDirectionDegrees: weather.wind_direction_degrees,
+      windGustsKmh: weather.wind_gusts_kmh ? Number.parseFloat(weather.wind_gusts_kmh) : null,
+      precipitationMm: weather.precipitation_mm ? Number.parseFloat(weather.precipitation_mm) : null,
+      weatherCode: weather.weather_code,
+      weatherDescription: weather.weather_description,
+      cloudCoverPercent: weather.cloud_cover_percent,
+      pressureHpa: weather.pressure_hpa ? Number.parseFloat(weather.pressure_hpa) : null,
+      visibilityMeters: weather.visibility_meters,
+      uvIndex: weather.uv_index ? Number.parseFloat(weather.uv_index) : null,
+      recordedAt,
+    };
   }
 
   async getPeriodSummary(req: Request & { user: AuthUser }, query: PeriodSummaryQuery): Promise<PeriodSummaryResponse> {

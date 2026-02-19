@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { type Request } from 'express';
 import {
   CardioMetric,
+  ExecutionWeather,
   GeoJSONLineString,
   RouteMarker,
   SetCompletion,
@@ -12,7 +13,9 @@ import {
   WorkoutSchedule,
 } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { WeatherService } from 'src/modules/weather/weather.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import {
@@ -63,6 +66,8 @@ export class WorkoutExecutionsApiService {
     private readonly workoutScheduleRepository: WorkoutScheduleRepository,
     private readonly workoutRepository: WorkoutRepository,
     private readonly personalRecordsDetectionService: PersonalRecordsDetectionService,
+    private readonly weatherService: WeatherService,
+    private readonly executionWeatherRepository: ExecutionWeatherRepository,
   ) {}
 
   // Workout Executions
@@ -214,6 +219,9 @@ export class WorkoutExecutionsApiService {
       this.personalRecordsDetectionService.detectAndStorePRs(id, req.user.id).catch((error) => {
         this.logger.error(`Failed to detect PRs for execution ${id}:`, error);
       });
+
+      // Trigger weather fetch asynchronously for workouts with route data
+      this.triggerWeatherFetch(id, updatedExecution.started_at);
     }
 
     let workout: Workout | undefined;
@@ -441,6 +449,45 @@ export class WorkoutExecutionsApiService {
     const markers = await this.workoutRouteRepository.findMarkersByRouteId(route.id);
 
     return { data: this.mapWorkoutRouteToDTO(route, markers) };
+  }
+
+  // Weather
+
+  /**
+   * Trigger weather fetch asynchronously for a workout execution that has route data.
+   * Weather is fetched from the first coordinate of the route at the workout start time.
+   */
+  private triggerWeatherFetch(executionId: string, startedAt: Date | string): void {
+    (async () => {
+      try {
+        // Check if route exists for this execution
+        const route = await this.workoutRouteRepository.findByExecutionId(executionId);
+        if (!route) {
+          this.logger.debug(`No route found for execution ${executionId}, skipping weather fetch`);
+          return;
+        }
+
+        // Extract coordinates from route GeoJSON (format: [longitude, latitude])
+        const coordinates = route.route_geojson.coordinates;
+        if (!coordinates || coordinates.length === 0) {
+          this.logger.debug(`No coordinates in route for execution ${executionId}, skipping weather fetch`);
+          return;
+        }
+
+        const [longitude, latitude] = coordinates[0];
+        const workoutStartedAt = startedAt instanceof Date ? startedAt : new Date(startedAt);
+
+        // Fetch weather asynchronously
+        await this.weatherService.fetchAndStoreWeather({
+          workoutExecutionId: executionId,
+          latitude,
+          longitude,
+          startedAt: workoutStartedAt,
+        });
+      } catch (error) {
+        this.logger.error(`Failed to fetch weather for execution ${executionId}:`, error);
+      }
+    })();
   }
 
   // Mappers

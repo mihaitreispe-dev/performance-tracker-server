@@ -30,3 +30,4 @@ export * from './workout-plan-items-table.interface';
 export * from './daily-training-loads-table.interface';
 export * from './personal-records-table.interface';
 export * from './personal-record-history-table.interface';
+export * from './execution-weather-table.interface';

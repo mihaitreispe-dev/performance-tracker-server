@@ -145,6 +145,77 @@ export class SplitDTO {
   elevationMeters?: number | null;
 }
 
+export class ExecutionWeatherDTO {
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  temperatureCelsius?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  feelsLikeCelsius?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  humidityPercent?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  windSpeedKmh?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  windDirectionDegrees?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  windGustsKmh?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  precipitationMm?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  weatherCode?: number | null;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  weatherDescription?: string | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  cloudCoverPercent?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  pressureHpa?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  visibilityMeters?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  uvIndex?: number | null;
+
+  @ApiProperty()
+  @IsString()
+  recordedAt: string;
+}
+
 export class RouteAnalyticsDTO {
   @ApiProperty()
   @IsNumber()
@@ -212,6 +283,12 @@ export class WorkoutAnalyticsDTO {
   @ValidateNested()
   @IsOptional()
   route?: RouteAnalyticsDTO | null;
+
+  @ApiPropertyOptional({ type: ExecutionWeatherDTO, description: 'Weather conditions at workout start' })
+  @IsObject()
+  @ValidateNested()
+  @IsOptional()
+  weather?: ExecutionWeatherDTO | null;
 }
 
 export class WorkoutAnalyticsResponse extends ItemResponse<WorkoutAnalyticsDTO> {

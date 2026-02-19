@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { WeatherService } from 'src/modules/weather/weather.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
@@ -31,6 +33,8 @@ export class WorkoutExecutionsApiModule {
           PersonalRecordsDetectionService,
           PersonalRecordRepository,
           ExerciseInstanceRepository,
+          WeatherService,
+          ExecutionWeatherRepository,
         ],
         controllers: [WorkoutExecutionsApiController],
       };
