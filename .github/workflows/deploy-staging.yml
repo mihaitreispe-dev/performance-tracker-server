@@ -1,0 +1,130 @@
+name: deploy-staging
+
+on:
+  push:
+    branches: [deploy-staging]
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, deploy]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure environment
+        run: |
+          # Don't quote variables, since docker compose leaves them as quoted values
+          cat <<EOF > .env
+            # Module enablement
+            API_V1_MODULE_ENABLED=Y
+            API_V1_PORT=5100
+            CRON_MODULE_ENABLED=N
+            # API URL
+            API_V1_URL=${{ vars.API_V1_URL_STAGING }}
+            # Database
+            DB_HOST=${{ secrets.DB_HOST_STAGING }}
+            DB_PORT=${{ secrets.DB_PORT_STAGING }}
+            DB_USER=${{ secrets.DB_USER_STAGING }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD_STAGING }}
+            DB_NAME=${{ secrets.DB_NAME_STAGING }}
+            DB_SSL=${{ vars.DB_SSL_STAGING }}
+            # Auth
+            JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET_STAGING }}
+            JWT_ACCESS_TOKEN_EXPIRY=${{ vars.JWT_ACCESS_TOKEN_EXPIRY_STAGING }}
+            JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET_STAGING }}
+            JWT_REFRESH_TOKEN_EXPIRY=${{ vars.JWT_REFRESH_TOKEN_EXPIRY_STAGING }}
+            # Swagger
+            SWAGGER_USERNAME=${{ secrets.SWAGGER_USERNAME_STAGING }}
+            SWAGGER_PASSWORD=${{ secrets.SWAGGER_PASSWORD_STAGING }}
+            # AWS
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_STAGING }}
+            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY_STAGING }}
+            # S3
+            S3_REGION=${{ vars.S3_REGION_STAGING }}
+            S3_UPLOAD_BUCKET=${{ vars.S3_UPLOAD_BUCKET_STAGING }}
+            S3_CONTENT_BUCKET=${{ vars.S3_CONTENT_BUCKET_STAGING }}
+            # CDN
+            CDN_URL=${{ vars.CDN_URL_STAGING }}
+            DISABLE_CDN=${{ vars.DISABLE_CDN_STAGING }}
+            # CloudFront
+            CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID_STAGING }}
+            CLOUDFRONT_PRIVATE_KEY=${{ secrets.CLOUDFRONT_PRIVATE_KEY_STAGING }}
+            # Firebase
+            FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID_STAGING }}
+            FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL_STAGING }}
+            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY_STAGING }}
+            # MediaConvert
+            MEDIA_CONVERT_REGION=${{ vars.MEDIA_CONVERT_REGION_STAGING }}
+            MEDIA_CONVERT_ROLE=${{ secrets.MEDIA_CONVERT_ROLE_STAGING }}
+            MEDIA_CONVERT_QUEUE=${{ secrets.MEDIA_CONVERT_QUEUE_STAGING }}
+            DISABLE_MEDIA_CONVERT=${{ vars.DISABLE_MEDIA_CONVERT_STAGING }}
+            # Strava Integration
+            STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID_STAGING }}
+            STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET_STAGING }}
+            STRAVA_REDIRECT_URI=${{ vars.STRAVA_REDIRECT_URI_STAGING }}
+            STRAVA_WEBHOOK_VERIFY_TOKEN=${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN_STAGING }}
+            # Garmin Integration
+            GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY_STAGING }}
+            GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET_STAGING }}
+            GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI_STAGING }}
+            # Google Maps
+            GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY_STAGING }}
+          EOF
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_GH_RUNNER_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_GH_RUNNER_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image
+        id: build-image
+        env:
+          IMAGE_NAME: ${{ steps.login-ecr.outputs.registry }}/pt-server:${{ github.sha }}
+        run: |
+          docker compose \
+            -f docker/stacks/pt-server/docker-compose.yml \
+            --env-file .env \
+            build api
+          echo "image=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Push image to registry
+        run: |
+          docker push ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy image to swarm
+        env:
+          IMAGE_NAME: ${{ steps.build-image.outputs.image }}
+          DOCKER_HOST: ssh://${{ vars.DEPLOY_SSH_USER_STAGING }}@${{ vars.DEPLOY_HOST_STAGING }}
+        run: |
+          docker stack deploy \
+            --with-registry-auth --resolve-image=always \
+            --prune \
+            -c docker/stacks/pt-server/docker-compose.yml \
+            pt-server
+
+      - name: Run database migrations
+        env:
+          DOCKER_HOST: ssh://${{ vars.DEPLOY_SSH_USER_STAGING }}@${{ vars.DEPLOY_HOST_STAGING }}
+        run: |
+          # Wait for service to be running
+          sleep 10
+          # Get the container ID of the running service
+          CONTAINER_ID=$(docker ps -q -f "name=pt-server_api")
+          if [ -n "$CONTAINER_ID" ]; then
+            docker exec $CONTAINER_ID yarn migrate:latest
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f .env

@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  api:
+    image: ${IMAGE_NAME:-pt-server:latest}
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+    ports:
+      - "5100:5100"
+    environment:
+      # Module enablement
+      - API_V1_MODULE_ENABLED=${API_V1_MODULE_ENABLED:-Y}
+      - API_V1_PORT=${API_V1_PORT:-5100}
+      - CRON_MODULE_ENABLED=${CRON_MODULE_ENABLED:-N}
+      # API URL
+      - API_V1_URL=${API_V1_URL}
+      # Database
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL=${DB_SSL}
+      # Auth
+      - JWT_ACCESS_TOKEN_SECRET=${JWT_ACCESS_TOKEN_SECRET}
+      - JWT_ACCESS_TOKEN_EXPIRY=${JWT_ACCESS_TOKEN_EXPIRY}
+      - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
+      - JWT_REFRESH_TOKEN_EXPIRY=${JWT_REFRESH_TOKEN_EXPIRY}
+      # Swagger
+      - SWAGGER_USERNAME=${SWAGGER_USERNAME}
+      - SWAGGER_PASSWORD=${SWAGGER_PASSWORD}
+      # AWS
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY}
+      # S3
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_REGION=${S3_REGION}
+      - S3_UPLOAD_BUCKET=${S3_UPLOAD_BUCKET}
+      - S3_CONTENT_BUCKET=${S3_CONTENT_BUCKET}
+      # CDN
+      - CDN_URL=${CDN_URL}
+      - DISABLE_CDN=${DISABLE_CDN:-N}
+      # CloudFront
+      - CLOUDFRONT_KEY_PAIR_ID=${CLOUDFRONT_KEY_PAIR_ID}
+      - CLOUDFRONT_PRIVATE_KEY=${CLOUDFRONT_PRIVATE_KEY}
+      # Firebase
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      # MediaConvert
+      - MEDIA_CONVERT_REGION=${MEDIA_CONVERT_REGION}
+      - MEDIA_CONVERT_ROLE=${MEDIA_CONVERT_ROLE}
+      - MEDIA_CONVERT_QUEUE=${MEDIA_CONVERT_QUEUE}
+      - DISABLE_MEDIA_CONVERT=${DISABLE_MEDIA_CONVERT:-N}
+      # Strava Integration
+      - STRAVA_CLIENT_ID=${STRAVA_CLIENT_ID}
+      - STRAVA_CLIENT_SECRET=${STRAVA_CLIENT_SECRET}
+      - STRAVA_REDIRECT_URI=${STRAVA_REDIRECT_URI}
+      - STRAVA_WEBHOOK_VERIFY_TOKEN=${STRAVA_WEBHOOK_VERIFY_TOKEN}
+      # Garmin Integration
+      - GARMIN_CONSUMER_KEY=${GARMIN_CONSUMER_KEY:-}
+      - GARMIN_CONSUMER_SECRET=${GARMIN_CONSUMER_SECRET:-}
+      - GARMIN_REDIRECT_URI=${GARMIN_REDIRECT_URI:-}
+      # Google Maps
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5100/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
