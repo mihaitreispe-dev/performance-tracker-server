@@ -1,6 +1,7 @@
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
+import { OAuthStatesTable } from './oauth-states-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
 import { CardioStepGroupsTable } from './cardio-step-groups-table.interface';
 import { CardioStepsTable } from './cardio-steps-table.interface';
@@ -14,11 +15,15 @@ import { ExerciseMuscleGroupsTable } from './exercise-muscle-groups-table.interf
 import { ExercisesTable } from './exercises-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { ExecutionWeatherTable } from './execution-weather-table.interface';
+import { FitnessFatigueDailyTable } from './fitness-fatigue-daily-table.interface';
+import { FitnessMetricsTable } from './fitness-metrics-table.interface';
+import { SleepLogsTable } from './sleep-logs-table.interface';
 import { PersonalRecordHistoryTable } from './personal-record-history-table.interface';
 import { PersonalRecordsTable } from './personal-records-table.interface';
 import { RefreshTokensTable } from './refresh-tokens-table.interface';
 import { RouteMarkersTable } from './route-markers-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
+import { TrainingStressScoresTable } from './training-stress-scores-table.interface';
 import { UserIntegrationsTable } from './user-integrations-table.interface';
 import { UserSettingsTable } from './user-settings-table.interface';
 import { UsersTable } from './users-table.interface';
@@ -64,4 +69,9 @@ export interface Database {
   personal_records: PersonalRecordsTable;
   personal_record_history: PersonalRecordHistoryTable;
   execution_weather: ExecutionWeatherTable;
+  sleep_logs: SleepLogsTable;
+  oauth_states: OAuthStatesTable;
+  fitness_metrics: FitnessMetricsTable;
+  training_stress_scores: TrainingStressScoresTable;
+  fitness_fatigue_daily: FitnessFatigueDailyTable;
 }

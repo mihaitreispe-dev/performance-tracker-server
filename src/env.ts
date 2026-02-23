@@ -177,6 +177,12 @@ export class Env extends BoostrapEnv {
   @IsString()
   GOOGLE_MAPS_API_KEY: string;
 
+  // CORS
+
+  @IsString()
+  @IsOptional()
+  CORS_ORIGINS?: string;
+
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {
       enableImplicitConversion: true,

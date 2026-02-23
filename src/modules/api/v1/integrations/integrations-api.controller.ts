@@ -50,7 +50,7 @@ export class IntegrationsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: OAuthUrlResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('strava/auth')
-  getStravaAuthUrl(@Req() req: Request & { user: AuthUser }): OAuthUrlResponse {
+  async getStravaAuthUrl(@Req() req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
     return this.service.getStravaAuthUrl(req);
   }
 
@@ -126,9 +126,10 @@ export class IntegrationsApiController {
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Get Garmin OAuth authorization URL' })
   @ApiResponse({ status: HttpStatus.OK, type: OAuthUrlResponse })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Garmin integration not available' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('garmin/auth')
-  getGarminAuthUrl(@Req() req: Request & { user: AuthUser }): OAuthUrlResponse {
+  async getGarminAuthUrl(@Req() req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
     return this.service.getGarminAuthUrl(req);
   }
 

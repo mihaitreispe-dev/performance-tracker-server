@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { Database, NewWorkoutPlan, WorkoutPlan, WorkoutPlanUpdate } from 'src/database/interfaces';
+import { Database, NewWorkoutPlan, WorkoutPlan, WorkoutPlanGoal, WorkoutPlanUpdate } from 'src/database/interfaces';
 
 export interface WorkoutPlanFilter {
   userId?: string;
+  q?: string;
+  goal?: WorkoutPlanGoal;
 }
 
 export interface WorkoutPlanSort {
@@ -35,6 +37,20 @@ export class WorkoutPlanRepository {
       query = query.where('user_id', '=', filter.userId);
     }
 
+    if (filter?.q) {
+      const searchTerm = `%${filter.q.toLowerCase()}%`;
+      query = query.where((eb) =>
+        eb.or([
+          eb('name', 'ilike', searchTerm),
+          eb('description', 'ilike', searchTerm),
+        ]),
+      );
+    }
+
+    if (filter?.goal) {
+      query = query.where('goal', '=', filter.goal);
+    }
+
     if (sort && sort.length > 0) {
       for (const s of sort) {
         query = query.orderBy(s.field, s.direction ?? 'asc');
@@ -58,6 +74,20 @@ export class WorkoutPlanRepository {
 
     if (filter?.userId) {
       query = query.where('user_id', '=', filter.userId);
+    }
+
+    if (filter?.q) {
+      const searchTerm = `%${filter.q.toLowerCase()}%`;
+      query = query.where((eb) =>
+        eb.or([
+          eb('name', 'ilike', searchTerm),
+          eb('description', 'ilike', searchTerm),
+        ]),
+      );
+    }
+
+    if (filter?.goal) {
+      query = query.where('goal', '=', filter.goal);
     }
 
     const result = await query.executeTakeFirstOrThrow();

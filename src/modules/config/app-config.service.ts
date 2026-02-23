@@ -193,4 +193,15 @@ export class AppConfigService {
   get googleMapsApiKey(): string | undefined {
     return this.configService.get('GOOGLE_MAPS_API_KEY');
   }
+
+  // CORS
+
+  get corsOrigins(): string[] {
+    const origins = this.configService.get('CORS_ORIGINS');
+    if (!origins) {
+      // Default to restrictive policy in production
+      return [];
+    }
+    return origins.split(',').map((origin) => origin.trim());
+  }
 }

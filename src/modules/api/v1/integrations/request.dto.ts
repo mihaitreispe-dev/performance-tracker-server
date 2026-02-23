@@ -61,9 +61,69 @@ export class StravaWebhookBody {
   updates?: Record<string, any>;
 }
 
+export class GarminSleepLevelInterval {
+  @ApiProperty()
+  startTimeInSeconds: number;
+
+  @ApiProperty()
+  endTimeInSeconds: number;
+}
+
+export class GarminSleepLevelsMap {
+  @ApiPropertyOptional({ type: [GarminSleepLevelInterval] })
+  awake?: GarminSleepLevelInterval[];
+
+  @ApiPropertyOptional({ type: [GarminSleepLevelInterval] })
+  light?: GarminSleepLevelInterval[];
+
+  @ApiPropertyOptional({ type: [GarminSleepLevelInterval] })
+  deep?: GarminSleepLevelInterval[];
+
+  @ApiPropertyOptional({ type: [GarminSleepLevelInterval] })
+  rem?: GarminSleepLevelInterval[];
+}
+
+export class GarminSleepSummary {
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  userAccessToken: string;
+
+  @ApiProperty()
+  summaryId: string;
+
+  @ApiProperty({ description: 'Date in YYYY-MM-DD format' })
+  calendarDate: string;
+
+  @ApiProperty()
+  startTimeInSeconds: number;
+
+  @ApiPropertyOptional()
+  startTimeOffsetInSeconds?: number;
+
+  @ApiProperty()
+  durationInSeconds: number;
+
+  @ApiPropertyOptional()
+  sleepLevelsMap?: GarminSleepLevelsMap;
+
+  @ApiPropertyOptional()
+  restingHeartRateInBeatsPerMinute?: number;
+
+  @ApiPropertyOptional()
+  avgOvernightHrv?: number;
+
+  @ApiPropertyOptional({ description: 'Heart rate samples with time offset as keys' })
+  timeOffsetHeartRateSamples?: Record<string, number>;
+}
+
 export class GarminWebhookBody {
-  @ApiProperty({ description: 'Array of activity summaries' })
-  activities: GarminActivitySummary[];
+  @ApiPropertyOptional({ description: 'Array of activity summaries' })
+  activities?: GarminActivitySummary[];
+
+  @ApiPropertyOptional({ description: 'Array of sleep summaries' })
+  sleeps?: GarminSleepSummary[];
 }
 
 export class GarminActivitySummary {

@@ -31,3 +31,8 @@ export * from './daily-training-loads-table.interface';
 export * from './personal-records-table.interface';
 export * from './personal-record-history-table.interface';
 export * from './execution-weather-table.interface';
+export * from './sleep-logs-table.interface';
+export * from './oauth-states-table.interface';
+export * from './fitness-metrics-table.interface';
+export * from './training-stress-scores-table.interface';
+export * from './fitness-fatigue-daily-table.interface';

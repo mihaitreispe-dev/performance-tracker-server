@@ -31,6 +31,19 @@ export class WorkoutScheduleRepository {
     return this.db.selectFrom('workout_schedules').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
+  /**
+   * Bulk fetch workout schedules by IDs - more efficient than multiple findById calls
+   */
+  async findByIds(ids: string[]): Promise<WorkoutSchedule[]> {
+    if (ids.length === 0) return [];
+
+    return this.db
+      .selectFrom('workout_schedules')
+      .where('id', 'in', ids)
+      .selectAll()
+      .execute();
+  }
+
   async findMany(options: WorkoutScheduleFindManyOptions = {}): Promise<WorkoutSchedule[]> {
     const { filter, sort, offset, limit } = options;
     let query = this.db.selectFrom('workout_schedules').selectAll();

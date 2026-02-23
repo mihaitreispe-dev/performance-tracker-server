@@ -5,7 +5,10 @@ import { AllExceptionsFilter } from 'src/lib/http/filters/all-exceptions-filter'
 import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.interceptor';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
+import { UserRepository } from 'src/repositories/user.repository';
 
+import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-api.module';
 import { AnalyticsApiModule } from './analytics/analytics-api.module';
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
@@ -15,6 +18,7 @@ import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
+import { SleepApiModule } from './sleep/sleep-api.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
 import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file-imports-api.module';
 import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
@@ -35,9 +39,11 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     WorkoutFileImportsApiModule.register(),
     CardioCategoriesApiModule.register(),
     AnalyticsApiModule.register(),
+    AdvancedMetricsApiModule.register(),
     IntegrationsApiModule.register(),
     WorkoutPlansApiModule.register(),
     PersonalRecordsApiModule.register(),
+    SleepApiModule.register(),
   ],
   providers: [
     {
@@ -45,6 +51,12 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
       useExisting: JwtAuthGuard,
     },
     JwtAuthGuard,
+    {
+      provide: APP_GUARD,
+      useExisting: RolesGuard,
+    },
+    RolesGuard,
+    UserRepository,
     {
       provide: APP_PIPE,
       useValue: new ValidationPipe({

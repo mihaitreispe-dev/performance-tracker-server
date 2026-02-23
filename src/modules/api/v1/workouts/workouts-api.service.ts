@@ -571,17 +571,20 @@ export class WorkoutsApiService {
     const result = new Map<string, ExerciseInfoDTO>();
     if (exerciseIds.length === 0) return result;
 
-    for (const exerciseId of exerciseIds) {
-      const exercise = await this.exerciseRepo.findById(exerciseId);
-      if (exercise) {
+    // Bulk fetch all exercises instead of N individual queries
+    const exercises = await this.exerciseRepo.findByIds(exerciseIds);
+
+    // Resolve pictures in parallel for better performance
+    await Promise.all(
+      exercises.map(async (exercise) => {
         const picture = await this.getExercisePictureUrl(exercise);
-        result.set(exerciseId, {
+        result.set(exercise.id, {
           id: exercise.id,
           name: exercise.name,
           picture,
         });
-      }
-    }
+      }),
+    );
 
     return result;
   }

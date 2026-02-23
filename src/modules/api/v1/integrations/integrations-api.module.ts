@@ -1,6 +1,8 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { OAuthStateRepository } from 'src/repositories/oauth-state.repository';
+import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
 import { UserIntegrationRepository } from 'src/repositories/user-integration.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
@@ -23,6 +25,8 @@ export class IntegrationsApiModule {
           WorkoutExecutionRepository,
           CardioMetricsRepository,
           WorkoutRouteRepository,
+          SleepLogRepository,
+          OAuthStateRepository,
         ],
         controllers: [IntegrationsApiController],
       };

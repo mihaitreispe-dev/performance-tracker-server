@@ -10,6 +10,16 @@ import { IsEnumString } from 'src/lib/validators/is-enum-string';
 import { WorkoutPlanSortField } from './types';
 
 export class ListWorkoutPlansQuery extends PageQuery {
+  @ApiPropertyOptional({ description: 'Search by name or description' })
+  @IsString()
+  @IsOptional()
+  q?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by goal', enum: WorkoutPlanGoal })
+  @IsEnumString(WorkoutPlanGoal)
+  @IsOptional()
+  goal?: WorkoutPlanGoal;
+
   @SortParam(WorkoutPlanSortField)
   sort?: SortOptions<'name' | 'duration_weeks' | 'created_at' | 'updated_at'>;
 }

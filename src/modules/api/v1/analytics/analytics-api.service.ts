@@ -1003,17 +1003,19 @@ export class AnalyticsApiService {
       executionsByDate.set(dateKey, existing);
     }
 
-    // Process each day
+    // Process each day and cache load contributions
     const current = new Date(startDate);
     const allDailyLoads: Array<{ date: string; dailyLoad: number }> = [];
+    const loadContributionsCache = new Map<string, { hrLoad: number; durationLoad: number; volumeLoad: number }>();
 
     while (current <= today) {
       const dateKey = current.toISOString().split('T')[0];
       const dayExecutions = executionsByDate.get(dateKey) ?? [];
 
-      // Calculate daily load for this day
-      const { hrLoad, durationLoad, volumeLoad } = await this.calculateDailyLoad(dayExecutions, hrZones);
-      const dailyLoad = hrLoad + durationLoad + volumeLoad;
+      // Calculate daily load for this day and cache the result
+      const loadContributions = await this.calculateDailyLoad(dayExecutions, hrZones);
+      loadContributionsCache.set(dateKey, loadContributions);
+      const dailyLoad = loadContributions.hrLoad + loadContributions.durationLoad + loadContributions.volumeLoad;
 
       allDailyLoads.push({ date: dateKey, dailyLoad });
       current.setDate(current.getDate() + 1);
@@ -1057,8 +1059,8 @@ export class AnalyticsApiService {
         ? ((chronicLoad - acuteLoad) / chronicLoad) * 10  // -10 to +10 range typically
         : 0;
 
-      // Calculate load contributions
-      const { hrLoad, durationLoad, volumeLoad } = await this.calculateDailyLoad(dayExecutions, hrZones);
+      // Get load contributions from cache (already calculated in first pass)
+      const { hrLoad, durationLoad, volumeLoad } = loadContributionsCache.get(date) ?? { hrLoad: 0, durationLoad: 0, volumeLoad: 0 };
 
       // Only update if data doesn't exist or if it's a recent day (last 7 days need refresh)
       const dateObj = new Date(date);

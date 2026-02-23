@@ -5,11 +5,14 @@ import { RateLimiter } from 'src/lib/util/rate-limiter';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { OAuthStateRepository } from 'src/repositories/oauth-state.repository';
+import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
 import { UserIntegrationRepository } from 'src/repositories/user-integration.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 
 import {
+  GarminSleepSummary,
   GarminWebhookBody,
   OAuthCallbackQuery,
   PushToStravaBody,
@@ -55,6 +58,8 @@ export class IntegrationsApiService {
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
     private readonly cardioMetricsRepository: CardioMetricsRepository,
     private readonly workoutRouteRepository: WorkoutRouteRepository,
+    private readonly sleepLogRepository: SleepLogRepository,
+    private readonly oauthStateRepository: OAuthStateRepository,
     private readonly configService: AppConfigService,
   ) {}
 
@@ -72,7 +77,7 @@ export class IntegrationsApiService {
 
   // Strava OAuth
 
-  getStravaAuthUrl(req: Request & { user: AuthUser }): OAuthUrlResponse {
+  async getStravaAuthUrl(req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
     const clientId = this.configService.get('STRAVA_CLIENT_ID');
     const redirectUri = this.configService.get('STRAVA_REDIRECT_URI');
 
@@ -80,7 +85,13 @@ export class IntegrationsApiService {
       throw new BadRequestException('Strava integration not configured');
     }
 
-    const state = Buffer.from(JSON.stringify({ userId: req.user.id })).toString('base64');
+    // Generate cryptographically secure state token stored in database
+    const oauthState = await this.oauthStateRepository.create({
+      user_id: req.user.id,
+      provider: IntegrationProvider.STRAVA,
+      expiresInMinutes: 10,
+    });
+
     const scopes = 'read,activity:read_all';
 
     const authUrl = new URL('https://www.strava.com/oauth/authorize');
@@ -88,7 +99,7 @@ export class IntegrationsApiService {
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', scopes);
-    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('state', oauthState.state_token);
 
     return { authUrl: authUrl.toString() };
   }
@@ -105,14 +116,16 @@ export class IntegrationsApiService {
       throw new BadRequestException('Missing state parameter');
     }
 
-    // Decode state to get user ID
-    let userId: string;
-    try {
-      const stateData = JSON.parse(Buffer.from(query.state, 'base64').toString());
-      userId = stateData.userId;
-    } catch {
-      throw new BadRequestException('Invalid state parameter');
+    // Validate state token from database (cryptographically secure, one-time use)
+    const oauthState = await this.oauthStateRepository.findAndValidate(query.state, IntegrationProvider.STRAVA);
+    if (!oauthState) {
+      throw new BadRequestException('Invalid or expired state parameter');
     }
+
+    // Delete state immediately to prevent reuse (one-time use)
+    await this.oauthStateRepository.deleteByToken(query.state);
+
+    const userId = oauthState.user_id;
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
@@ -683,66 +696,52 @@ export class IntegrationsApiService {
   }
 
   // Garmin OAuth
+  // NOTE: Garmin uses OAuth 1.0a which requires a proper implementation.
+  // This integration is currently disabled pending proper OAuth 1.0a implementation.
 
-  getGarminAuthUrl(req: Request & { user: AuthUser }): OAuthUrlResponse {
-    const consumerKey = this.configService.get('GARMIN_CONSUMER_KEY');
-    const redirectUri = this.configService.get('GARMIN_REDIRECT_URI');
-
-    if (!consumerKey || !redirectUri) {
-      throw new BadRequestException('Garmin integration not configured');
-    }
-
-    // Garmin uses OAuth 1.0a which is more complex
-    // For simplicity, we'll use a placeholder URL
-    // In production, you'd need to implement OAuth 1.0a flow
-    const state = Buffer.from(JSON.stringify({ userId: req.user.id })).toString('base64');
-
-    const authUrl = new URL('https://connect.garmin.com/oauthConfirm');
-    authUrl.searchParams.set('oauth_callback', redirectUri);
-    authUrl.searchParams.set('state', state);
-
-    return { authUrl: authUrl.toString() };
+  async getGarminAuthUrl(_req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
+    // Garmin OAuth 1.0a is not yet properly implemented
+    // Returning an error to prevent users from attempting to connect
+    throw new BadRequestException(
+      'Garmin integration is not yet available. Please check back later or use Strava integration.',
+    );
   }
 
-  async handleGarminCallback(query: OAuthCallbackQuery): Promise<UserIntegrationResponse> {
-    // Garmin OAuth 1.0a callback handling
-    // This is a simplified implementation
-    if (!query.state) {
-      throw new BadRequestException('Missing state parameter');
-    }
-
-    let userId: string;
-    try {
-      const stateData = JSON.parse(Buffer.from(query.state, 'base64').toString());
-      userId = stateData.userId;
-    } catch {
-      throw new BadRequestException('Invalid state parameter');
-    }
-
-    // In production, you'd exchange the oauth_verifier for access tokens
-    // For now, we'll create a placeholder integration
-    const integration = await this.userIntegrationRepository.create({
-      user_id: userId,
-      provider: IntegrationProvider.GARMIN,
-      access_token: query.code, // In reality, this would be the actual access token
-      refresh_token: null,
-    });
-
-    return { data: this.mapIntegrationToDTO(integration) };
+  async handleGarminCallback(_query: OAuthCallbackQuery): Promise<UserIntegrationResponse> {
+    // Garmin OAuth 1.0a callback handling not implemented
+    throw new BadRequestException(
+      'Garmin integration is not yet available. Please check back later or use Strava integration.',
+    );
   }
 
   async handleGarminWebhook(body: GarminWebhookBody): Promise<WebhookAckResponse> {
-    this.logger.log(`Received Garmin webhook with ${body.activities?.length ?? 0} activities`);
+    const activityCount = body.activities?.length ?? 0;
+    const sleepCount = body.sleeps?.length ?? 0;
+    this.logger.log(`Received Garmin webhook with ${activityCount} activities and ${sleepCount} sleep summaries`);
 
-    if (!body.activities || body.activities.length === 0) {
-      return { status: 'no_activities' };
+    if (activityCount === 0 && sleepCount === 0) {
+      return { status: 'no_data' };
     }
 
-    for (const activity of body.activities) {
-      try {
-        await this.syncGarminActivity(activity);
-      } catch (error) {
-        this.logger.error(`Failed to sync Garmin activity ${activity.activityId}: ${error}`);
+    // Process activities
+    if (body.activities && body.activities.length > 0) {
+      for (const activity of body.activities) {
+        try {
+          await this.syncGarminActivity(activity);
+        } catch (error) {
+          this.logger.error(`Failed to sync Garmin activity ${activity.activityId}: ${error}`);
+        }
+      }
+    }
+
+    // Process sleep data
+    if (body.sleeps && body.sleeps.length > 0) {
+      for (const sleep of body.sleeps) {
+        try {
+          await this.syncGarminSleep(sleep);
+        } catch (error) {
+          this.logger.error(`Failed to sync Garmin sleep ${sleep.summaryId}: ${error}`);
+        }
       }
     }
 
@@ -803,6 +802,87 @@ export class IntegrationsApiService {
     });
 
     this.logger.log(`Synced Garmin activity ${activity.activityId} as execution ${execution.id}`);
+  }
+
+  private async syncGarminSleep(sleep: GarminSleepSummary): Promise<void> {
+    // Find user integration by Garmin user ID
+    const integration = await this.userIntegrationRepository.findByProviderExternalId(
+      IntegrationProvider.GARMIN,
+      sleep.userId,
+    );
+
+    if (!integration || !integration.is_active) {
+      this.logger.warn(`No active integration found for Garmin user ${sleep.userId}`);
+      return;
+    }
+
+    // Check if sleep already synced by external_id (summaryId)
+    const existing = await this.sleepLogRepository.findByExternalId(sleep.summaryId);
+    if (existing) {
+      this.logger.log(`Sleep ${sleep.summaryId} already synced`);
+      return;
+    }
+
+    // Calculate sleep stage durations from sleepLevelsMap
+    let awakeDurationSeconds = 0;
+    let lightDurationSeconds = 0;
+    let deepDurationSeconds = 0;
+    let remDurationSeconds = 0;
+
+    if (sleep.sleepLevelsMap) {
+      awakeDurationSeconds = this.calculateSleepStageDuration(sleep.sleepLevelsMap.awake);
+      lightDurationSeconds = this.calculateSleepStageDuration(sleep.sleepLevelsMap.light);
+      deepDurationSeconds = this.calculateSleepStageDuration(sleep.sleepLevelsMap.deep);
+      remDurationSeconds = this.calculateSleepStageDuration(sleep.sleepLevelsMap.rem);
+    }
+
+    // Convert HR samples from timeOffset format to absolute timestamps
+    let hrSamples: { timestampSeconds: number; heartRate: number }[] | null = null;
+    if (sleep.timeOffsetHeartRateSamples && Object.keys(sleep.timeOffsetHeartRateSamples).length > 0) {
+      hrSamples = Object.entries(sleep.timeOffsetHeartRateSamples).map(([offsetStr, heartRate]) => ({
+        timestampSeconds: sleep.startTimeInSeconds + Number.parseInt(offsetStr, 10),
+        heartRate,
+      }));
+    }
+
+    // Calculate start and end times
+    const startTime = new Date(sleep.startTimeInSeconds * 1000);
+    const endTime = new Date((sleep.startTimeInSeconds + sleep.durationInSeconds) * 1000);
+    const logDate = new Date(sleep.calendarDate);
+
+    // Create sleep log
+    const sleepLog = await this.sleepLogRepository.create({
+      user_id: integration.user_id,
+      log_date: logDate,
+      start_time: startTime,
+      end_time: endTime,
+      total_duration_seconds: sleep.durationInSeconds,
+      awake_duration_seconds: awakeDurationSeconds,
+      light_duration_seconds: lightDurationSeconds,
+      deep_duration_seconds: deepDurationSeconds,
+      rem_duration_seconds: remDurationSeconds,
+      avg_resting_hr: sleep.restingHeartRateInBeatsPerMinute ?? null,
+      avg_hrv: sleep.avgOvernightHrv ?? null,
+      hr_samples: hrSamples,
+      source: 'garmin',
+      external_id: sleep.summaryId,
+    });
+
+    // Update last sync time
+    await this.userIntegrationRepository.updateById(integration.id, {
+      last_sync_at: new Date(),
+    });
+
+    this.logger.log(`Synced Garmin sleep ${sleep.summaryId} as sleep log ${sleepLog.id}`);
+  }
+
+  private calculateSleepStageDuration(intervals?: { startTimeInSeconds: number; endTimeInSeconds: number }[]): number {
+    if (!intervals || intervals.length === 0) {
+      return 0;
+    }
+    return intervals.reduce((total, interval) => {
+      return total + (interval.endTimeInSeconds - interval.startTimeInSeconds);
+    }, 0);
   }
 
   // Disconnect integration

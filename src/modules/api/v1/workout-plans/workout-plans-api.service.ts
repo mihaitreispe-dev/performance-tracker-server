@@ -38,7 +38,11 @@ export class WorkoutPlansApiService {
   ) {}
 
   async list(req: Request & { user: AuthUser }, query: ListWorkoutPlansQuery): Promise<WorkoutPlanListResponse> {
-    const filter = { userId: req.user.id };
+    const filter = {
+      userId: req.user.id,
+      q: query.q,
+      goal: query.goal,
+    };
 
     const sort: WorkoutPlanSort[] | undefined = query.sort?.map((s) => ({
       field: s.field as 'name' | 'duration_weeks' | 'created_at' | 'updated_at',

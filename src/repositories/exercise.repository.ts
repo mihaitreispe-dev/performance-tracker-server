@@ -41,6 +41,21 @@ export class ExerciseRepository {
     return { ...result, cues: parseSQLArray(result.cues) };
   }
 
+  /**
+   * Bulk fetch exercises by IDs - more efficient than multiple findById calls
+   */
+  async findByIds(ids: string[]): Promise<Exercise[]> {
+    if (ids.length === 0) return [];
+
+    const results = await this.db
+      .selectFrom('exercises')
+      .where('id', 'in', ids)
+      .selectAll()
+      .execute();
+
+    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+  }
+
   async findMany(options: ExerciseFindManyOptions = {}): Promise<Exercise[]> {
     const { filter, sort, offset, limit } = options;
 

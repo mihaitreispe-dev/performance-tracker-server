@@ -100,7 +100,7 @@ export class WorkoutExecutionsApiService {
       this.workoutExecutionRepository.countMany(filter),
     ]);
 
-    // Fetch workouts for executions that have schedule IDs
+    // Fetch workouts for executions that have schedule IDs using bulk fetch
     const scheduleIds = [
       ...new Set(executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!)),
     ];
@@ -108,19 +108,17 @@ export class WorkoutExecutionsApiService {
     const workoutMap = new Map<string, Workout>();
 
     if (scheduleIds.length > 0) {
-      const schedules = await Promise.all(scheduleIds.map((id) => this.workoutScheduleRepository.findById(id)));
+      // Bulk fetch schedules instead of N individual queries
+      const schedules = await this.workoutScheduleRepository.findByIds(scheduleIds);
       for (const schedule of schedules) {
-        if (schedule) {
-          scheduleMap.set(schedule.id, schedule);
-        }
+        scheduleMap.set(schedule.id, schedule);
       }
 
+      // Bulk fetch workouts instead of N individual queries
       const workoutIds = [...new Set([...scheduleMap.values()].map((s) => s.workout_id))];
-      const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepository.findById(id)));
+      const workouts = await this.workoutRepository.findByIds(workoutIds);
       for (const workout of workouts) {
-        if (workout) {
-          workoutMap.set(workout.id, workout);
-        }
+        workoutMap.set(workout.id, workout);
       }
     }
 
@@ -208,9 +206,19 @@ export class WorkoutExecutionsApiService {
     const updatedExecution = await this.workoutExecutionRepository.updateById(id, updateData as any);
 
     // Also mark the schedule as completed if the execution is completed
+    // and move the scheduled_date to the completion date if they differ
     if (body.completedAt && updatedExecution.workout_schedule_id) {
+      const completionDate = new Date(body.completedAt);
+      // Use UTC methods to avoid timezone issues
+      const completionDateOnly = new Date(Date.UTC(
+        completionDate.getUTCFullYear(),
+        completionDate.getUTCMonth(),
+        completionDate.getUTCDate(),
+      ));
+
       await this.workoutScheduleRepository.updateById(updatedExecution.workout_schedule_id, {
-        completed_at: new Date(body.completedAt),
+        completed_at: completionDate,
+        scheduled_date: completionDateOnly,
       });
     }
 

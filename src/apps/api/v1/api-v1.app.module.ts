@@ -45,7 +45,30 @@ export async function bootstrap(opts?: { port: number }) {
   };
   app.use(urlencoded({ verify: rawBodyBuffer, limit: '50mb', extended: true }));
   app.use(json({ verify: rawBodyBuffer, limit: '50mb' }));
-  app.use(cors());
+
+  // Configure CORS with restricted origins from environment
+  const corsOrigins = configService.corsOrigins;
+  if (corsOrigins.length > 0) {
+    app.use(
+      cors({
+        origin: corsOrigins,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      }),
+    );
+  } else if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
+    // Allow all origins in development mode only
+    app.use(cors());
+  } else {
+    // Production with no CORS_ORIGINS set - restrict to same origin
+    app.use(
+      cors({
+        origin: false,
+        credentials: true,
+      }),
+    );
+  }
 
   const docsRoute = '/docs/api-explorer';
   const swaggerUsername = configService.swaggerUsername;
