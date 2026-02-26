@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Command, Console } from 'nestjs-console';
 import { Kysely } from 'kysely';
+import { Command, Console } from 'nestjs-console';
 import { InjectKysely } from 'nestjs-kysely';
 import { Database } from 'src/database/interfaces';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
@@ -106,11 +106,9 @@ export class MigrateScheduleDatesService {
       try {
         const completedAt = new Date(schedule.completed_at!);
         // Use UTC methods to avoid timezone issues
-        const newScheduledDate = new Date(Date.UTC(
-          completedAt.getUTCFullYear(),
-          completedAt.getUTCMonth(),
-          completedAt.getUTCDate(),
-        ));
+        const newScheduledDate = new Date(
+          Date.UTC(completedAt.getUTCFullYear(), completedAt.getUTCMonth(), completedAt.getUTCDate()),
+        );
 
         await this.workoutScheduleRepository.updateById(schedule.id, {
           scheduled_date: newScheduledDate,

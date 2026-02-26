@@ -5,6 +5,7 @@ import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module
 import { S3Module } from 'src/modules/s3/s3.module';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
 
@@ -30,6 +31,7 @@ export class ExercisesApiModule {
           EquipmentRepository,
           MuscleGroupRepository,
           ExerciseImageRepository,
+          ExerciseChainRepository,
         ],
         controllers: [ExercisesApiController],
       };

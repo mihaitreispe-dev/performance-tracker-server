@@ -1,18 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import {
-  CardioMetric,
-  CardioMetricType,
-  FitnessMetricType,
-  WorkoutExecution,
-  WorkoutRoute,
-  WorkoutType,
-} from 'src/database/interfaces';
+import { CardioMetric, CardioMetricType, FitnessMetricType, WorkoutExecution } from 'src/database/interfaces';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
 
 export interface Vo2MaxResult {
   value: number | null;
@@ -182,7 +175,7 @@ export class Vo2MaxService {
       if (hrMetrics.length === 0) continue;
 
       const route = await this.workoutRouteRepository.findByExecutionId(execution.id);
-      if (!route || parseFloat(route.total_distance_meters) < 1000) continue; // Minimum 1km
+      if (!route || Number.parseFloat(route.total_distance_meters) < 1000) continue; // Minimum 1km
 
       // Check workout type via workout_schedule -> workout
       if (execution.workout_schedule_id) {
@@ -198,10 +191,7 @@ export class Vo2MaxService {
     return runningExecutions;
   }
 
-  private async extractSteadyStateSegments(
-    execution: WorkoutExecution,
-    maxHR: number,
-  ): Promise<SteadyStateSegment[]> {
+  private async extractSteadyStateSegments(execution: WorkoutExecution, maxHR: number): Promise<SteadyStateSegment[]> {
     const segments: SteadyStateSegment[] = [];
 
     // Get all HR data for this workout
@@ -283,7 +273,7 @@ export class Vo2MaxService {
     const paceMap = new Map<number, number>();
     for (const pm of paceMetrics) {
       const ts = new Date(pm.recorded_at).getTime();
-      paceMap.set(Math.floor(ts / 1000), parseFloat(pm.value));
+      paceMap.set(Math.floor(ts / 1000), Number.parseFloat(pm.value));
     }
 
     for (const hrm of hrMetrics) {
@@ -302,7 +292,7 @@ export class Vo2MaxService {
 
       result.push({
         timestamp,
-        hr: parseFloat(hrm.value),
+        hr: Number.parseFloat(hrm.value),
         pace,
       });
     }
@@ -336,14 +326,14 @@ export class Vo2MaxService {
       sumY = 0,
       sumXY = 0,
       sumX2 = 0,
-      sumY2 = 0;
+      _sumY2 = 0;
 
     for (const point of dataPoints) {
       sumX += point.hrPercent;
       sumY += point.paceMetersPerMin;
       sumXY += point.hrPercent * point.paceMetersPerMin;
       sumX2 += point.hrPercent * point.hrPercent;
-      sumY2 += point.paceMetersPerMin * point.paceMetersPerMin;
+      _sumY2 += point.paceMetersPerMin * point.paceMetersPerMin;
     }
 
     const denominator = n * sumX2 - sumX * sumX;
@@ -392,7 +382,7 @@ export class Vo2MaxService {
       const route = await this.workoutRouteRepository.findByExecutionId(execution.id);
       if (!route) continue;
 
-      const distance = parseFloat(route.total_distance_meters);
+      const distance = Number.parseFloat(route.total_distance_meters);
       if (distance < 1500 || distance > 4000) continue; // Reasonable range for Cooper test
 
       // Cooper formula: VO2max = (distance_meters - 504.9) / 44.73
@@ -418,8 +408,8 @@ export class Vo2MaxService {
     if (!latest) return null;
 
     return {
-      value: parseFloat(latest.value),
-      confidence: parseFloat(latest.confidence || '0'),
+      value: Number.parseFloat(latest.value),
+      confidence: Number.parseFloat(latest.confidence || '0'),
       dataPointsUsed: latest.metadata?.dataPointsUsed || 0,
       algorithm: latest.metadata?.algorithm || 'unknown',
     };

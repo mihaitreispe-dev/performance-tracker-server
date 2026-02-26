@@ -16,7 +16,11 @@ export interface FitnessFatigueDailyTable {
   daily_tss: ColumnType<string, string | number, string | number>; // Sum of TSS for the day
   ramp_rate: ColumnType<string | null, string | number | null, string | number | null>; // Weekly CTL change rate
   workout_count: ColumnType<number, number | undefined, number>;
-  metadata: ColumnType<FitnessFatigueDailyMetadata | null, FitnessFatigueDailyMetadata | null, FitnessFatigueDailyMetadata | null>;
+  metadata: ColumnType<
+    FitnessFatigueDailyMetadata | null,
+    FitnessFatigueDailyMetadata | null,
+    FitnessFatigueDailyMetadata | null
+  >;
   created_at: ColumnType<Date, never, never>;
   updated_at: ColumnType<Date, never, Date>;
 }

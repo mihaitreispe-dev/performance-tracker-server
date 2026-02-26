@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely, sql } from 'kysely';
-import {
-  Database,
-  DailyTrainingLoad,
-  NewDailyTrainingLoad,
-  UpdateDailyTrainingLoad,
-} from 'src/database/interfaces';
+import { InjectKysely } from 'nestjs-kysely';
+import { DailyTrainingLoad, Database, NewDailyTrainingLoad, UpdateDailyTrainingLoad } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 
 interface FindManyFilter {
@@ -26,11 +21,7 @@ export class DailyTrainingLoadRepository {
   constructor(@InjectKysely() private readonly db: Kysely<Database>) {}
 
   async findById(id: string): Promise<DailyTrainingLoad | undefined> {
-    return this.db
-      .selectFrom('daily_training_loads')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+    return this.db.selectFrom('daily_training_loads').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
   async findByUserAndDate(userId: string, date: Date): Promise<DailyTrainingLoad | undefined> {
@@ -44,10 +35,7 @@ export class DailyTrainingLoadRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<DailyTrainingLoad[]> {
-    let query = this.db
-      .selectFrom('daily_training_loads')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('daily_training_loads').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.dateFrom) {
       const dateFromStr = formatDateToYMD(options.filter.dateFrom);
@@ -75,11 +63,7 @@ export class DailyTrainingLoadRepository {
   }
 
   async create(data: NewDailyTrainingLoad): Promise<DailyTrainingLoad> {
-    return this.db
-      .insertInto('daily_training_loads')
-      .values(data)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('daily_training_loads').values(data).returningAll().executeTakeFirstOrThrow();
   }
 
   async upsert(data: NewDailyTrainingLoad): Promise<DailyTrainingLoad> {
@@ -116,10 +100,7 @@ export class DailyTrainingLoadRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.db
-      .deleteFrom('daily_training_loads')
-      .where('id', '=', id)
-      .executeTakeFirst();
+    const result = await this.db.deleteFrom('daily_training_loads').where('id', '=', id).executeTakeFirst();
     return result.numDeletedRows > 0n;
   }
 

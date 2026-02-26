@@ -1,6 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 

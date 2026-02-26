@@ -17,7 +17,13 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
-import { AnalyticsPeriod, PeriodSummaryQuery, StrengthProgressionQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery } from './request.dto';
+import {
+  AnalyticsPeriod,
+  PeriodSummaryQuery,
+  StrengthProgressionQuery,
+  TrainingLoadHistoryQuery,
+  WeeklySummaryQuery,
+} from './request.dto';
 import {
   CurrentTrainingLoadDTO,
   CurrentTrainingLoadResponse,
@@ -876,9 +882,10 @@ export class AnalyticsApiService {
     const fitnessScore = Math.round(chronicLoad * 10) / 10;
     const fatigueScore = Math.round(acuteLoad * 10) / 10;
     // Use relative form score (percentage-based) for better scaling
-    const formScore = chronicLoad > 0
-      ? Math.round(((chronicLoad - acuteLoad) / chronicLoad) * 100) / 10  // -10 to +10 range typically
-      : 0;
+    const formScore =
+      chronicLoad > 0
+        ? Math.round(((chronicLoad - acuteLoad) / chronicLoad) * 100) / 10 // -10 to +10 range typically
+        : 0;
 
     // Form status based on ACWR (more reliable than absolute form score)
     let formStatus: 'fresh' | 'neutral' | 'fatigued' | 'no_data' = 'no_data';
@@ -973,9 +980,7 @@ export class AnalyticsApiService {
     startDate.setDate(today.getDate() - daysBack + 1);
 
     // Get existing data dates
-    const existingDates = new Set(
-      await this.dailyTrainingLoadRepository.getDaysWithData(userId, startDate, today),
-    );
+    const existingDates = new Set(await this.dailyTrainingLoadRepository.getDaysWithData(userId, startDate, today));
 
     // Get user settings for HR zones
     const settings = await this.userSettingsRepository.findByUserId(userId);
@@ -1055,12 +1060,17 @@ export class AnalyticsApiService {
       const fitnessScore = chronicLoad;
       const fatigueScore = acuteLoad;
       // Use relative form score (percentage-based) for better scaling
-      const formScore = chronicLoad > 0
-        ? ((chronicLoad - acuteLoad) / chronicLoad) * 10  // -10 to +10 range typically
-        : 0;
+      const formScore =
+        chronicLoad > 0
+          ? ((chronicLoad - acuteLoad) / chronicLoad) * 10 // -10 to +10 range typically
+          : 0;
 
       // Get load contributions from cache (already calculated in first pass)
-      const { hrLoad, durationLoad, volumeLoad } = loadContributionsCache.get(date) ?? { hrLoad: 0, durationLoad: 0, volumeLoad: 0 };
+      const { hrLoad, durationLoad, volumeLoad } = loadContributionsCache.get(date) ?? {
+        hrLoad: 0,
+        durationLoad: 0,
+        volumeLoad: 0,
+      };
 
       // Only update if data doesn't exist or if it's a recent day (last 7 days need refresh)
       const dateObj = new Date(date);
@@ -1328,7 +1338,7 @@ export class AnalyticsApiService {
     const daysRemaining = 7 - todayDayOfWeek;
 
     // Current week on track if already has 3+ or can still reach 3
-    const currentWeekOnTrack = currentWeekWorkouts >= 3 || (currentWeekWorkouts + daysRemaining >= 3);
+    const currentWeekOnTrack = currentWeekWorkouts >= 3 || currentWeekWorkouts + daysRemaining >= 3;
     const workoutsNeededThisWeek = Math.max(0, 3 - currentWeekWorkouts);
 
     // If current week already qualifies, add it to current streak
@@ -1419,24 +1429,21 @@ export class AnalyticsApiService {
           description: null,
         },
         hasData: false,
-        message: 'No running data available. Complete a run with GPS tracking or achieve a running PR to see predictions.',
+        message:
+          'No running data available. Complete a run with GPS tracking or achieve a running PR to see predictions.',
       };
       return { data };
     }
 
     // Calculate predictions using Riegel's formula: T2 = T1 × (D2/D1)^1.06
     const predictions: RacePredictionDTO[] = this.RACE_DISTANCES.map((race) => {
-      const predictedTimeSeconds = this.predictRaceTime(
-        dataSource.distanceMeters,
-        dataSource.timeSeconds,
-        race.meters,
-      );
+      const predictedTimeSeconds = this.predictRaceTime(dataSource.distanceMeters, dataSource.timeSeconds, race.meters);
 
       const paceSecondsPerKm = predictedTimeSeconds / (race.meters / 1000);
 
       // Calculate confidence based on how close the source distance is to the target
-      const distanceRatio = Math.min(dataSource.distanceMeters, race.meters) /
-                           Math.max(dataSource.distanceMeters, race.meters);
+      const distanceRatio =
+        Math.min(dataSource.distanceMeters, race.meters) / Math.max(dataSource.distanceMeters, race.meters);
       const confidence = Math.round(distanceRatio * 100);
 
       return {
@@ -1480,9 +1487,7 @@ export class AnalyticsApiService {
     for (const prDef of prRecordTypes) {
       const pr = prs.find((p) => p.record_type === prDef.type);
       if (pr) {
-        const achievedAt = pr.achieved_at instanceof Date
-          ? pr.achieved_at.toISOString()
-          : String(pr.achieved_at);
+        const achievedAt = pr.achieved_at instanceof Date ? pr.achieved_at.toISOString() : String(pr.achieved_at);
 
         return {
           sourceType: 'personal_record',
@@ -1529,9 +1534,8 @@ export class AnalyticsApiService {
 
       // Prefer longer distances
       if (!bestRun || distance > bestRun.distance) {
-        const completedAt = execution.completed_at instanceof Date
-          ? execution.completed_at
-          : new Date(String(execution.completed_at));
+        const completedAt =
+          execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
 
         bestRun = { distance, time, date: completedAt };
       }
@@ -1622,10 +1626,13 @@ export class AnalyticsApiService {
     });
 
     // For each execution, get set completions for this exercise
-    const dataPointsMap = new Map<string, {
-      sets: Array<{ weight: number; reps: number; rpe: number | null }>;
-      date: Date;
-    }>();
+    const dataPointsMap = new Map<
+      string,
+      {
+        sets: Array<{ weight: number; reps: number; rpe: number | null }>;
+        date: Date;
+      }
+    >();
 
     for (const execution of executions) {
       // Get all set completions for this execution
@@ -1648,9 +1655,8 @@ export class AnalyticsApiService {
       const relevantSets = setCompletions.filter((sc) => exerciseInstanceIds.has(sc.exercise_instance_id));
       if (relevantSets.length === 0) continue;
 
-      const completedAt = execution.completed_at instanceof Date
-        ? execution.completed_at
-        : new Date(String(execution.completed_at));
+      const completedAt =
+        execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
       const dateKey = formatDateToYMD(completedAt);
 
       const existing = dataPointsMap.get(dateKey) || { sets: [], date: completedAt };
@@ -1692,9 +1698,10 @@ export class AnalyticsApiService {
       );
 
       const rpesWithValue = sets.filter((s) => s.rpe !== null).map((s) => s.rpe!);
-      const avgRpe = rpesWithValue.length > 0
-        ? Math.round((rpesWithValue.reduce((a, b) => a + b, 0) / rpesWithValue.length) * 10) / 10
-        : null;
+      const avgRpe =
+        rpesWithValue.length > 0
+          ? Math.round((rpesWithValue.reduce((a, b) => a + b, 0) / rpesWithValue.length) * 10) / 10
+          : null;
 
       dataPoints.push({
         date,
@@ -1751,13 +1758,16 @@ export class AnalyticsApiService {
     });
 
     // Track exercises with their stats
-    const exerciseStats = new Map<string, {
-      exerciseId: string;
-      exerciseName: string;
-      sessionCount: number;
-      lastSessionDate: Date;
-      maxWeight: number;
-    }>();
+    const exerciseStats = new Map<
+      string,
+      {
+        exerciseId: string;
+        exerciseName: string;
+        sessionCount: number;
+        lastSessionDate: Date;
+        maxWeight: number;
+      }
+    >();
 
     for (const execution of executions) {
       // Get all set completions for this execution
@@ -1787,9 +1797,8 @@ export class AnalyticsApiService {
         exerciseSets.set(exerciseId, existing);
       }
 
-      const completedAt = execution.completed_at instanceof Date
-        ? execution.completed_at
-        : new Date(String(execution.completed_at));
+      const completedAt =
+        execution.completed_at instanceof Date ? execution.completed_at : new Date(String(execution.completed_at));
 
       for (const [exerciseId, sets] of exerciseSets) {
         const existing = exerciseStats.get(exerciseId);

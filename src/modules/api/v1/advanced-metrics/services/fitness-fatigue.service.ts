@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import {
-  FitnessFatigueDaily,
-  NewFitnessFatigueDaily,
-  TrainingRecommendation,
-} from 'src/database/interfaces';
+import { NewFitnessFatigueDaily, TrainingRecommendation } from 'src/database/interfaces';
+import { formatDateToYMD } from 'src/lib/util';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
-import { formatDateToYMD } from 'src/lib/util';
 
 export interface FitnessFatigueResult {
   date: string;
@@ -55,8 +51,8 @@ export class FitnessFatigueService {
     yesterday.setDate(yesterday.getDate() - 1);
 
     const yesterdayData = await this.fitnessFatigueRepository.findByUserAndDate(userId, yesterday);
-    const previousCTL = yesterdayData ? parseFloat(yesterdayData.ctl) : 0;
-    const previousATL = yesterdayData ? parseFloat(yesterdayData.atl) : 0;
+    const previousCTL = yesterdayData ? Number.parseFloat(yesterdayData.ctl) : 0;
+    const previousATL = yesterdayData ? Number.parseFloat(yesterdayData.atl) : 0;
 
     // Get today's TSS
     const dailyTss = await this.trainingStressRepository.getTotalTSSForDate(userId, date);
@@ -154,24 +150,24 @@ export class FitnessFatigueService {
 
     const data: FitnessFatigueResult[] = records.map((r) => ({
       date: formatDateToYMD(r.date),
-      ctl: parseFloat(r.ctl),
-      atl: parseFloat(r.atl),
-      tsb: parseFloat(r.tsb),
-      dailyTss: parseFloat(r.daily_tss),
-      rampRate: r.ramp_rate ? parseFloat(r.ramp_rate) : null,
-      recommendation: this.getRecommendation(parseFloat(r.tsb)),
+      ctl: Number.parseFloat(r.ctl),
+      atl: Number.parseFloat(r.atl),
+      tsb: Number.parseFloat(r.tsb),
+      dailyTss: Number.parseFloat(r.daily_tss),
+      rampRate: r.ramp_rate ? Number.parseFloat(r.ramp_rate) : null,
+      recommendation: this.getRecommendation(Number.parseFloat(r.tsb)),
     }));
 
     // Get current (latest) values
     const latest = records[records.length - 1];
-    const currentTsb = parseFloat(latest.tsb);
+    const currentTsb = Number.parseFloat(latest.tsb);
     const recommendation = this.getRecommendation(currentTsb);
 
     return {
       data,
       currentForm: {
-        ctl: parseFloat(latest.ctl),
-        atl: parseFloat(latest.atl),
+        ctl: Number.parseFloat(latest.ctl),
+        atl: Number.parseFloat(latest.atl),
         tsb: currentTsb,
         recommendation,
         recommendationText: this.getRecommendationText(recommendation, currentTsb),
@@ -187,15 +183,15 @@ export class FitnessFatigueService {
 
     if (!latest) return null;
 
-    const tsb = parseFloat(latest.tsb);
+    const tsb = Number.parseFloat(latest.tsb);
 
     return {
       date: formatDateToYMD(latest.date),
-      ctl: parseFloat(latest.ctl),
-      atl: parseFloat(latest.atl),
+      ctl: Number.parseFloat(latest.ctl),
+      atl: Number.parseFloat(latest.atl),
       tsb,
-      dailyTss: parseFloat(latest.daily_tss),
-      rampRate: latest.ramp_rate ? parseFloat(latest.ramp_rate) : null,
+      dailyTss: Number.parseFloat(latest.daily_tss),
+      rampRate: latest.ramp_rate ? Number.parseFloat(latest.ramp_rate) : null,
       recommendation: this.getRecommendation(tsb),
     };
   }
@@ -211,7 +207,7 @@ export class FitnessFatigueService {
 
     if (!weekAgoData) return null;
 
-    const weekAgoCTL = parseFloat(weekAgoData.ctl);
+    const weekAgoCTL = Number.parseFloat(weekAgoData.ctl);
     const rampRate = currentCTL - weekAgoCTL;
 
     return Math.round(rampRate * 100) / 100;
@@ -251,14 +247,11 @@ export class FitnessFatigueService {
   /**
    * Predict future TSB based on planned training
    */
-  async predictFutureTSB(
-    userId: string,
-    plannedDailyTSS: number[],
-  ): Promise<FitnessFatigueResult[]> {
+  async predictFutureTSB(userId: string, plannedDailyTSS: number[]): Promise<FitnessFatigueResult[]> {
     const latest = await this.fitnessFatigueRepository.getLatestForUser(userId);
 
-    let ctl = latest ? parseFloat(latest.ctl) : 0;
-    let atl = latest ? parseFloat(latest.atl) : 0;
+    let ctl = latest ? Number.parseFloat(latest.ctl) : 0;
+    let atl = latest ? Number.parseFloat(latest.atl) : 0;
 
     const predictions: FitnessFatigueResult[] = [];
     const startDate = new Date();

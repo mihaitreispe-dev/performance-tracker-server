@@ -16,7 +16,13 @@ import { UserRepository } from 'src/repositories/user.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody, UpdateUserSettingsBody } from './request.dto';
+import {
+  CreateTokensBody,
+  CreateTokensQuery,
+  RevokeTokensBody,
+  UpdateUserBody,
+  UpdateUserSettingsBody,
+} from './request.dto';
 import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse, UserSettingsResponse } from './response.dto';
 
 @Injectable()
@@ -265,7 +271,10 @@ export class AuthApiService {
     };
   }
 
-  async updateUserSettings(req: Request & { user: AuthUser }, body: UpdateUserSettingsBody): Promise<UserSettingsResponse> {
+  async updateUserSettings(
+    req: Request & { user: AuthUser },
+    body: UpdateUserSettingsBody,
+  ): Promise<UserSettingsResponse> {
     const updateData: Record<string, unknown> = {};
 
     if (body.hrZones !== undefined) {

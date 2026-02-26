@@ -202,6 +202,6 @@ export class AppConfigService {
       // Default to restrictive policy in production
       return [];
     }
-    return origins.split(',').map((origin) => origin.trim());
+    return origins.split(',').map((origin: string) => origin.trim());
   }
 }

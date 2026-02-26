@@ -2,29 +2,23 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { PersonalRecord, PersonalRecordHistory, PersonalRecordType } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
-import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 
+import { ListPersonalRecordsQuery, PeriodComparisonQuery, PREvolutionQuery, RecentPRsQuery } from './request.dto';
 import {
-  ListPersonalRecordsQuery,
-  PREvolutionQuery,
-  PeriodComparisonQuery,
-  RecentPRsQuery,
-} from './request.dto';
-import {
-  PersonalRecordDTO,
-  PersonalRecordListResponse,
   ExercisePRsDTO,
   ExercisePRsResponse,
-  PREvolutionDTO,
-  PREvolutionResponse,
-  PREvolutionPointDTO,
   PeriodComparisonDTO,
   PeriodComparisonResponse,
   PeriodPRSummaryDTO,
-  RecentPRsDTO,
-  RecentPRsResponse,
+  PersonalRecordDTO,
+  PersonalRecordListResponse,
+  PREvolutionDTO,
+  PREvolutionPointDTO,
+  PREvolutionResponse,
   RecentPRDTO,
+  RecentPRsResponse,
 } from './response.dto';
 
 @Injectable()
@@ -50,10 +44,7 @@ export class PersonalRecordsApiService {
     return { data: { records: recordDTOs } };
   }
 
-  async getStrengthPRsForExercise(
-    req: Request & { user: AuthUser },
-    exerciseId: string,
-  ): Promise<ExercisePRsResponse> {
+  async getStrengthPRsForExercise(req: Request & { user: AuthUser }, exerciseId: string): Promise<ExercisePRsResponse> {
     const exercise = await this.exerciseRepository.findById(exerciseId);
     if (!exercise) {
       throw new NotFoundException('Exercise not found');
@@ -101,11 +92,11 @@ export class PersonalRecordsApiService {
       exerciseName = exercise?.name ?? null;
     }
 
-    const unit = history.length > 0 ? history[0].unit : currentBest?.unit ?? this.getDefaultUnit(query.recordType);
+    const unit = history.length > 0 ? history[0].unit : (currentBest?.unit ?? this.getDefaultUnit(query.recordType));
 
     const historyPoints: PREvolutionPointDTO[] = history.map((h) => ({
-      value: parseFloat(h.value),
-      formattedValue: this.formatValue(parseFloat(h.value), h.unit, query.recordType),
+      value: Number.parseFloat(h.value),
+      formattedValue: this.formatValue(Number.parseFloat(h.value), h.unit, query.recordType),
       achievedAt: h.achieved_at instanceof Date ? h.achieved_at.toISOString() : String(h.achieved_at),
       workoutExecutionId: h.workout_execution_id,
     }));
@@ -153,11 +144,12 @@ export class PersonalRecordsApiService {
       prs: result.period2PRs.map((p) => this.mapHistoryToDTO(p, exerciseNames.get(p.exercise_id ?? ''))),
     };
 
-    const changePercentage = result.period2Count > 0
-      ? ((result.period1Count - result.period2Count) / result.period2Count) * 100
-      : result.period1Count > 0
-        ? 100
-        : 0;
+    const changePercentage =
+      result.period2Count > 0
+        ? ((result.period1Count - result.period2Count) / result.period2Count) * 100
+        : result.period1Count > 0
+          ? 100
+          : 0;
 
     const data: PeriodComparisonDTO = {
       period1,
@@ -192,8 +184,8 @@ export class PersonalRecordsApiService {
       });
 
       const previousPR = allHistory.length > 0 ? allHistory[allHistory.length - 1] : null;
-      const value = parseFloat(pr.value);
-      const previousValue = previousPR ? parseFloat(previousPR.value) : null;
+      const value = Number.parseFloat(pr.value);
+      const previousValue = previousPR ? Number.parseFloat(previousPR.value) : null;
 
       let improvement: number | null = null;
       let improvementPercentage: number | null = null;
@@ -248,7 +240,7 @@ export class PersonalRecordsApiService {
   }
 
   private mapToDTO(record: PersonalRecord, exerciseName?: string | null): PersonalRecordDTO {
-    const value = parseFloat(record.value);
+    const value = Number.parseFloat(record.value);
     return {
       id: record.id,
       recordType: record.record_type,
@@ -265,7 +257,7 @@ export class PersonalRecordsApiService {
   }
 
   private mapHistoryToDTO(record: PersonalRecordHistory, exerciseName?: string | null): PersonalRecordDTO {
-    const value = parseFloat(record.value);
+    const value = Number.parseFloat(record.value);
     return {
       id: record.id,
       recordType: record.record_type,
@@ -281,7 +273,7 @@ export class PersonalRecordsApiService {
     };
   }
 
-  private formatValue(value: number, unit: string, recordType: PersonalRecordType): string {
+  private formatValue(value: number, unit: string, _recordType: PersonalRecordType): string {
     if (unit === 'seconds') {
       return this.formatTime(value);
     }

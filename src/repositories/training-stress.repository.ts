@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely, sql } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import {
   Database,
-  TrainingStressScore,
   NewTrainingStressScore,
+  TrainingStressScore,
   UpdateTrainingStressScore,
 } from 'src/database/interfaces';
 
@@ -25,11 +25,7 @@ export class TrainingStressRepository {
   constructor(@InjectKysely() private readonly db: Kysely<Database>) {}
 
   async findById(id: string): Promise<TrainingStressScore | undefined> {
-    return this.db
-      .selectFrom('training_stress_scores')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+    return this.db.selectFrom('training_stress_scores').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
   async findByWorkoutExecutionId(workoutExecutionId: string): Promise<TrainingStressScore | undefined> {
@@ -41,9 +37,7 @@ export class TrainingStressRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<TrainingStressScore[]> {
-    let query = this.db
-      .selectFrom('training_stress_scores')
-      .selectAll();
+    let query = this.db.selectFrom('training_stress_scores').selectAll();
 
     if (options.filter.workoutExecutionIds && options.filter.workoutExecutionIds.length > 0) {
       query = query.where('workout_execution_id', 'in', options.filter.workoutExecutionIds);
@@ -104,15 +98,11 @@ export class TrainingStressRepository {
       .where('workout_executions.completed_at', '<=', endOfDay)
       .executeTakeFirst();
 
-    return parseFloat(result?.total_tss || '0');
+    return Number.parseFloat(result?.total_tss || '0');
   }
 
   async create(data: NewTrainingStressScore): Promise<TrainingStressScore> {
-    return this.db
-      .insertInto('training_stress_scores')
-      .values(data)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('training_stress_scores').values(data).returningAll().executeTakeFirstOrThrow();
   }
 
   async upsert(data: NewTrainingStressScore): Promise<TrainingStressScore> {
@@ -149,10 +139,7 @@ export class TrainingStressRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.db
-      .deleteFrom('training_stress_scores')
-      .where('id', '=', id)
-      .executeTakeFirst();
+    const result = await this.db.deleteFrom('training_stress_scores').where('id', '=', id).executeTakeFirst();
     return result.numDeletedRows > 0n;
   }
 

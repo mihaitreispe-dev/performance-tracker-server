@@ -1,17 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  PersonalRecordType,
-  SetCompletion,
-  RouteMarker,
-  WorkoutRoute,
-  WorkoutExecution,
   NewPersonalRecord,
+  PersonalRecordType,
+  RouteMarker,
+  SetCompletion,
+  WorkoutExecution,
+  WorkoutRoute,
 } from 'src/database/interfaces';
+import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
-import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
-import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
+import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 
 interface DetectedPR {
   recordType: PersonalRecordType;
@@ -63,7 +63,9 @@ export class PersonalRecordsDetectionService {
         await this.processDetectedPR(detected, userId, executionId, achievedAt);
       }
 
-      this.logger.log(`PR detection completed for execution ${executionId}: ${allDetectedPRs.length} potential PRs detected`);
+      this.logger.log(
+        `PR detection completed for execution ${executionId}: ${allDetectedPRs.length} potential PRs detected`,
+      );
     } catch (error) {
       this.logger.error(`Error detecting PRs for execution ${executionId}:`, error);
     }
@@ -150,7 +152,7 @@ export class PersonalRecordsDetectionService {
     let max: number | null = null;
     for (const s of sets) {
       if (s.actual_load) {
-        const load = parseFloat(s.actual_load);
+        const load = Number.parseFloat(s.actual_load);
         if (max === null || load > max) {
           max = load;
         }
@@ -175,7 +177,7 @@ export class PersonalRecordsDetectionService {
     let max: number | null = null;
     for (const s of sets) {
       if (s.actual_load && s.actual_reps !== null) {
-        const volume = parseFloat(s.actual_load) * s.actual_reps;
+        const volume = Number.parseFloat(s.actual_load) * s.actual_reps;
         if (max === null || volume > max) {
           max = volume;
         }
@@ -219,9 +221,8 @@ export class PersonalRecordsDetectionService {
 
       for (const marker of sortedMarkers) {
         // Assuming km markers, marker_number * 1000 gives meters
-        const distanceAtMarker = marker.marker_type === 'km'
-          ? marker.marker_number * 1000
-          : marker.marker_number * 1609.34; // miles to meters
+        const distanceAtMarker =
+          marker.marker_type === 'km' ? marker.marker_number * 1000 : marker.marker_number * 1609.34; // miles to meters
 
         if (distanceAtMarker >= targetDistance && marker.cumulative_time_seconds) {
           detectedPRs.push({
@@ -276,7 +277,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.LONGEST_DISTANCE,
         exerciseId: null,
-        value: parseFloat(route.total_distance_meters),
+        value: Number.parseFloat(route.total_distance_meters),
         unit: 'meters',
       });
     }
@@ -286,7 +287,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.MAX_ELEVATION_GAIN,
         exerciseId: null,
-        value: parseFloat(route.elevation_gain_meters),
+        value: Number.parseFloat(route.elevation_gain_meters),
         unit: 'meters',
       });
     }
@@ -356,7 +357,7 @@ export class PersonalRecordsDetectionService {
       return true;
     }
 
-    const existingValue = parseFloat(existing.value);
+    const existingValue = Number.parseFloat(existing.value);
 
     // For time-based PRs (lower is better)
     const timePRTypes: PersonalRecordType[] = [

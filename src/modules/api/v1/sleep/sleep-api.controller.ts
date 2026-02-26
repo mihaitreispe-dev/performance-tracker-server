@@ -17,7 +17,13 @@ import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
-import { CreateSleepLogBody, ListSleepLogsQuery, SleepLogDateParam, SleepLogIdParam, UpdateSleepLogBody } from './request.dto';
+import {
+  CreateSleepLogBody,
+  ListSleepLogsQuery,
+  SleepLogDateParam,
+  SleepLogIdParam,
+  UpdateSleepLogBody,
+} from './request.dto';
 import { SleepLogListResponse, SleepLogResponse } from './response.dto';
 import { SleepApiService } from './sleep-api.service';
 
@@ -57,10 +63,7 @@ export class SleepApiController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get(':id')
-  async getById(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: SleepLogIdParam,
-  ): Promise<SleepLogResponse> {
+  async getById(@Req() req: Request & { user: AuthUser }, @Param() params: SleepLogIdParam): Promise<SleepLogResponse> {
     return this.service.getById(req, params.id);
   }
 
@@ -69,10 +72,7 @@ export class SleepApiController {
   @ApiResponse({ status: HttpStatus.CREATED, type: SleepLogResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post()
-  async create(
-    @Req() req: Request & { user: AuthUser },
-    @Body() body: CreateSleepLogBody,
-  ): Promise<SleepLogResponse> {
+  async create(@Req() req: Request & { user: AuthUser }, @Body() body: CreateSleepLogBody): Promise<SleepLogResponse> {
     return this.service.create(req, body);
   }
 

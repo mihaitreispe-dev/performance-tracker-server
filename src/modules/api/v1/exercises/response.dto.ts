@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { ExerciseLevel, ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
@@ -168,4 +178,46 @@ export class ExerciseUploadUrlResponse extends ItemResponse<ExerciseUploadUrlDTO
   @IsObject({ always: true })
   @ValidateNested()
   declare data: ExerciseUploadUrlDTO;
+}
+
+export class ExerciseChainMemberDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  picture?: string | null;
+
+  @ApiPropertyOptional({ enum: ExerciseLevel })
+  @IsEnumString(ExerciseLevel)
+  @IsOptional()
+  level?: ExerciseLevel | null;
+
+  @ApiProperty()
+  @IsNumber()
+  position: number;
+}
+
+export class ExerciseChainDTO {
+  @ApiProperty()
+  @IsUUID()
+  chainId: string;
+
+  @ApiProperty({ type: [ExerciseChainMemberDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  members: ExerciseChainMemberDTO[];
+}
+
+export class ExerciseChainResponse extends ItemResponse<ExerciseChainDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: ExerciseChainDTO;
 }

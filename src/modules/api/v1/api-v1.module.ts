@@ -17,6 +17,7 @@ import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
+import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
@@ -44,6 +45,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     WorkoutPlansApiModule.register(),
     PersonalRecordsApiModule.register(),
     SleepApiModule.register(),
+    PainLogsApiModule.register(),
   ],
   providers: [
     {

@@ -4,15 +4,15 @@ import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repos
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
-import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 
 import { AdvancedMetricsApiController } from './advanced-metrics-api.controller';
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
-import { Vo2MaxService } from './services/vo2max.service';
-import { TrainingStressService } from './services/training-stress.service';
 import { FitnessFatigueService } from './services/fitness-fatigue.service';
+import { TrainingStressService } from './services/training-stress.service';
+import { Vo2MaxService } from './services/vo2max.service';
 
 @Module({})
 export class AdvancedMetricsApiModule {

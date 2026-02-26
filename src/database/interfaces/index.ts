@@ -36,3 +36,5 @@ export * from './oauth-states-table.interface';
 export * from './fitness-metrics-table.interface';
 export * from './training-stress-scores-table.interface';
 export * from './fitness-fatigue-daily-table.interface';
+export * from './exercise-chains-table.interface';
+export * from './pain-logs-table.interface';

@@ -2,11 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { type Request } from 'express';
 import { Workout, WorkoutPlan, WorkoutPlanItem } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutItemRepository } from 'src/repositories/workout-item.repository';
 import { WorkoutPlanRepository, WorkoutPlanSort } from 'src/repositories/workout-plan.repository';
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
-import { WorkoutItemRepository } from 'src/repositories/workout-item.repository';
 
 import {
   ActivatePlanBody,
@@ -180,7 +180,9 @@ export class WorkoutPlansApiService {
 
     // Validate week number against plan duration
     if (body.weekNumber > plan.duration_weeks) {
-      throw new BadRequestException(`Week number ${body.weekNumber} exceeds plan duration of ${plan.duration_weeks} weeks`);
+      throw new BadRequestException(
+        `Week number ${body.weekNumber} exceeds plan duration of ${plan.duration_weeks} weeks`,
+      );
     }
 
     // Verify workout exists and belongs to user
@@ -221,7 +223,11 @@ export class WorkoutPlansApiService {
     await this.workoutPlanItemRepo.deleteById(itemId);
   }
 
-  async activate(req: Request & { user: AuthUser }, planId: string, body: ActivatePlanBody): Promise<ActivatePlanResponse> {
+  async activate(
+    req: Request & { user: AuthUser },
+    planId: string,
+    body: ActivatePlanBody,
+  ): Promise<ActivatePlanResponse> {
     const plan = await this.workoutPlanRepo.findById(planId);
     if (!plan) {
       throw new NotFoundException('Workout plan not found');

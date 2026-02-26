@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AnalyticsApiService } from './analytics-api.service';
+import { Request } from 'express';
+
+import { WorkoutExecution, WorkoutExecutionSource } from '../../../../database/interfaces';
 import { CardioMetricsRepository } from '../../../../repositories/cardio-metrics.repository';
 import { DailyTrainingLoadRepository } from '../../../../repositories/daily-training-load.repository';
 import { ExecutionWeatherRepository } from '../../../../repositories/execution-weather.repository';
@@ -13,21 +15,17 @@ import { WorkoutRepository } from '../../../../repositories/workout.repository';
 import { WorkoutExecutionRepository } from '../../../../repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from '../../../../repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from '../../../../repositories/workout-schedule.repository';
-import { WorkoutExecutionSource, WorkoutType } from '../../../../database/interfaces';
 import { AuthUser } from '../../../auth/types/authenticated-user';
-import { Request } from 'express';
+import { AnalyticsApiService } from './analytics-api.service';
 
 describe('AnalyticsApiService', () => {
   let service: AnalyticsApiService;
   let workoutExecutionRepository: jest.Mocked<WorkoutExecutionRepository>;
   let workoutScheduleRepository: jest.Mocked<WorkoutScheduleRepository>;
-  let workoutRepository: jest.Mocked<WorkoutRepository>;
+  let _workoutRepository: jest.Mocked<WorkoutRepository>;
 
   const mockUser: AuthUser = {
     id: 'user-1',
-    email: 'test@test.com',
-    displayName: 'Test User',
-    roles: [],
   };
 
   const createMockRequest = (): Request & { user: AuthUser } => {
@@ -72,7 +70,7 @@ describe('AnalyticsApiService', () => {
     service = module.get<AnalyticsApiService>(AnalyticsApiService);
     workoutExecutionRepository = module.get(WorkoutExecutionRepository);
     workoutScheduleRepository = module.get(WorkoutScheduleRepository);
-    workoutRepository = module.get(WorkoutRepository);
+    _workoutRepository = module.get(WorkoutRepository);
   });
 
   describe('getStreak', () => {
@@ -96,7 +94,7 @@ describe('AnalyticsApiService', () => {
       ];
 
       workoutExecutionRepository.findMany.mockResolvedValue(executions);
-      workoutScheduleRepository.findById.mockResolvedValue(null);
+      workoutScheduleRepository.findById.mockResolvedValue(undefined);
 
       const result = await service.getStreak(createMockRequest());
 
@@ -113,7 +111,7 @@ describe('AnalyticsApiService', () => {
       ];
 
       workoutExecutionRepository.findMany.mockResolvedValue(executions);
-      workoutScheduleRepository.findById.mockResolvedValue(null);
+      workoutScheduleRepository.findById.mockResolvedValue(undefined);
 
       const result = await service.getStreak(createMockRequest());
 
@@ -143,7 +141,7 @@ describe('AnalyticsApiService', () => {
       ];
 
       workoutExecutionRepository.findMany.mockResolvedValue(executions);
-      workoutScheduleRepository.findById.mockResolvedValue(null);
+      workoutScheduleRepository.findById.mockResolvedValue(undefined);
 
       const result = await service.getStreak(createMockRequest());
 
@@ -171,7 +169,7 @@ describe('AnalyticsApiService', () => {
       ];
 
       workoutExecutionRepository.findMany.mockResolvedValue(executions);
-      workoutScheduleRepository.findById.mockResolvedValue(null);
+      workoutScheduleRepository.findById.mockResolvedValue(undefined);
 
       const result = await service.getStreak(createMockRequest());
 
@@ -196,7 +194,7 @@ describe('AnalyticsApiService', () => {
       ];
 
       workoutExecutionRepository.findMany.mockResolvedValue(executions);
-      workoutScheduleRepository.findById.mockResolvedValue(null);
+      workoutScheduleRepository.findById.mockResolvedValue(undefined);
 
       const result = await service.getStreak(createMockRequest());
 
@@ -222,20 +220,20 @@ describe('AnalyticsApiService', () => {
 });
 
 // Helper functions
-function createMockExecution(id: string, completedAt: Date) {
+function createMockExecution(id: string, completedAt: Date): WorkoutExecution {
   return {
     id,
     user_id: 'user-1',
     workout_schedule_id: null,
-    started_at: new Date(completedAt.getTime() - 3600000).toISOString(),
-    completed_at: completedAt.toISOString(),
+    started_at: new Date(completedAt.getTime() - 3600000),
+    completed_at: completedAt,
     duration_seconds: 3600,
     source: WorkoutExecutionSource.MANUAL,
     external_id: null,
     notes: null,
-    created_at: completedAt.toISOString(),
-    updated_at: completedAt.toISOString(),
-  };
+    created_at: completedAt,
+    updated_at: completedAt,
+  } as unknown as WorkoutExecution;
 }
 
 function getThisWeekMonday(): Date {

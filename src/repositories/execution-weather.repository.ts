@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import {
-  Database,
-  ExecutionWeather,
-  ExecutionWeatherUpdate,
-  NewExecutionWeather,
-} from 'src/database/interfaces';
+import { Database, ExecutionWeather, ExecutionWeatherUpdate, NewExecutionWeather } from 'src/database/interfaces';
 
 @Injectable()
 export class ExecutionWeatherRepository {

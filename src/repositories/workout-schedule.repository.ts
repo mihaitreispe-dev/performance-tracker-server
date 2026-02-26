@@ -37,11 +37,7 @@ export class WorkoutScheduleRepository {
   async findByIds(ids: string[]): Promise<WorkoutSchedule[]> {
     if (ids.length === 0) return [];
 
-    return this.db
-      .selectFrom('workout_schedules')
-      .where('id', 'in', ids)
-      .selectAll()
-      .execute();
+    return this.db.selectFrom('workout_schedules').where('id', 'in', ids).selectAll().execute();
   }
 
   async findMany(options: WorkoutScheduleFindManyOptions = {}): Promise<WorkoutSchedule[]> {

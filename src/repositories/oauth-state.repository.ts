@@ -1,5 +1,6 @@
+import { randomBytes } from 'node:crypto';
+
 import { Injectable } from '@nestjs/common';
-import { randomBytes } from 'crypto';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Database, NewOAuthState, OAuthState } from 'src/database/interfaces/index';
@@ -18,7 +19,9 @@ export class OAuthStateRepository {
   /**
    * Create a new OAuth state with expiry (default 10 minutes)
    */
-  async create(data: Omit<NewOAuthState, 'state_token' | 'expires_at'> & { expiresInMinutes?: number }): Promise<OAuthState> {
+  async create(
+    data: Omit<NewOAuthState, 'state_token' | 'expires_at'> & { expiresInMinutes?: number },
+  ): Promise<OAuthState> {
     const stateToken = this.generateStateToken();
     const expiresInMinutes = data.expiresInMinutes ?? 10;
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);

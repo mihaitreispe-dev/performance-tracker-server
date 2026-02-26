@@ -45,11 +45,7 @@ export class SleepLogRepository {
   }
 
   async findByExternalId(externalId: string): Promise<SleepLog | undefined> {
-    return this.db
-      .selectFrom('sleep_logs')
-      .where('external_id', '=', externalId)
-      .selectAll()
-      .executeTakeFirst();
+    return this.db.selectFrom('sleep_logs').where('external_id', '=', externalId).selectAll().executeTakeFirst();
   }
 
   async findMany(options: SleepLogFindManyOptions = {}): Promise<SleepLog[]> {
@@ -108,7 +104,7 @@ export class SleepLogRepository {
   async updateById(id: string, data: SleepLogUpdate): Promise<SleepLog> {
     return this.db
       .updateTable('sleep_logs')
-      .set({ ...data, updated_at: new Date() } as SleepLogUpdate)
+      .set({ ...data, updated_at: new Date() } as any)
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();

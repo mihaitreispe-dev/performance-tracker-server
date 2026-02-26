@@ -29,7 +29,10 @@ export class ListWorkoutSchedulesQuery extends PageQuery {
   @IsOptional()
   completed?: boolean;
 
-  @ApiPropertyOptional({ type: Boolean, description: 'Include execution summary (distance, duration, pace) in response' })
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Include execution summary (distance, duration, pace) in response',
+  })
   @IsBoolean()
   @Type(() => Boolean)
   @IsOptional()

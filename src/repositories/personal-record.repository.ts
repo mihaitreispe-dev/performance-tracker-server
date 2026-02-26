@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely, sql } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import {
   Database,
-  PersonalRecord,
   NewPersonalRecord,
-  PersonalRecordHistory,
   NewPersonalRecordHistory,
+  PersonalRecord,
+  PersonalRecordHistory,
   PersonalRecordType,
 } from 'src/database/interfaces';
 
@@ -201,9 +201,12 @@ export class PersonalRecordRepository {
     return Number(result?.count ?? 0);
   }
 
-  async getPeriodComparison(
-    filter: PeriodComparisonFilter,
-  ): Promise<{ period1Count: number; period2Count: number; period1PRs: PersonalRecordHistory[]; period2PRs: PersonalRecordHistory[] }> {
+  async getPeriodComparison(filter: PeriodComparisonFilter): Promise<{
+    period1Count: number;
+    period2Count: number;
+    period1PRs: PersonalRecordHistory[];
+    period2PRs: PersonalRecordHistory[];
+  }> {
     const [period1Count, period2Count, period1PRs, period2PRs] = await Promise.all([
       this.countPRsInPeriod(filter.userId, filter.period1Start, filter.period1End),
       this.countPRsInPeriod(filter.userId, filter.period2Start, filter.period2End),

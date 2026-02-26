@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely, sql } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import {
   Database,
   FitnessMetric,
@@ -27,18 +27,11 @@ export class FitnessMetricsRepository {
   constructor(@InjectKysely() private readonly db: Kysely<Database>) {}
 
   async findById(id: string): Promise<FitnessMetric | undefined> {
-    return this.db
-      .selectFrom('fitness_metrics')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+    return this.db.selectFrom('fitness_metrics').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
   async findMany(options: FindManyOptions): Promise<FitnessMetric[]> {
-    let query = this.db
-      .selectFrom('fitness_metrics')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('fitness_metrics').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.metricType) {
       query = query.where('metric_type', '=', options.filter.metricType);
@@ -99,11 +92,7 @@ export class FitnessMetricsRepository {
       .execute();
   }
 
-  async getHistory(
-    userId: string,
-    metricType: FitnessMetricType,
-    days: number = 90,
-  ): Promise<FitnessMetric[]> {
+  async getHistory(userId: string, metricType: FitnessMetricType, days: number = 90): Promise<FitnessMetric[]> {
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - days);
 
@@ -118,11 +107,7 @@ export class FitnessMetricsRepository {
   }
 
   async create(data: NewFitnessMetric): Promise<FitnessMetric> {
-    return this.db
-      .insertInto('fitness_metrics')
-      .values(data)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('fitness_metrics').values(data).returningAll().executeTakeFirstOrThrow();
   }
 
   async update(id: string, data: UpdateFitnessMetric): Promise<FitnessMetric | undefined> {
@@ -135,10 +120,7 @@ export class FitnessMetricsRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.db
-      .deleteFrom('fitness_metrics')
-      .where('id', '=', id)
-      .executeTakeFirst();
+    const result = await this.db.deleteFrom('fitness_metrics').where('id', '=', id).executeTakeFirst();
     return result.numDeletedRows > 0n;
   }
 

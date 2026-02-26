@@ -107,7 +107,11 @@ export class WorkoutPlansApiController {
   @ApiOperation({ summary: 'Add workout to plan at specific week/day position' })
   @ApiResponse({ status: HttpStatus.CREATED, type: WorkoutPlanItemResponse })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Plan or workout not found' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Invalid week number or duplicate position' })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    type: ErrorResponse,
+    description: 'Invalid week number or duplicate position',
+  })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post(':id/items')
   async addItem(
@@ -125,10 +129,7 @@ export class WorkoutPlansApiController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/items/:itemId')
-  async removeItem(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: WorkoutPlanItemIdParam,
-  ): Promise<void> {
+  async removeItem(@Req() req: Request & { user: AuthUser }, @Param() params: WorkoutPlanItemIdParam): Promise<void> {
     return this.service.removeItem(req, params.id, params.itemId);
   }
 

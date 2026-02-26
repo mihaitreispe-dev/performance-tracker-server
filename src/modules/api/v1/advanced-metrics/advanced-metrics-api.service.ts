@@ -1,22 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { FitnessMetricType } from 'src/database/interfaces';
+import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
-import { AuthUser } from 'src/modules/auth/types/authenticated-user';
-import { Vo2MaxService } from './services/vo2max.service';
-import { TrainingStressService } from './services/training-stress.service';
-import { FitnessFatigueService } from './services/fitness-fatigue.service';
+
+import { FitnessFatiguePredictionBody, ThresholdOverrideBody } from './request.dto';
 import {
-  Vo2MaxResponse,
-  Vo2MaxHistoryResponse,
-  FitnessFatigueResponse,
-  TrainingStressResponse,
-  ThresholdsResponse,
-  ThresholdOverrideResponse,
   FitnessFatiguePredictionResponse,
+  FitnessFatigueResponse,
+  ThresholdOverrideResponse,
+  ThresholdsResponse,
+  TrainingStressResponse,
+  Vo2MaxHistoryResponse,
+  Vo2MaxResponse,
 } from './response.dto';
-import { ThresholdOverrideBody, FitnessFatiguePredictionBody } from './request.dto';
+import { FitnessFatigueService } from './services/fitness-fatigue.service';
+import { TrainingStressService } from './services/training-stress.service';
+import { Vo2MaxService } from './services/vo2max.service';
 
 @Injectable()
 export class AdvancedMetricsApiService {
@@ -91,8 +92,8 @@ export class AdvancedMetricsApiService {
 
     const historyPoints = history.map((h) => ({
       calculatedAt: h.calculated_at.toISOString(),
-      value: parseFloat(h.value),
-      confidence: parseFloat(h.confidence || '0'),
+      value: Number.parseFloat(h.value),
+      confidence: Number.parseFloat(h.confidence || '0'),
     }));
 
     // Calculate changes
@@ -108,9 +109,7 @@ export class AdvancedMetricsApiService {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const thirtyDaysPoint = historyPoints.find(
-        (p) => new Date(p.calculatedAt) <= thirtyDaysAgo,
-      );
+      const thirtyDaysPoint = historyPoints.find((p) => new Date(p.calculatedAt) <= thirtyDaysAgo);
       if (thirtyDaysPoint) {
         changeFrom30Days = Math.round((last - thirtyDaysPoint.value) * 10) / 10;
       }
@@ -156,7 +155,7 @@ export class AdvancedMetricsApiService {
     }
 
     // Get existing or calculate
-    let result = await this.trainingStressService.getForWorkout(workoutId);
+    const result = await this.trainingStressService.getForWorkout(workoutId);
 
     if (!result) {
       // Calculate if not exists
@@ -178,15 +177,17 @@ export class AdvancedMetricsApiService {
 
     return new TrainingStressResponse({
       data: {
-        tss: result.tss ? parseFloat(result.tss) : null,
-        trimp: result.trimp ? parseFloat(result.trimp) : null,
-        aerobicTE: result.aerobic_te ? parseFloat(result.aerobic_te) : null,
-        anaerobicTE: result.anaerobic_te ? parseFloat(result.anaerobic_te) : null,
-        estimatedRecoveryHours: result.estimated_recovery_hours ? parseFloat(result.estimated_recovery_hours) : null,
-        intensityFactor: result.intensity_factor ? parseFloat(result.intensity_factor) : null,
-        hrss: result.hrss ? parseFloat(result.hrss) : null,
-        normalizedPace: result.normalized_pace ? parseFloat(result.normalized_pace) : null,
-        normalizedPower: result.normalized_power ? parseFloat(result.normalized_power) : null,
+        tss: result.tss ? Number.parseFloat(result.tss) : null,
+        trimp: result.trimp ? Number.parseFloat(result.trimp) : null,
+        aerobicTE: result.aerobic_te ? Number.parseFloat(result.aerobic_te) : null,
+        anaerobicTE: result.anaerobic_te ? Number.parseFloat(result.anaerobic_te) : null,
+        estimatedRecoveryHours: result.estimated_recovery_hours
+          ? Number.parseFloat(result.estimated_recovery_hours)
+          : null,
+        intensityFactor: result.intensity_factor ? Number.parseFloat(result.intensity_factor) : null,
+        hrss: result.hrss ? Number.parseFloat(result.hrss) : null,
+        normalizedPace: result.normalized_pace ? Number.parseFloat(result.normalized_pace) : null,
+        normalizedPower: result.normalized_power ? Number.parseFloat(result.normalized_power) : null,
       },
     });
   }
@@ -200,8 +201,8 @@ export class AdvancedMetricsApiService {
 
     const thresholds = metrics.map((m) => ({
       metricType: m.metric_type as FitnessMetricType,
-      value: parseFloat(m.value),
-      confidence: parseFloat(m.confidence || '0'),
+      value: Number.parseFloat(m.value),
+      confidence: Number.parseFloat(m.confidence || '0'),
       calculatedAt: m.calculated_at.toISOString(),
       source: m.metadata?.sourceType || 'calculated',
     }));
@@ -236,7 +237,7 @@ export class AdvancedMetricsApiService {
     return new ThresholdOverrideResponse({
       data: {
         metricType: body.metricType,
-        value: parseFloat(metric.value),
+        value: Number.parseFloat(metric.value),
         updatedAt: metric.calculated_at.toISOString(),
       },
     });

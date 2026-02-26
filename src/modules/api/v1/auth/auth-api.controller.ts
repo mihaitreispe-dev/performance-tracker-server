@@ -6,7 +6,13 @@ import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AuthApiService } from './auth-api.service';
-import { CreateTokensBody, CreateTokensQuery, RevokeTokensBody, UpdateUserBody, UpdateUserSettingsBody } from './request.dto';
+import {
+  CreateTokensBody,
+  CreateTokensQuery,
+  RevokeTokensBody,
+  UpdateUserBody,
+  UpdateUserSettingsBody,
+} from './request.dto';
 import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse, UserSettingsResponse } from './response.dto';
 
 @ApiTags('auth')

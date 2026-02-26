@@ -47,11 +47,7 @@ export class ExerciseRepository {
   async findByIds(ids: string[]): Promise<Exercise[]> {
     if (ids.length === 0) return [];
 
-    const results = await this.db
-      .selectFrom('exercises')
-      .where('id', 'in', ids)
-      .selectAll()
-      .execute();
+    const results = await this.db.selectFrom('exercises').where('id', 'in', ids).selectAll().execute();
 
     return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
   }

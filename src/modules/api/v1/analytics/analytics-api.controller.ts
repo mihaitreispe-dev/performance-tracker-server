@@ -5,7 +5,14 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AnalyticsApiService } from './analytics-api.service';
-import { PeriodSummaryQuery, StrengthProgressionParam, StrengthProgressionQuery, TrainingLoadHistoryQuery, WeeklySummaryQuery, WorkoutAnalyticsParam } from './request.dto';
+import {
+  PeriodSummaryQuery,
+  StrengthProgressionParam,
+  StrengthProgressionQuery,
+  TrainingLoadHistoryQuery,
+  WeeklySummaryQuery,
+  WorkoutAnalyticsParam,
+} from './request.dto';
 import {
   CurrentTrainingLoadResponse,
   PeriodSummaryResponse,
@@ -66,9 +73,7 @@ export class AnalyticsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: CurrentTrainingLoadResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('training-load')
-  async getCurrentTrainingLoad(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<CurrentTrainingLoadResponse> {
+  async getCurrentTrainingLoad(@Req() req: Request & { user: AuthUser }): Promise<CurrentTrainingLoadResponse> {
     return this.service.getCurrentTrainingLoad(req);
   }
 
@@ -89,9 +94,7 @@ export class AnalyticsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: StreakResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('streak')
-  async getStreak(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<StreakResponse> {
+  async getStreak(@Req() req: Request & { user: AuthUser }): Promise<StreakResponse> {
     return this.service.getStreak(req);
   }
 
@@ -100,9 +103,7 @@ export class AnalyticsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: RacePredictionsResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('race-predictions')
-  async getRacePredictions(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<RacePredictionsResponse> {
+  async getRacePredictions(@Req() req: Request & { user: AuthUser }): Promise<RacePredictionsResponse> {
     return this.service.getRacePredictions(req);
   }
 
@@ -111,9 +112,7 @@ export class AnalyticsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: TrackedExercisesResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('strength/exercises')
-  async getTrackedExercises(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<TrackedExercisesResponse> {
+  async getTrackedExercises(@Req() req: Request & { user: AuthUser }): Promise<TrackedExercisesResponse> {
     return this.service.getTrackedExercises(req);
   }
 

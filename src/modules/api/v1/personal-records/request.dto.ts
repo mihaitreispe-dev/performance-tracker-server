@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import { IsDateString, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { PersonalRecordType } from 'src/database/interfaces';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';

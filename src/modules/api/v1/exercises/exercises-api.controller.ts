@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Version,
@@ -20,8 +21,19 @@ import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { ExercisesApiService } from './exercises-api.service';
-import { CreateExerciseBody, ExerciseIdParam, ListExercisesQuery, UpdateExerciseBody } from './request.dto';
-import { ExerciseListResponse, ExerciseResponse, ExerciseUploadUrlResponse } from './response.dto';
+import {
+  CreateExerciseBody,
+  ExerciseIdParam,
+  ListExercisesQuery,
+  UpdateExerciseBody,
+  UpdateExerciseChainBody,
+} from './request.dto';
+import {
+  ExerciseChainResponse,
+  ExerciseListResponse,
+  ExerciseResponse,
+  ExerciseUploadUrlResponse,
+} from './response.dto';
 
 @ApiTags('exercises')
 @ApiBearerAuth('JWT')
@@ -121,5 +133,49 @@ export class ExercisesApiController {
   @Delete(':id')
   async delete(@Req() req: Request & { user: AuthUser }, @Param() params: ExerciseIdParam): Promise<void> {
     return this.service.delete(req, params.id);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get exercise progression chain (admin only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: ExerciseChainResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @Get(':id/chain')
+  async getChain(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+  ): Promise<ExerciseChainResponse | null> {
+    return this.service.getExerciseChain(req, params.id);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update exercise progression chain (admin only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: ExerciseChainResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @Put(':id/chain')
+  async updateChain(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+    @Body() body: UpdateExerciseChainBody,
+  ): Promise<ExerciseChainResponse> {
+    return this.service.updateExerciseChain(req, params.id, body);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Remove exercise from its chain (admin only)' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id/chain')
+  async removeFromChain(@Req() req: Request & { user: AuthUser }, @Param() params: ExerciseIdParam): Promise<void> {
+    return this.service.removeFromChain(req, params.id);
   }
 }

@@ -39,12 +39,7 @@ export class WorkoutPlanRepository {
 
     if (filter?.q) {
       const searchTerm = `%${filter.q.toLowerCase()}%`;
-      query = query.where((eb) =>
-        eb.or([
-          eb('name', 'ilike', searchTerm),
-          eb('description', 'ilike', searchTerm),
-        ]),
-      );
+      query = query.where((eb) => eb.or([eb('name', 'ilike', searchTerm), eb('description', 'ilike', searchTerm)]));
     }
 
     if (filter?.goal) {
@@ -78,12 +73,7 @@ export class WorkoutPlanRepository {
 
     if (filter?.q) {
       const searchTerm = `%${filter.q.toLowerCase()}%`;
-      query = query.where((eb) =>
-        eb.or([
-          eb('name', 'ilike', searchTerm),
-          eb('description', 'ilike', searchTerm),
-        ]),
-      );
+      query = query.where((eb) => eb.or([eb('name', 'ilike', searchTerm), eb('description', 'ilike', searchTerm)]));
     }
 
     if (filter?.goal) {

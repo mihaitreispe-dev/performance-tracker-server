@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely, sql } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import {
   Database,
   FitnessFatigueDaily,
@@ -26,11 +26,7 @@ export class FitnessFatigueRepository {
   constructor(@InjectKysely() private readonly db: Kysely<Database>) {}
 
   async findById(id: string): Promise<FitnessFatigueDaily | undefined> {
-    return this.db
-      .selectFrom('fitness_fatigue_daily')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
+    return this.db.selectFrom('fitness_fatigue_daily').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
   async findByUserAndDate(userId: string, date: Date): Promise<FitnessFatigueDaily | undefined> {
@@ -44,10 +40,7 @@ export class FitnessFatigueRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<FitnessFatigueDaily[]> {
-    let query = this.db
-      .selectFrom('fitness_fatigue_daily')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('fitness_fatigue_daily').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.dateFrom) {
       const dateFromStr = formatDateToYMD(options.filter.dateFrom);
@@ -99,11 +92,7 @@ export class FitnessFatigueRepository {
   }
 
   async create(data: NewFitnessFatigueDaily): Promise<FitnessFatigueDaily> {
-    return this.db
-      .insertInto('fitness_fatigue_daily')
-      .values(data)
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    return this.db.insertInto('fitness_fatigue_daily').values(data).returningAll().executeTakeFirstOrThrow();
   }
 
   async upsert(data: NewFitnessFatigueDaily): Promise<FitnessFatigueDaily> {
@@ -136,10 +125,7 @@ export class FitnessFatigueRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.db
-      .deleteFrom('fitness_fatigue_daily')
-      .where('id', '=', id)
-      .executeTakeFirst();
+    const result = await this.db.deleteFrom('fitness_fatigue_daily').where('id', '=', id).executeTakeFirst();
     return result.numDeletedRows > 0n;
   }
 

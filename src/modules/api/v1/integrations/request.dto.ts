@@ -199,7 +199,7 @@ export class StravaSyncQuery {
     minimum: 1,
     maximum: 1000,
   })
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number.parseInt(value, 10))
   @IsInt()
   @Min(1)
   @Max(1000)

@@ -31,11 +31,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index for querying by user and date
-  await db.schema
-    .createIndex('idx_sleep_logs_user_date')
-    .on('sleep_logs')
-    .columns(['user_id', 'log_date'])
-    .execute();
+  await db.schema.createIndex('idx_sleep_logs_user_date').on('sleep_logs').columns(['user_id', 'log_date']).execute();
 
   // Index for external_id lookups (for Garmin sync)
   await db.schema

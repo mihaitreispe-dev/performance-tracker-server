@@ -3,21 +3,17 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
+import { FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
 import {
-  HistoryQuery,
-  WorkoutIdParam,
-  ThresholdOverrideBody,
-  FitnessFatiguePredictionBody,
-} from './request.dto';
-import {
-  Vo2MaxResponse,
-  Vo2MaxHistoryResponse,
-  FitnessFatigueResponse,
-  TrainingStressResponse,
-  ThresholdsResponse,
-  ThresholdOverrideResponse,
   FitnessFatiguePredictionResponse,
+  FitnessFatigueResponse,
+  ThresholdOverrideResponse,
+  ThresholdsResponse,
+  TrainingStressResponse,
+  Vo2MaxHistoryResponse,
+  Vo2MaxResponse,
 } from './response.dto';
 
 @ApiTags('advanced-metrics')

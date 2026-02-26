@@ -5,7 +5,6 @@ import {
   FitnessMetricType,
   NewTrainingStressScore,
   TrainingStressScore,
-  WorkoutExecution,
 } from 'src/database/interfaces';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
@@ -79,14 +78,11 @@ export class TrainingStressService {
       execution.user_id,
       FitnessMetricType.RHR,
     );
-    const restingHR = restingHRMetric ? parseFloat(restingHRMetric.value) : 60; // Default 60 bpm
+    const restingHR = restingHRMetric ? Number.parseFloat(restingHRMetric.value) : 60; // Default 60 bpm
 
     // Get LTHR if available
-    const lthrMetric = await this.fitnessMetricsRepository.getLatestByType(
-      execution.user_id,
-      FitnessMetricType.LTHR,
-    );
-    const lthr = lthrMetric ? parseFloat(lthrMetric.value) : maxHR ? maxHR * 0.85 : null;
+    const lthrMetric = await this.fitnessMetricsRepository.getLatestByType(execution.user_id, FitnessMetricType.LTHR);
+    const lthr = lthrMetric ? Number.parseFloat(lthrMetric.value) : maxHR ? maxHR * 0.85 : null;
 
     const result: TrainingStressResult = {
       tss: null,
@@ -138,11 +134,8 @@ export class TrainingStressService {
       result.normalizedPower = normalizedPower;
 
       // Get FTP if available
-      const ftpMetric = await this.fitnessMetricsRepository.getLatestByType(
-        execution.user_id,
-        FitnessMetricType.FTP,
-      );
-      const ftp = ftpMetric ? parseFloat(ftpMetric.value) : null;
+      const ftpMetric = await this.fitnessMetricsRepository.getLatestByType(execution.user_id, FitnessMetricType.FTP);
+      const ftp = ftpMetric ? Number.parseFloat(ftpMetric.value) : null;
 
       if (ftp && normalizedPower) {
         const intensityFactor = normalizedPower / ftp;
@@ -155,16 +148,13 @@ export class TrainingStressService {
     if (!result.tss) {
       const route = await this.workoutRouteRepository.findByExecutionId(workoutExecutionId);
       if (route && durationSeconds > 0) {
-        const distanceMeters = parseFloat(route.total_distance_meters);
-        const paceMinPerKm = (durationSeconds / 60) / (distanceMeters / 1000);
+        const distanceMeters = Number.parseFloat(route.total_distance_meters);
+        const paceMinPerKm = durationSeconds / 60 / (distanceMeters / 1000);
         result.normalizedPace = paceMinPerKm;
 
         // Get LTP (Lactate Threshold Pace)
-        const ltpMetric = await this.fitnessMetricsRepository.getLatestByType(
-          execution.user_id,
-          FitnessMetricType.LTP,
-        );
-        const ltp = ltpMetric ? parseFloat(ltpMetric.value) : null;
+        const ltpMetric = await this.fitnessMetricsRepository.getLatestByType(execution.user_id, FitnessMetricType.LTP);
+        const ltp = ltpMetric ? Number.parseFloat(ltpMetric.value) : null;
 
         if (ltp) {
           // Running TSS = (duration_sec × (pace_factor)²) × 100 / 3600
@@ -191,12 +181,7 @@ export class TrainingStressService {
    * Calculate TRIMP using Banister method
    * TRIMP = T × ΔHR × 0.64e^(1.92×ΔHR) [men - using as default]
    */
-  private calculateTRIMP(
-    avgHR: number,
-    maxHR: number,
-    restingHR: number,
-    durationMinutes: number,
-  ): number {
+  private calculateTRIMP(avgHR: number, maxHR: number, restingHR: number, durationMinutes: number): number {
     const hrReserve = (avgHR - restingHR) / (maxHR - restingHR);
     const hrReserveClamped = Math.max(0, Math.min(1, hrReserve));
 
@@ -213,8 +198,8 @@ export class TrainingStressService {
    */
   private calculateHRSS(
     hrMetrics: CardioMetric[],
-    maxHR: number,
-    restingHR: number,
+    _maxHR: number,
+    _restingHR: number,
     lthr: number,
     durationSeconds: number,
   ): number {
@@ -223,7 +208,7 @@ export class TrainingStressService {
     let totalTime = 0;
 
     for (let i = 1; i < hrMetrics.length; i++) {
-      const hr = parseFloat(hrMetrics[i].value);
+      const hr = Number.parseFloat(hrMetrics[i].value);
       const prevTime = new Date(hrMetrics[i - 1].recorded_at).getTime();
       const currTime = new Date(hrMetrics[i].recorded_at).getTime();
       const interval = (currTime - prevTime) / 1000;
@@ -248,7 +233,7 @@ export class TrainingStressService {
    * Calculate power-based TSS
    * TSS = (duration_sec × IF²) × 100 / 3600
    */
-  private calculatePowerTSS(durationSeconds: number, intensityFactor: number, ftp: number): number {
+  private calculatePowerTSS(durationSeconds: number, intensityFactor: number, _ftp: number): number {
     const tss = (durationSeconds * intensityFactor ** 2 * 100) / 3600;
     return Math.round(tss * 10) / 10;
   }
@@ -259,7 +244,7 @@ export class TrainingStressService {
   private calculateNormalizedPower(powerMetrics: CardioMetric[]): number {
     if (powerMetrics.length < 30) {
       // Not enough data for 30-sec rolling avg
-      const powers = powerMetrics.map((m) => parseFloat(m.value));
+      const powers = powerMetrics.map((m) => Number.parseFloat(m.value));
       return this.average(powers);
     }
 
@@ -267,7 +252,7 @@ export class TrainingStressService {
     const rollingAvgs: number[] = [];
     for (let i = 29; i < powerMetrics.length; i++) {
       const window = powerMetrics.slice(i - 29, i + 1);
-      const avg = this.average(window.map((m) => parseFloat(m.value)));
+      const avg = this.average(window.map((m) => Number.parseFloat(m.value)));
       rollingAvgs.push(avg);
     }
 
@@ -286,7 +271,7 @@ export class TrainingStressService {
   private calculateTrainingEffect(
     hrMetrics: CardioMetric[],
     maxHR: number,
-    durationSeconds: number,
+    _durationSeconds: number,
     zones?: { zone: number; minPct: number; maxPct: number }[],
   ): { aerobic: number; anaerobic: number } {
     const defaultZones = zones || [
@@ -341,7 +326,7 @@ export class TrainingStressService {
     zones.forEach((z) => zoneTime.set(z.zone, 0));
 
     for (let i = 1; i < hrMetrics.length; i++) {
-      const hr = parseFloat(hrMetrics[i].value);
+      const hr = Number.parseFloat(hrMetrics[i].value);
       const hrPct = (hr / maxHR) * 100;
 
       const prevTime = new Date(hrMetrics[i - 1].recorded_at).getTime();
@@ -396,7 +381,7 @@ export class TrainingStressService {
    */
   async getTotalTSSForDateRange(userId: string, dateFrom: Date, dateTo: Date): Promise<number> {
     const scores = await this.trainingStressRepository.findByUserAndDateRange(userId, dateFrom, dateTo);
-    return scores.reduce((total, score) => total + parseFloat(score.tss || '0'), 0);
+    return scores.reduce((total, score) => total + Number.parseFloat(score.tss || '0'), 0);
   }
 
   private async storeResult(workoutExecutionId: string, result: TrainingStressResult): Promise<void> {
@@ -424,7 +409,7 @@ export class TrainingStressService {
   }
 
   private calculateAverageHR(hrMetrics: CardioMetric[]): number {
-    const hrs = hrMetrics.map((m) => parseFloat(m.value));
+    const hrs = hrMetrics.map((m) => Number.parseFloat(m.value));
     return this.average(hrs);
   }
 

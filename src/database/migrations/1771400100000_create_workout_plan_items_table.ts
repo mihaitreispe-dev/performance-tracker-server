@@ -12,8 +12,16 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .addUniqueConstraint('uq_workout_plan_items_plan_week_day', ['workout_plan_id', 'week_number', 'day_of_week'])
     .execute();
 
-  await db.schema.createIndex('idx_workout_plan_items_workout_plan_id').on('workout_plan_items').column('workout_plan_id').execute();
-  await db.schema.createIndex('idx_workout_plan_items_workout_id').on('workout_plan_items').column('workout_id').execute();
+  await db.schema
+    .createIndex('idx_workout_plan_items_workout_plan_id')
+    .on('workout_plan_items')
+    .column('workout_plan_id')
+    .execute();
+  await db.schema
+    .createIndex('idx_workout_plan_items_workout_id')
+    .on('workout_plan_items')
+    .column('workout_id')
+    .execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

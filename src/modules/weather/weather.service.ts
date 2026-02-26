@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 
-import {
-  HourlyWeatherData,
-  OpenMeteoArchiveResponse,
-  WEATHER_DESCRIPTIONS,
-  WeatherFetchParams,
-} from './types';
+import { HourlyWeatherData, OpenMeteoArchiveResponse, WEATHER_DESCRIPTIONS, WeatherFetchParams } from './types';
 
 @Injectable()
 export class WeatherService {

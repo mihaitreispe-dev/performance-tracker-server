@@ -143,3 +143,10 @@ export class ExerciseIdParam {
   @IsUUID()
   id: string;
 }
+
+export class UpdateExerciseChainBody {
+  @ApiProperty({ type: [String], description: 'Ordered list of exercise IDs in the chain (position 0 = easiest)' })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  memberIds: string[];
+}

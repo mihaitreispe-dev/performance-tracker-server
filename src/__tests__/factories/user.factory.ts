@@ -14,7 +14,7 @@ export interface UserFactoryOptions {
 
 export function createUser(options: UserFactoryOptions = {}): User {
   userCounter++;
-  const now = new Date().toISOString();
+  const now = new Date();
 
   return {
     id: options.id ?? `user-${userCounter}`,
@@ -31,7 +31,7 @@ export function createUser(options: UserFactoryOptions = {}): User {
     created_at: now,
     updated_at: now,
     last_sign_in_at: now,
-  };
+  } as unknown as User;
 }
 
 export function createAdminUser(options: UserFactoryOptions = {}): User {

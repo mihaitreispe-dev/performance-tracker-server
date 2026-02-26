@@ -16,22 +16,22 @@ export interface WorkoutExecutionFactoryOptions {
 
 export function createWorkoutExecution(options: WorkoutExecutionFactoryOptions = {}): WorkoutExecution {
   executionCounter++;
-  const now = new Date().toISOString();
-  const startedAt = options.startedAt ?? now;
+  const now = new Date();
+  const startedAt = options.startedAt ? new Date(options.startedAt) : now;
 
   return {
     id: options.id ?? `execution-${executionCounter}`,
     user_id: options.userId ?? 'user-1',
     workout_schedule_id: options.workoutScheduleId ?? null,
     started_at: startedAt,
-    completed_at: options.completedAt ?? null,
+    completed_at: options.completedAt ? new Date(options.completedAt) : null,
     duration_seconds: options.durationSeconds ?? null,
     source: options.source ?? WorkoutExecutionSource.MANUAL,
     external_id: options.externalId ?? null,
     notes: options.notes ?? null,
     created_at: now,
     updated_at: now,
-  };
+  } as unknown as WorkoutExecution;
 }
 
 export function createCompletedWorkoutExecution(options: WorkoutExecutionFactoryOptions = {}): WorkoutExecution {

@@ -2,7 +2,6 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { type Request } from 'express';
 import {
   CardioMetric,
-  ExecutionWeather,
   GeoJSONLineString,
   RouteMarker,
   SetCompletion,
@@ -27,7 +26,6 @@ import { WorkoutRouteRepository } from 'src/repositories/workout-route.repositor
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
-
 import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
   BatchUploadMetricsBody,
@@ -210,11 +208,9 @@ export class WorkoutExecutionsApiService {
     if (body.completedAt && updatedExecution.workout_schedule_id) {
       const completionDate = new Date(body.completedAt);
       // Use UTC methods to avoid timezone issues
-      const completionDateOnly = new Date(Date.UTC(
-        completionDate.getUTCFullYear(),
-        completionDate.getUTCMonth(),
-        completionDate.getUTCDate(),
-      ));
+      const completionDateOnly = new Date(
+        Date.UTC(completionDate.getUTCFullYear(), completionDate.getUTCMonth(), completionDate.getUTCDate()),
+      );
 
       await this.workoutScheduleRepository.updateById(updatedExecution.workout_schedule_id, {
         completed_at: completionDate,

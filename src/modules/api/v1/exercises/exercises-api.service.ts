@@ -1,6 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
-import { Exercise, ExerciseImage, ExerciseStatus, ExerciseVisibility, UserRole } from 'src/database/interfaces';
+import {
+  Exercise,
+  ExerciseImage,
+  ExerciseLevel,
+  ExerciseStatus,
+  ExerciseVisibility,
+  UserRole,
+} from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppAccessControlService } from 'src/modules/app-access-control/app-access-control.service';
@@ -10,13 +17,22 @@ import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.servi
 import { S3Service } from 'src/modules/s3/s3.service';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { ExerciseChainMemberWithExercise, ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CreateExerciseBody, ExerciseIdParam, ListExercisesQuery, UpdateExerciseBody } from './request.dto';
+import {
+  CreateExerciseBody,
+  ExerciseIdParam,
+  ListExercisesQuery,
+  UpdateExerciseBody,
+  UpdateExerciseChainBody,
+} from './request.dto';
 import {
   EquipmentDTO,
+  ExerciseChainMemberDTO,
+  ExerciseChainResponse,
   ExerciseDTO,
   ExerciseImageDTO,
   ExerciseListResponse,
@@ -33,6 +49,7 @@ export class ExercisesApiService {
     private readonly equipmentRepo: EquipmentRepository,
     private readonly muscleGroupRepo: MuscleGroupRepository,
     private readonly exerciseImageRepo: ExerciseImageRepository,
+    private readonly exerciseChainRepo: ExerciseChainRepository,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
     private readonly accessControlService: AppAccessControlService,
@@ -252,6 +269,109 @@ export class ExercisesApiService {
 
     const updated = await this.exerciseRepo.findById(params.id);
     return { data: await this.mapExerciseToDTO(updated!) };
+  }
+
+  async getExerciseChain(req: Request & { user: AuthUser }, id: string): Promise<ExerciseChainResponse | null> {
+    await this.requireAdmin(req.user.id);
+
+    const exercise = await this.exerciseRepo.findById(id);
+    if (!exercise) {
+      throw new NotFoundException();
+    }
+
+    const chain = await this.exerciseChainRepo.findByExerciseId(id);
+    if (!chain) {
+      return null;
+    }
+
+    const members = await this.exerciseChainRepo.findChainMembers(chain.id);
+    return {
+      data: {
+        chainId: chain.id,
+        members: await Promise.all(members.map((m) => this.mapChainMemberToDTO(m))),
+      },
+    };
+  }
+
+  async updateExerciseChain(
+    req: Request & { user: AuthUser },
+    id: string,
+    body: UpdateExerciseChainBody,
+  ): Promise<ExerciseChainResponse> {
+    await this.requireAdmin(req.user.id);
+
+    const exercise = await this.exerciseRepo.findById(id);
+    if (!exercise) {
+      throw new NotFoundException();
+    }
+
+    // Ensure the current exercise is included in the chain
+    if (!body.memberIds.includes(id)) {
+      body.memberIds.push(id);
+    }
+
+    // Validate all exercises exist
+    const exercises = await this.exerciseRepo.findByIds(body.memberIds);
+    if (exercises.length !== body.memberIds.length) {
+      throw new NotFoundException('One or more exercises not found');
+    }
+
+    // Check if any of the exercises already belong to other chains
+    for (const exerciseId of body.memberIds) {
+      if (exerciseId === id) continue;
+      const existingChain = await this.exerciseChainRepo.findByExerciseId(exerciseId);
+      if (existingChain) {
+        const currentExerciseChain = await this.exerciseChainRepo.findByExerciseId(id);
+        if (!currentExerciseChain || existingChain.id !== currentExerciseChain.id) {
+          throw new NotFoundException(`Exercise ${exerciseId} already belongs to another chain`);
+        }
+      }
+    }
+
+    // Get or create chain
+    let chain = await this.exerciseChainRepo.findByExerciseId(id);
+    if (!chain) {
+      chain = await this.exerciseChainRepo.createChain();
+    }
+
+    // Update members
+    await this.exerciseChainRepo.setChainMembers(chain.id, body.memberIds);
+
+    const members = await this.exerciseChainRepo.findChainMembers(chain.id);
+    return {
+      data: {
+        chainId: chain.id,
+        members: await Promise.all(members.map((m) => this.mapChainMemberToDTO(m))),
+      },
+    };
+  }
+
+  async removeFromChain(req: Request & { user: AuthUser }, id: string): Promise<void> {
+    await this.requireAdmin(req.user.id);
+
+    const exercise = await this.exerciseRepo.findById(id);
+    if (!exercise) {
+      throw new NotFoundException();
+    }
+
+    const chainId = await this.exerciseChainRepo.removeExerciseFromChain(id);
+    if (chainId) {
+      await this.exerciseChainRepo.deleteChainIfEmpty(chainId);
+    }
+  }
+
+  private async mapChainMemberToDTO(member: ExerciseChainMemberWithExercise): Promise<ExerciseChainMemberDTO> {
+    // Get picture URL for the exercise
+    const exercise = await this.exerciseRepo.findById(member.exercise_id);
+    const picture = exercise ? await this.getPictureUrl(exercise) : null;
+
+    return {
+      id: member.exercise_id,
+      name: member.exercise_name,
+      picture,
+      level: member.exercise_level as ExerciseLevel | null,
+      position: member.position,
+    };
   }
 
   private async requireAdmin(userId: string): Promise<void> {

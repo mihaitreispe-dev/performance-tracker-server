@@ -3,8 +3,8 @@ import { type Request } from 'express';
 import { Workout, WorkoutExecution, WorkoutSchedule } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
-import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import {
   WorkoutScheduleFilter,

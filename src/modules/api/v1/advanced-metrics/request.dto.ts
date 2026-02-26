@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { FitnessMetricType } from 'src/database/interfaces';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -14,7 +14,7 @@ export class HistoryQuery {
   @Min(1)
   @Max(365)
   @IsOptional()
-  @Transform(({ value }) => (value ? parseInt(value, 10) : undefined))
+  @Transform(({ value }) => (value ? Number.parseInt(value, 10) : undefined))
   days?: number;
 }
 
