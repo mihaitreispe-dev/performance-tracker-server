@@ -183,6 +183,16 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   CORS_ORIGINS?: string;
 
+  // OpenAI (Voice Assistant)
+
+  @IsString()
+  @IsOptional()
+  OPENAI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENAI_MODEL?: string;
+
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {
       enableImplicitConversion: true,
