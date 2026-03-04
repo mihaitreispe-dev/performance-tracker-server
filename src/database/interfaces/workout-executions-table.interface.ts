@@ -8,6 +8,7 @@ export enum WorkoutExecutionSource {
   STRAVA = 'strava',
   APPLE_HEALTH = 'apple_health',
   FITBIT = 'fitbit',
+  TRAININGPEAKS = 'trainingpeaks',
 }
 
 export interface WorkoutExecutionsTable {

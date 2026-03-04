@@ -267,6 +267,9 @@ export class AuthApiService {
     return {
       data: {
         hrZones: settings?.hr_zones ?? null,
+        powerZones: settings?.power_zones ?? null,
+        paceZones: settings?.pace_zones ?? null,
+        rpeZones: settings?.rpe_zones ?? null,
       },
     };
   }
@@ -280,11 +283,23 @@ export class AuthApiService {
     if (body.hrZones !== undefined) {
       updateData.hr_zones = body.hrZones;
     }
+    if (body.powerZones !== undefined) {
+      updateData.power_zones = body.powerZones;
+    }
+    if (body.paceZones !== undefined) {
+      updateData.pace_zones = body.paceZones;
+    }
+    if (body.rpeZones !== undefined) {
+      updateData.rpe_zones = body.rpeZones;
+    }
 
     const settings = await this.userSettingsRepo.upsert(req.user.id, updateData);
     return {
       data: {
         hrZones: settings.hr_zones ?? null,
+        powerZones: settings.power_zones ?? null,
+        paceZones: settings.pace_zones ?? null,
+        rpeZones: settings.rpe_zones ?? null,
       },
     };
   }

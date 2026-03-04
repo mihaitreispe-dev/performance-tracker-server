@@ -30,6 +30,15 @@ export class CardioMetricsRepository {
     return this.db.selectFrom('cardio_metrics').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
+  async findByExecutionId(workoutExecutionId: string): Promise<CardioMetric[]> {
+    return this.db
+      .selectFrom('cardio_metrics')
+      .where('workout_execution_id', '=', workoutExecutionId)
+      .selectAll()
+      .orderBy('recorded_at', 'asc')
+      .execute();
+  }
+
   async findMany(options: CardioMetricFindManyOptions = {}): Promise<CardioMetric[]> {
     const { filter, sort, offset, limit } = options;
     let query = this.db.selectFrom('cardio_metrics').selectAll();

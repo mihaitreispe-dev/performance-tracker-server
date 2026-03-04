@@ -45,3 +45,6 @@ Dockerfile*
 .DS_Store
 *.pem
 *.key
+
+# OpenWearables submodule (has its own Docker build)
+openwearables

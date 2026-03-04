@@ -131,6 +131,7 @@ export class CardioStepDTO {
   @IsOptional()
   distance?: number | null;
 
+  // HR targets
   @ApiPropertyOptional({ type: Number })
   @IsInt()
   @IsOptional()
@@ -140,6 +141,59 @@ export class CardioStepDTO {
   @IsInt()
   @IsOptional()
   hrMax?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  hrZone?: number | null;
+
+  // Power targets
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  powerMin?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  powerMax?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  powerZone?: number | null;
+
+  // Pace targets
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  paceMin?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  paceMax?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  paceZone?: number | null;
+
+  // RPE targets
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  rpeMin?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  rpeMax?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsInt()
+  @IsOptional()
+  rpeZone?: number | null;
 
   @ApiPropertyOptional({ type: String })
   @IsString()

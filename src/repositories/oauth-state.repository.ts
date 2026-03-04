@@ -75,4 +75,23 @@ export class OAuthStateRepository {
   async deleteByUserId(userId: string): Promise<void> {
     await this.db.deleteFrom('oauth_states').where('user_id', '=', userId).execute();
   }
+
+  /**
+   * Find a state by token only (without provider check)
+   */
+  async findByStateToken(stateToken: string): Promise<OAuthState | undefined> {
+    return this.db
+      .selectFrom('oauth_states')
+      .selectAll()
+      .where('state_token', '=', stateToken)
+      .where('expires_at', '>', new Date())
+      .executeTakeFirst();
+  }
+
+  /**
+   * Delete a state by token
+   */
+  async deleteByStateToken(stateToken: string): Promise<void> {
+    await this.db.deleteFrom('oauth_states').where('state_token', '=', stateToken).execute();
+  }
 }

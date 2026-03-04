@@ -171,6 +171,7 @@ export class CardioStepBody {
   @IsOptional()
   distance?: number;
 
+  // HR targets
   @ApiPropertyOptional({ type: Number, description: 'Heart rate minimum (bpm)' })
   @IsInt()
   @Min(30)
@@ -182,6 +183,69 @@ export class CardioStepBody {
   @Min(30)
   @IsOptional()
   hrMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Heart rate zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  hrZone?: number;
+
+  // Power targets
+  @ApiPropertyOptional({ type: Number, description: 'Power minimum (watts)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  powerMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Power maximum (watts)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  powerMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Power zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  powerZone?: number;
+
+  // Pace targets
+  @ApiPropertyOptional({ type: Number, description: 'Pace minimum (seconds per km)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  paceMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Pace maximum (seconds per km)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  paceMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Pace zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  paceZone?: number;
+
+  // RPE targets
+  @ApiPropertyOptional({ type: Number, description: 'RPE minimum (1-10)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'RPE maximum (1-10)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'RPE zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeZone?: number;
 
   @ApiPropertyOptional({ type: String, description: 'Notes for this step' })
   @IsString()
@@ -295,6 +359,69 @@ export class WorkoutItemBody {
   @Min(30)
   @IsOptional()
   hrMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Heart rate zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  hrZone?: number;
+
+  // Power targets (for cardio_step type)
+  @ApiPropertyOptional({ type: Number, description: 'Power minimum (watts)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  powerMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Power maximum (watts)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  powerMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Power zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  powerZone?: number;
+
+  // Pace targets (for cardio_step type)
+  @ApiPropertyOptional({ type: Number, description: 'Pace minimum (seconds per km)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  paceMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Pace maximum (seconds per km)' })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  paceMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Pace zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  paceZone?: number;
+
+  // RPE targets (for cardio_step type)
+  @ApiPropertyOptional({ type: Number, description: 'RPE minimum (1-10)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeMin?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'RPE maximum (1-10)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeMax?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'RPE zone (1-7)' })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  rpeZone?: number;
 
   // cardio_step_group fields
   @ApiPropertyOptional({

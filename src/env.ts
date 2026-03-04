@@ -193,6 +193,30 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   OPENAI_MODEL?: string;
 
+  // OpenWearables
+
+  @IsString()
+  @IsOptional()
+  OPENWEARABLES_API_URL?: string;
+
+  @IsString()
+  @IsOptional()
+  OPENWEARABLES_API_KEY?: string;
+
+  // TrainingPeaks Integration
+
+  @IsString()
+  @IsOptional()
+  TRAININGPEAKS_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  TRAININGPEAKS_CLIENT_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  TRAININGPEAKS_REDIRECT_URI?: string;
+
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {
       enableImplicitConversion: true,

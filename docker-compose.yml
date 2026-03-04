@@ -61,6 +61,12 @@ services:
       - GARMIN_REDIRECT_URI=${GARMIN_REDIRECT_URI:-}
       # Google Maps
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-turbo}
+      # OpenWearables
+      - OPENWEARABLES_API_URL=http://openwearables:8000/api/v1
+      - OPENWEARABLES_API_KEY=${OPENWEARABLES_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -83,6 +89,7 @@ services:
       - POSTGRES_DB=${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     ports:
       - "${DB_EXTERNAL_PORT:-5432}:5432"
     networks:
@@ -115,8 +122,107 @@ services:
     profiles:
       - migrate
 
+  # ============================================
+  # OpenWearables Services
+  # ============================================
+
+  redis:
+    image: redis:8-alpine
+    container_name: performance-tracker-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - performance-tracker
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openwearables:
+    build:
+      context: ./openwearables/backend
+      dockerfile: Dockerfile
+    container_name: performance-tracker-openwearables
+    image: performance-tracker-openwearables:latest
+    restart: unless-stopped
+    command: scripts/start/app.sh
+    env_file:
+      - ./openwearables/backend/config/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${OW_DB_NAME:-openwearables}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "${OW_API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - performance-tracker
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  openwearables-worker:
+    image: performance-tracker-openwearables:latest
+    container_name: performance-tracker-openwearables-worker
+    restart: unless-stopped
+    command: scripts/start/worker.sh
+    env_file:
+      - ./openwearables/backend/config/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${OW_DB_NAME:-openwearables}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - db
+      - openwearables
+    networks:
+      - performance-tracker
+
+  openwearables-beat:
+    image: performance-tracker-openwearables:latest
+    container_name: performance-tracker-openwearables-beat
+    restart: unless-stopped
+    command: scripts/start/beat.sh
+    env_file:
+      - ./openwearables/backend/config/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${OW_DB_NAME:-openwearables}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - db
+      - openwearables
+    networks:
+      - performance-tracker
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   performance-tracker:

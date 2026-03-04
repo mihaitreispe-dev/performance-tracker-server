@@ -7,6 +7,8 @@ export enum IntegrationProvider {
   GARMIN = 'garmin',
   APPLE_HEALTH = 'apple_health',
   FITBIT = 'fitbit',
+  OPENWEARABLES = 'openwearables',
+  TRAININGPEAKS = 'trainingpeaks',
 }
 
 export interface UserIntegrationsTable {

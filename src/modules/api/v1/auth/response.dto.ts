@@ -131,6 +131,63 @@ class HRZonesSettingsDTO {
   zones: HRZoneConfigDTO[];
 }
 
+// Training Zone DTO (used by Power, Pace, RPE)
+
+class TrainingZoneDTO {
+  @ApiProperty()
+  @IsNumber()
+  zone: number;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+
+  @ApiProperty()
+  @IsNumber()
+  minValue: number;
+
+  @ApiProperty()
+  @IsNumber()
+  maxValue: number;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  color?: string;
+}
+
+class PowerZonesSettingsDTO {
+  @ApiProperty()
+  @IsNumber()
+  ftp: number;
+
+  @ApiProperty({ type: [TrainingZoneDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrainingZoneDTO)
+  zones: TrainingZoneDTO[];
+}
+
+class PaceZonesSettingsDTO {
+  @ApiProperty()
+  @IsNumber()
+  thresholdPace: number;
+
+  @ApiProperty({ type: [TrainingZoneDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrainingZoneDTO)
+  zones: TrainingZoneDTO[];
+}
+
+class RPEZonesSettingsDTO {
+  @ApiProperty({ type: [TrainingZoneDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TrainingZoneDTO)
+  zones: TrainingZoneDTO[];
+}
+
 class UserSettingsDTO {
   @ApiPropertyOptional({ type: HRZonesSettingsDTO, nullable: true })
   @IsObject()
@@ -138,6 +195,27 @@ class UserSettingsDTO {
   @Type(() => HRZonesSettingsDTO)
   @IsOptional()
   hrZones?: HRZonesSettingsDTO | null;
+
+  @ApiPropertyOptional({ type: PowerZonesSettingsDTO, nullable: true })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PowerZonesSettingsDTO)
+  @IsOptional()
+  powerZones?: PowerZonesSettingsDTO | null;
+
+  @ApiPropertyOptional({ type: PaceZonesSettingsDTO, nullable: true })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => PaceZonesSettingsDTO)
+  @IsOptional()
+  paceZones?: PaceZonesSettingsDTO | null;
+
+  @ApiPropertyOptional({ type: RPEZonesSettingsDTO, nullable: true })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RPEZonesSettingsDTO)
+  @IsOptional()
+  rpeZones?: RPEZonesSettingsDTO | null;
 }
 
 export class UserSettingsResponse extends ItemResponse<UserSettingsDTO> {

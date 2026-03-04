@@ -10,6 +10,8 @@ import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.r
 import { ExerciseInstanceGroupRepository } from 'src/repositories/exercise-instance-group.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 
+import { FitGeneratorService } from './fit-generator.service';
+import { WorkoutExportController } from './workout-export.controller';
 import { WorkoutsApiController } from './workouts-api.controller';
 import { WorkoutsApiService } from './workouts-api.service';
 
@@ -23,6 +25,7 @@ export class WorkoutsApiModule {
         imports: [S3Module.register(), AppConfigModule.register()],
         providers: [
           WorkoutsApiService,
+          FitGeneratorService,
           WorkoutRepository,
           ExerciseInstanceRepository,
           ExerciseInstanceGroupRepository,
@@ -32,7 +35,7 @@ export class WorkoutsApiModule {
           CardioStepGroupRepository,
           CardioCategoryRepository,
         ],
-        controllers: [WorkoutsApiController],
+        controllers: [WorkoutsApiController, WorkoutExportController],
       };
     }
     return this.instance;

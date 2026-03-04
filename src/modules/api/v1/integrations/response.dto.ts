@@ -124,3 +124,35 @@ export class PushToStravaResponse extends ItemResponse<PushToStravaResultDTO> {
   @ValidateNested()
   declare data: PushToStravaResultDTO;
 }
+
+export class TrainingPeaksSyncResultDTO {
+  @ApiProperty({ description: 'Total number of workouts found in TrainingPeaks' })
+  @IsInt()
+  totalWorkouts: number;
+
+  @ApiProperty({ description: 'Number of workouts successfully synced' })
+  @IsInt()
+  syncedCount: number;
+
+  @ApiProperty({ description: 'Number of workouts skipped (already synced or incomplete)' })
+  @IsInt()
+  skippedCount: number;
+
+  @ApiProperty({ description: 'Number of workouts that failed to sync' })
+  @IsInt()
+  failedCount: number;
+
+  @ApiProperty({
+    description: 'Overall sync status',
+    enum: ['completed', 'error'],
+  })
+  @IsString()
+  status: 'completed' | 'error';
+}
+
+export class TrainingPeaksSyncResponse extends ItemResponse<TrainingPeaksSyncResultDTO> {
+  @ApiProperty({ type: TrainingPeaksSyncResultDTO })
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: TrainingPeaksSyncResultDTO;
+}

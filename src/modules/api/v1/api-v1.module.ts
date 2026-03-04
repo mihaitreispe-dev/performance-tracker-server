@@ -12,6 +12,8 @@ import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-ap
 import { AnalyticsApiModule } from './analytics/analytics-api.module';
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
+import { DataExportApiModule } from './data-export/data-export.module';
+import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
@@ -21,6 +23,7 @@ import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
 import { VoiceApiModule } from './voice/voice.module';
+import { WearablesApiModule } from './wearables/wearables-api.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
 import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file-imports-api.module';
 import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
@@ -48,6 +51,9 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     SleepApiModule.register(),
     PainLogsApiModule.register(),
     VoiceApiModule.register(),
+    WearablesApiModule.register(),
+    DataImportApiModule.register(),
+    DataExportApiModule.register(),
   ],
   providers: [
     {

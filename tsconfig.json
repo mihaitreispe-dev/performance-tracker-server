@@ -1,4 +1,5 @@
 {
+  "exclude": ["openwearables", "node_modules", "dist"],
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",

@@ -3,7 +3,10 @@ import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
 import { CardioStepGroupsTable } from './cardio-step-groups-table.interface';
 import { CardioStepsTable } from './cardio-steps-table.interface';
+import { DailyHealthMetricsTable } from './daily-health-metrics-table.interface';
 import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
+import { DataExportJobsTable } from './data-export-jobs-table.interface';
+import { DataImportJobsTable } from './data-import-jobs-table.interface';
 import { EquipmentTable } from './equipment-table.interface';
 import { ExecutionWeatherTable } from './execution-weather-table.interface';
 import { ExerciseChainMembersTable, ExerciseChainsTable } from './exercise-chains-table.interface';
@@ -29,6 +32,8 @@ import { TrainingStressScoresTable } from './training-stress-scores-table.interf
 import { UserIntegrationsTable } from './user-integrations-table.interface';
 import { UserSettingsTable } from './user-settings-table.interface';
 import { UsersTable } from './users-table.interface';
+import { WearableProviderConnectionsTable } from './wearable-provider-connections-table.interface';
+import { WearableProviderPrioritiesTable } from './wearable-provider-priorities-table.interface';
 import { WorkoutExecutionsTable } from './workout-executions-table.interface';
 import { WorkoutFileImportsTable } from './workout-file-imports-table.interface';
 import { WorkoutItemsTable } from './workout-items-table.interface';
@@ -79,4 +84,9 @@ export interface Database {
   exercise_chains: ExerciseChainsTable;
   exercise_chain_members: ExerciseChainMembersTable;
   pain_logs: PainLogsTable;
+  wearable_provider_connections: WearableProviderConnectionsTable;
+  wearable_provider_priorities: WearableProviderPrioritiesTable;
+  daily_health_metrics: DailyHealthMetricsTable;
+  data_import_jobs: DataImportJobsTable;
+  data_export_jobs: DataExportJobsTable;
 }

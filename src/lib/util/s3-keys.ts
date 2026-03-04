@@ -19,4 +19,8 @@ export const s3Keys = {
       };
     },
   },
+  dataImportArchive: (userId: string, importType: string, filename: string) =>
+    `data-imports/${userId}/${importType}/${Date.now()}_${filename}`,
+  dataExport: (userId: string, jobId: string, filename: string) =>
+    `data-exports/${userId}/${jobId}/${filename}`,
 };

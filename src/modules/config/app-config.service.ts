@@ -214,4 +214,14 @@ export class AppConfigService {
   get openaiModel(): string {
     return this.configService.get('OPENAI_MODEL') || 'gpt-4-turbo';
   }
+
+  // OpenWearables
+
+  get openwearablesApiUrl(): string {
+    return this.configService.get('OPENWEARABLES_API_URL') || 'http://localhost:8000/api/v1';
+  }
+
+  get openwearablesApiKey(): string | undefined {
+    return this.configService.get('OPENWEARABLES_API_KEY');
+  }
 }

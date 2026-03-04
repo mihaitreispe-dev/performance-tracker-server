@@ -1,5 +1,5 @@
 # Base stage
-FROM node:20.15.1-alpine3.20 AS base
+FROM node:20-alpine AS base
 RUN apk update && apk add bash
 
 # All deps stage

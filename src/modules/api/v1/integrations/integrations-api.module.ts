@@ -9,6 +9,7 @@ import { WorkoutRouteRepository } from 'src/repositories/workout-route.repositor
 
 import { IntegrationsApiController } from './integrations-api.controller';
 import { IntegrationsApiService } from './integrations-api.service';
+import { TrainingPeaksService } from './trainingpeaks.service';
 
 @Module({})
 export class IntegrationsApiModule {
@@ -21,6 +22,7 @@ export class IntegrationsApiModule {
         imports: [AppConfigModule.register()],
         providers: [
           IntegrationsApiService,
+          TrainingPeaksService,
           UserIntegrationRepository,
           WorkoutExecutionRepository,
           CardioMetricsRepository,

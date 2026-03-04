@@ -14,21 +14,27 @@ import {
   StravaSyncQuery,
   StravaWebhookBody,
   StravaWebhookQuery,
+  TrainingPeaksSyncQuery,
 } from './request.dto';
 import {
   OAuthUrlResponse,
   PushToStravaResponse,
   StravaSyncResponse,
   StravaWebhookVerifyResponse,
+  TrainingPeaksSyncResponse,
   UserIntegrationListResponse,
   UserIntegrationResponse,
   WebhookAckResponse,
 } from './response.dto';
+import { TrainingPeaksService } from './trainingpeaks.service';
 
 @ApiTags('integrations')
 @Controller('integrations')
 export class IntegrationsApiController {
-  constructor(private readonly service: IntegrationsApiService) {}
+  constructor(
+    private readonly service: IntegrationsApiService,
+    private readonly trainingPeaksService: TrainingPeaksService,
+  ) {}
 
   // List user's integrations
 
@@ -150,6 +156,43 @@ export class IntegrationsApiController {
   @Post('garmin/webhook')
   async handleGarminWebhook(@Body() body: GarminWebhookBody): Promise<WebhookAckResponse> {
     return this.service.handleGarminWebhook(body);
+  }
+
+  // TrainingPeaks OAuth
+
+  @Version('1')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Get TrainingPeaks OAuth authorization URL' })
+  @ApiResponse({ status: HttpStatus.OK, type: OAuthUrlResponse })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'TrainingPeaks not configured' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('trainingpeaks/auth')
+  async getTrainingPeaksAuthUrl(@Req() req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
+    return this.trainingPeaksService.getAuthUrl(req);
+  }
+
+  @Version('1')
+  @DisableJwtAuthGuard()
+  @ApiOperation({ summary: 'TrainingPeaks OAuth callback' })
+  @ApiResponse({ status: HttpStatus.OK, type: UserIntegrationResponse })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Invalid callback' })
+  @Get('trainingpeaks/callback')
+  async handleTrainingPeaksCallback(@Query() query: OAuthCallbackQuery): Promise<UserIntegrationResponse> {
+    return this.trainingPeaksService.handleCallback(query);
+  }
+
+  @Version('1')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Sync TrainingPeaks workouts' })
+  @ApiResponse({ status: HttpStatus.OK, type: TrainingPeaksSyncResponse })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'No TrainingPeaks integration found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized or token expired' })
+  @Post('trainingpeaks/sync')
+  async syncTrainingPeaksWorkouts(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: TrainingPeaksSyncQuery,
+  ): Promise<TrainingPeaksSyncResponse> {
+    return this.trainingPeaksService.syncWorkouts(req, query);
   }
 
   // Disconnect integration

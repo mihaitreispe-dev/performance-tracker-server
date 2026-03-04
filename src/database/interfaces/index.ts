@@ -38,3 +38,8 @@ export * from './training-stress-scores-table.interface';
 export * from './fitness-fatigue-daily-table.interface';
 export * from './exercise-chains-table.interface';
 export * from './pain-logs-table.interface';
+export * from './wearable-provider-connections-table.interface';
+export * from './wearable-provider-priorities-table.interface';
+export * from './daily-health-metrics-table.interface';
+export * from './data-import-jobs-table.interface';
+export * from './data-export-jobs-table.interface';
