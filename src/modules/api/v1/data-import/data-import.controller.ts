@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, Version } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Req, UseGuards, Version } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
+import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { DataImportService } from './data-import.service';
@@ -17,8 +18,10 @@ export class DataImportController {
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Request a presigned URL to upload an archive' })
   @ApiResponse({ status: HttpStatus.OK, type: RequestUploadUrlResponse })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Rate limit exceeded' })
+  @ApiResponse({ status: HttpStatus.TOO_MANY_REQUESTS, type: ErrorResponse, description: 'Rate limit exceeded' })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @UseGuards(RateLimitGuard)
+  @RateLimit(RateLimitPresets.FILE_UPLOAD)
   @Post('request-upload')
   async requestUploadUrl(
     @Req() req: Request & { user: AuthUser },

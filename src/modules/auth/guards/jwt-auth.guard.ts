@@ -56,16 +56,14 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
-    // First try Authorization header
+    // Extract token from Authorization header only
+    // Note: Query param tokens were previously supported for SSE but removed for security reasons.
+    // Tokens in URLs are logged in server logs, browser history, and proxy logs.
+    // For SSE authentication, use short-lived connection tokens obtained via a separate
+    // authenticated endpoint, or implement ticket-based authentication.
     const [type, token] = request.headers['authorization']?.split(' ') ?? [];
     if (type === 'Bearer' && token) {
       return token;
-    }
-
-    // Fallback to query param (for SSE which doesn't support headers)
-    const queryToken = request.query?.token;
-    if (typeof queryToken === 'string') {
-      return queryToken;
     }
 
     return undefined;

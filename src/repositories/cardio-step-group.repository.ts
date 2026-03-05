@@ -21,6 +21,14 @@ export class CardioStepGroupRepository {
     return this.db.selectFrom('cardio_step_groups').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
+  /**
+   * Bulk fetch cardio step groups by IDs - more efficient than multiple findById calls
+   */
+  async findByIds(ids: string[]): Promise<CardioStepGroup[]> {
+    if (ids.length === 0) return [];
+    return this.db.selectFrom('cardio_step_groups').where('id', 'in', ids).selectAll().execute();
+  }
+
   async deleteByIds(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await this.db.deleteFrom('cardio_step_groups').where('id', 'in', ids).execute();

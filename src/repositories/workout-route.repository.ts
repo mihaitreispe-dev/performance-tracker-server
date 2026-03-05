@@ -31,6 +31,25 @@ export class WorkoutRouteRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Bulk fetch workout routes by execution IDs - more efficient than multiple findByExecutionId calls
+   */
+  async findByExecutionIds(executionIds: string[]): Promise<Map<string, WorkoutRoute>> {
+    if (executionIds.length === 0) return new Map();
+
+    const results = await this.db
+      .selectFrom('workout_routes')
+      .where('workout_execution_id', 'in', executionIds)
+      .selectAll()
+      .execute();
+
+    const map = new Map<string, WorkoutRoute>();
+    for (const route of results) {
+      map.set(route.workout_execution_id, route);
+    }
+    return map;
+  }
+
   async create(data: NewWorkoutRoute): Promise<WorkoutRoute> {
     return this.db.insertInto('workout_routes').values(data).returningAll().executeTakeFirstOrThrow();
   }

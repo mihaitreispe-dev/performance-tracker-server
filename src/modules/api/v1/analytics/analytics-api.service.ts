@@ -110,10 +110,10 @@ export class AnalyticsApiService {
       },
     });
 
-    // Fetch workouts for type information
+    // Fetch workouts for type information - batch fetch instead of N+1 queries
     const workoutIds = [...new Set(schedules.map((s) => s.workout_id))];
-    const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepository.findById(id)));
-    const workoutMap = new Map(workouts.filter(Boolean).map((w) => [w!.id, w!]));
+    const workouts = await this.workoutRepository.findByIds(workoutIds);
+    const workoutMap = new Map(workouts.map((w) => [w.id, w]));
 
     // Calculate stats
     const totalScheduled = schedules.length;
@@ -243,12 +243,21 @@ export class AnalyticsApiService {
       exerciseInstanceMap.set(sc.exercise_instance_id, existing);
     }
 
+    // Batch fetch exercise instances and exercises
+    const instanceIds = [...exerciseInstanceMap.keys()];
+    const instances = await this.exerciseInstanceRepository.findByIds(instanceIds);
+    const instanceLookup = new Map(instances.map((i) => [i.id, i]));
+
+    const exerciseIds = [...new Set(instances.map((i) => i.exercise_id))];
+    const exercises = await this.exerciseRepository.findByIds(exerciseIds);
+    const exerciseLookup = new Map(exercises.map((e) => [e.id, e]));
+
     const setsSummary: SetSummaryDTO[] = [];
     for (const [instanceId, completions] of exerciseInstanceMap) {
-      const instance = await this.exerciseInstanceRepository.findById(instanceId);
+      const instance = instanceLookup.get(instanceId);
       if (!instance) continue;
 
-      const exercise = await this.exerciseRepository.findById(instance.exercise_id);
+      const exercise = exerciseLookup.get(instance.exercise_id);
       const exerciseName = exercise?.name ?? 'Unknown Exercise';
 
       const completedSets = completions.filter((c) => !c.skipped).length;
@@ -389,9 +398,9 @@ export class AnalyticsApiService {
     // Fetch workout types for each execution
     const workoutTypesMap = await this.getWorkoutTypesForExecutions(executions);
 
-    // Fetch routes for distance data
-    const routes = await Promise.all(executions.map((e) => this.workoutRouteRepository.findByExecutionId(e.id)));
-    const routeMap = new Map(routes.filter(Boolean).map((r, i) => [executions[i].id, r!]));
+    // Fetch routes for distance data - batch fetch instead of N+1 queries
+    const executionIds = executions.map((e) => e.id);
+    const routeMap = await this.workoutRouteRepository.findByExecutionIds(executionIds);
 
     // Calculate totals
     let totalDistanceMeters = 0;
@@ -489,18 +498,15 @@ export class AnalyticsApiService {
   private async getWorkoutTypesForExecutions(executions: WorkoutExecution[]): Promise<Map<string, WorkoutType>> {
     const result = new Map<string, WorkoutType>();
 
-    // Get schedule IDs and fetch schedules
-    const scheduleIds = executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!);
+    // Get schedule IDs and batch fetch schedules
+    const scheduleIds = [...new Set(executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!))];
+    const schedules = await this.workoutScheduleRepository.findByIds(scheduleIds);
+    const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
 
-    const schedules = await Promise.all(
-      [...new Set(scheduleIds)].map((id) => this.workoutScheduleRepository.findById(id)),
-    );
-    const scheduleMap = new Map(schedules.filter(Boolean).map((s) => [s!.id, s!]));
-
-    // Get workout IDs and fetch workouts
-    const workoutIds = [...new Set(schedules.filter(Boolean).map((s) => s!.workout_id))];
-    const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepository.findById(id)));
-    const workoutMap = new Map(workouts.filter(Boolean).map((w) => [w!.id, w!]));
+    // Get workout IDs and batch fetch workouts
+    const workoutIds = [...new Set(schedules.map((s) => s.workout_id))];
+    const workouts = await this.workoutRepository.findByIds(workoutIds);
+    const workoutMap = new Map(workouts.map((w) => [w.id, w]));
 
     // Build execution -> workout type map
     for (const execution of executions) {
@@ -655,15 +661,10 @@ export class AnalyticsApiService {
       return { configured: false };
     }
 
-    // Fetch all HR metrics for the executions
-    const allMetrics = await Promise.all(
-      executions.map((e) =>
-        this.cardioMetricsRepository.findMany({
-          filter: { workoutExecutionId: e.id, metricType: CardioMetricType.HEART_RATE },
-          sort: [{ field: 'recorded_at', direction: 'asc' }],
-        }),
-      ),
-    );
+    // Fetch all HR metrics for the executions - batch fetch instead of N+1 queries
+    const executionIds = executions.map((e) => e.id);
+    const allMetricsMap = await this.cardioMetricsRepository.findByExecutionIds(executionIds, CardioMetricType.HEART_RATE);
+    const allMetrics = executions.map((e) => allMetricsMap.get(e.id) || []);
 
     // Calculate time in each zone
     const zoneTimes = new Map<number, number>();
@@ -737,24 +738,14 @@ export class AnalyticsApiService {
       return null;
     }
 
-    // Get unique exercise instance IDs
+    // Get unique exercise instance IDs and batch fetch
     const exerciseInstanceIds = [...new Set(flattenedCompletions.map((c) => c.exercise_instance_id))];
+    const exerciseInstances = await this.exerciseInstanceRepository.findByIds(exerciseInstanceIds);
+    const instanceMap = new Map(exerciseInstances.map((ei) => [ei.id, ei]));
 
-    // Fetch exercise instances and their exercises
-    const exerciseInstances = await Promise.all(
-      exerciseInstanceIds.map((id) => this.exerciseInstanceRepository.findById(id)),
-    );
-    const instanceMap = new Map(exerciseInstances.filter(Boolean).map((ei) => [ei!.id, ei!]));
-
-    // Fetch exercises and their muscle groups
-    const exerciseIds = [...new Set(exerciseInstances.filter(Boolean).map((ei) => ei!.exercise_id))];
-    const exerciseMuscleGroups = await Promise.all(
-      exerciseIds.map(async (exId) => {
-        const muscleGroups = await this.muscleGroupRepository.findByExerciseId(exId);
-        return { exerciseId: exId, muscleGroups };
-      }),
-    );
-    const exerciseMuscleMap = new Map(exerciseMuscleGroups.map((emg) => [emg.exerciseId, emg.muscleGroups]));
+    // Batch fetch exercises and their muscle groups
+    const exerciseIds = [...new Set(exerciseInstances.map((ei) => ei.exercise_id))];
+    const exerciseMuscleMap = await this.muscleGroupRepository.findByExerciseIds(exerciseIds);
 
     // Aggregate volume by muscle group
     interface MuscleStats {
@@ -1644,7 +1635,31 @@ export class AnalyticsApiService {
       sort: [{ field: 'completed_at', direction: 'asc' }],
     });
 
-    // For each execution, get set completions for this exercise
+    // Batch fetch all set completions for all executions
+    const executionIds = executions.map((e) => e.id);
+    const allSetCompletionsMap = await this.setCompletionRepository.findByExecutionIds(executionIds, false);
+
+    // Collect all exercise instance IDs
+    const allInstanceIds = new Set<string>();
+    for (const completions of allSetCompletionsMap.values()) {
+      for (const sc of completions) {
+        allInstanceIds.add(sc.exercise_instance_id);
+      }
+    }
+
+    // Batch fetch all exercise instances
+    const allInstances = await this.exerciseInstanceRepository.findByIds([...allInstanceIds]);
+    const instanceLookup = new Map(allInstances.map((i) => [i.id, i]));
+
+    // Find which instance IDs match our target exercise
+    const matchingInstanceIds = new Set<string>();
+    for (const instance of allInstances) {
+      if (instance.exercise_id === exerciseId) {
+        matchingInstanceIds.add(instance.id);
+      }
+    }
+
+    // Build data points for each execution
     const dataPointsMap = new Map<
       string,
       {
@@ -1654,24 +1669,10 @@ export class AnalyticsApiService {
     >();
 
     for (const execution of executions) {
-      // Get all set completions for this execution
-      const setCompletions = await this.setCompletionRepository.findMany({
-        filter: { workoutExecutionId: execution.id, skipped: false },
-      });
+      const setCompletions = allSetCompletionsMap.get(execution.id) || [];
 
-      // Get exercise instance IDs that match our exercise
-      const exerciseInstanceIds = new Set<string>();
-      for (const sc of setCompletions) {
-        const instance = await this.exerciseInstanceRepository.findById(sc.exercise_instance_id);
-        if (instance && instance.exercise_id === exerciseId) {
-          exerciseInstanceIds.add(sc.exercise_instance_id);
-        }
-      }
-
-      if (exerciseInstanceIds.size === 0) continue;
-
-      // Filter set completions to only those for our exercise
-      const relevantSets = setCompletions.filter((sc) => exerciseInstanceIds.has(sc.exercise_instance_id));
+      // Filter to only sets for our target exercise
+      const relevantSets = setCompletions.filter((sc) => matchingInstanceIds.has(sc.exercise_instance_id));
       if (relevantSets.length === 0) continue;
 
       const completedAt =
@@ -1776,6 +1777,36 @@ export class AnalyticsApiService {
       sort: [{ field: 'completed_at', direction: 'desc' }],
     });
 
+    if (executions.length === 0) {
+      return { data: { exercises: [] } };
+    }
+
+    // Batch fetch all set completions for all executions
+    const executionIds = executions.map((e) => e.id);
+    const allSetCompletionsMap = await this.setCompletionRepository.findByExecutionIds(executionIds, false);
+
+    // Collect all unique exercise instance IDs
+    const allInstanceIds = new Set<string>();
+    for (const completions of allSetCompletionsMap.values()) {
+      for (const sc of completions) {
+        allInstanceIds.add(sc.exercise_instance_id);
+      }
+    }
+
+    // Batch fetch all exercise instances
+    const allInstances = await this.exerciseInstanceRepository.findByIds([...allInstanceIds]);
+    const instanceLookup = new Map(allInstances.map((i) => [i.id, i]));
+
+    // Collect all unique exercise IDs
+    const allExerciseIds = new Set<string>();
+    for (const instance of allInstances) {
+      allExerciseIds.add(instance.exercise_id);
+    }
+
+    // Batch fetch all exercises
+    const allExercises = await this.exerciseRepository.findByIds([...allExerciseIds]);
+    const exerciseLookup = new Map(allExercises.map((e) => [e.id, e]));
+
     // Track exercises with their stats
     const exerciseStats = new Map<
       string,
@@ -1789,31 +1820,17 @@ export class AnalyticsApiService {
     >();
 
     for (const execution of executions) {
-      // Get all set completions for this execution
-      const setCompletions = await this.setCompletionRepository.findMany({
-        filter: { workoutExecutionId: execution.id, skipped: false },
-      });
-
-      // Get unique exercise IDs from instances
-      const instanceExerciseMap = new Map<string, string>();
-      for (const sc of setCompletions) {
-        if (!instanceExerciseMap.has(sc.exercise_instance_id)) {
-          const instance = await this.exerciseInstanceRepository.findById(sc.exercise_instance_id);
-          if (instance) {
-            instanceExerciseMap.set(sc.exercise_instance_id, instance.exercise_id);
-          }
-        }
-      }
+      const setCompletions = allSetCompletionsMap.get(execution.id) || [];
 
       // Group sets by exercise
       const exerciseSets = new Map<string, typeof setCompletions>();
       for (const sc of setCompletions) {
-        const exerciseId = instanceExerciseMap.get(sc.exercise_instance_id);
-        if (!exerciseId) continue;
+        const instance = instanceLookup.get(sc.exercise_instance_id);
+        if (!instance) continue;
 
-        const existing = exerciseSets.get(exerciseId) || [];
+        const existing = exerciseSets.get(instance.exercise_id) || [];
         existing.push(sc);
-        exerciseSets.set(exerciseId, existing);
+        exerciseSets.set(instance.exercise_id, existing);
       }
 
       const completedAt =
@@ -1837,7 +1854,7 @@ export class AnalyticsApiService {
             existing.maxWeight = sessionMaxWeight;
           }
         } else {
-          const exercise = await this.exerciseRepository.findById(exerciseId);
+          const exercise = exerciseLookup.get(exerciseId);
           if (exercise) {
             exerciseStats.set(exerciseId, {
               exerciseId,

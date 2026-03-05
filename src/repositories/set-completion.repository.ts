@@ -75,6 +75,37 @@ export class SetCompletionRepository {
     return query.execute();
   }
 
+  /**
+   * Bulk fetch set completions by execution IDs - more efficient than multiple findMany calls
+   */
+  async findByExecutionIds(
+    executionIds: string[],
+    skipped?: boolean,
+  ): Promise<Map<string, SetCompletion[]>> {
+    if (executionIds.length === 0) return new Map();
+
+    let query = this.db
+      .selectFrom('set_completions')
+      .where('workout_execution_id', 'in', executionIds)
+      .selectAll()
+      .orderBy('workout_execution_id', 'asc')
+      .orderBy('completed_at', 'asc');
+
+    if (skipped !== undefined) {
+      query = query.where('skipped', '=', skipped);
+    }
+
+    const results = await query.execute();
+
+    const map = new Map<string, SetCompletion[]>();
+    for (const completion of results) {
+      const existing = map.get(completion.workout_execution_id) || [];
+      existing.push(completion);
+      map.set(completion.workout_execution_id, existing);
+    }
+    return map;
+  }
+
   async countMany(filter?: SetCompletionFilter): Promise<number> {
     let query = this.db.selectFrom('set_completions').select((eb) => eb.fn.countAll<number>().as('count'));
 

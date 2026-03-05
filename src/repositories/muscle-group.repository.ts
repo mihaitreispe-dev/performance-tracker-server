@@ -74,6 +74,44 @@ export class MuscleGroupRepository {
       .execute();
   }
 
+  /**
+   * Bulk fetch muscle groups for multiple exercises - more efficient than multiple findByExerciseId calls
+   */
+  async findByExerciseIds(
+    exerciseIds: string[],
+  ): Promise<Map<string, (MuscleGroup & { is_primary: boolean })[]>> {
+    if (exerciseIds.length === 0) return new Map();
+
+    const results = await this.db
+      .selectFrom('muscle_groups')
+      .innerJoin('exercise_muscle_groups', 'muscle_groups.id', 'exercise_muscle_groups.muscle_group_id')
+      .where('exercise_muscle_groups.exercise_id', 'in', exerciseIds)
+      .select([
+        'muscle_groups.id',
+        'muscle_groups.name',
+        'muscle_groups.created_at',
+        'muscle_groups.updated_at',
+        'exercise_muscle_groups.is_primary',
+        'exercise_muscle_groups.exercise_id',
+      ])
+      .execute();
+
+    const map = new Map<string, (MuscleGroup & { is_primary: boolean })[]>();
+    for (const row of results) {
+      const exerciseId = row.exercise_id;
+      const existing = map.get(exerciseId) || [];
+      existing.push({
+        id: row.id,
+        name: row.name,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        is_primary: row.is_primary,
+      });
+      map.set(exerciseId, existing);
+    }
+    return map;
+  }
+
   async unlinkFromExercise(exerciseId: string, muscleGroupId: string): Promise<void> {
     await this.db
       .deleteFrom('exercise_muscle_groups')

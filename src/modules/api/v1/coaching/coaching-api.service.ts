@@ -426,15 +426,10 @@ export class CoachingApiService {
       sort: [{ field: 'scheduled_date', direction: 'asc' }],
     });
 
-    // Fetch all workouts for the schedules
+    // Fetch all workouts for the schedules - batch fetch instead of N+1 queries
     const workoutIds = [...new Set(schedules.map((s) => s.workout_id))];
-    const workouts = await Promise.all(workoutIds.map((id) => this.workoutRepo.findById(id)));
-    const workoutMap = new Map<string, Workout>();
-    for (const workout of workouts) {
-      if (workout) {
-        workoutMap.set(workout.id, workout);
-      }
-    }
+    const workouts = await this.workoutRepo.findByIds(workoutIds);
+    const workoutMap = new Map<string, Workout>(workouts.map((w) => [w.id, w]));
 
     // Fetch execution data if requested
     let executionMap = new Map<string, ExecutionSummaryDTO>();
@@ -1159,57 +1154,9 @@ export class CoachingApiService {
     const hasMore = messages.length > limit;
     const resultMessages = hasMore ? messages.slice(0, limit) : messages;
 
-    // Get sender info and workout info
-    const senderIds = [...new Set(resultMessages.map((m) => m.sender_id))];
-    const senders = await Promise.all(senderIds.map((id) => this.userRepo.findById(id)));
-    const senderMap = new Map(senders.filter(Boolean).map((s) => [s!.id, s!]));
-
-    const scheduleIds = [...new Set(resultMessages.filter((m) => m.workout_schedule_id).map((m) => m.workout_schedule_id!))];
-    const workoutInfoMap = new Map<string, { name: string; scheduledDate: string }>();
-    for (const scheduleId of scheduleIds) {
-      const schedule = await this.scheduleRepo.findById(scheduleId);
-      if (schedule) {
-        const workout = await this.workoutRepo.findById(schedule.workout_id);
-        if (workout) {
-          const scheduledDate = schedule.scheduled_date instanceof Date
-            ? formatDateToYMD(schedule.scheduled_date)
-            : String(schedule.scheduled_date);
-          workoutInfoMap.set(scheduleId, { name: workout.name, scheduledDate });
-        }
-      }
-    }
-
-    // Fetch attached workouts
-    const attachedWorkoutIds = [...new Set(resultMessages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!))];
-    const attachedWorkoutsMap = new Map<string, AttachedWorkoutDTO>();
-    for (const workoutId of attachedWorkoutIds) {
-      const workout = await this.workoutRepo.findById(workoutId);
-      if (workout) {
-        attachedWorkoutsMap.set(workout.id, {
-          id: workout.id,
-          name: workout.name,
-          description: workout.description,
-          type: workout.type,
-          difficulty: workout.difficulty,
-        });
-      }
-    }
-
-    // Fetch attached plans
-    const attachedPlanIds = [...new Set(resultMessages.filter((m) => m.attached_plan_id).map((m) => m.attached_plan_id!))];
-    const attachedPlansMap = new Map<string, AttachedPlanDTO>();
-    for (const planId of attachedPlanIds) {
-      const plan = await this.workoutPlanRepo.findById(planId);
-      if (plan) {
-        attachedPlansMap.set(plan.id, {
-          id: plan.id,
-          name: plan.name,
-          description: plan.description,
-          durationWeeks: plan.duration_weeks,
-          goal: plan.goal,
-        });
-      }
-    }
+    // Build maps using helper method
+    const { senderMap, workoutInfoMap, attachedWorkoutsMap, attachedPlansMap } =
+      await this.buildMessageLookupMaps(resultMessages);
 
     // Mark messages as read (messages not from current user)
     await this.messageRepo.markConversationAsRead(relationship.id, userId);
@@ -1259,42 +1206,9 @@ export class CoachingApiService {
 
     const messages = await this.messageRepo.findWorkoutNotes(workoutScheduleId);
 
-    // Get sender info
-    const senderIds = [...new Set(messages.map((m) => m.sender_id))];
-    const senders = await Promise.all(senderIds.map((id) => this.userRepo.findById(id)));
-    const senderMap = new Map(senders.filter(Boolean).map((s) => [s!.id, s!]));
-
-    // Fetch attached workouts
-    const attachedWorkoutIds = [...new Set(messages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!))];
-    const attachedWorkoutsMap = new Map<string, AttachedWorkoutDTO>();
-    for (const wId of attachedWorkoutIds) {
-      const w = await this.workoutRepo.findById(wId);
-      if (w) {
-        attachedWorkoutsMap.set(w.id, {
-          id: w.id,
-          name: w.name,
-          description: w.description,
-          type: w.type,
-          difficulty: w.difficulty,
-        });
-      }
-    }
-
-    // Fetch attached plans
-    const attachedPlanIds = [...new Set(messages.filter((m) => m.attached_plan_id).map((m) => m.attached_plan_id!))];
-    const attachedPlansMap = new Map<string, AttachedPlanDTO>();
-    for (const pId of attachedPlanIds) {
-      const p = await this.workoutPlanRepo.findById(pId);
-      if (p) {
-        attachedPlansMap.set(p.id, {
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          durationWeeks: p.duration_weeks,
-          goal: p.goal,
-        });
-      }
-    }
+    // Build maps using helper method
+    const { senderMap, attachedWorkoutsMap, attachedPlansMap } =
+      await this.buildMessageLookupMaps(messages);
 
     return {
       data: messages.map((m) =>
@@ -1476,57 +1390,9 @@ export class CoachingApiService {
     const hasMore = messages.length > limit;
     const resultMessages = hasMore ? messages.slice(0, limit) : messages;
 
-    // Get sender info and workout info
-    const senderIds = [...new Set(resultMessages.map((m) => m.sender_id))];
-    const senders = await Promise.all(senderIds.map((id) => this.userRepo.findById(id)));
-    const senderMap = new Map(senders.filter(Boolean).map((s) => [s!.id, s!]));
-
-    const scheduleIds = [...new Set(resultMessages.filter((m) => m.workout_schedule_id).map((m) => m.workout_schedule_id!))];
-    const workoutInfoMap = new Map<string, { name: string; scheduledDate: string }>();
-    for (const scheduleId of scheduleIds) {
-      const schedule = await this.scheduleRepo.findById(scheduleId);
-      if (schedule) {
-        const workout = await this.workoutRepo.findById(schedule.workout_id);
-        if (workout) {
-          const scheduledDate = schedule.scheduled_date instanceof Date
-            ? formatDateToYMD(schedule.scheduled_date)
-            : String(schedule.scheduled_date);
-          workoutInfoMap.set(scheduleId, { name: workout.name, scheduledDate });
-        }
-      }
-    }
-
-    // Fetch attached workouts
-    const attachedWorkoutIds = [...new Set(resultMessages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!))];
-    const attachedWorkoutsMap = new Map<string, AttachedWorkoutDTO>();
-    for (const workoutId of attachedWorkoutIds) {
-      const workout = await this.workoutRepo.findById(workoutId);
-      if (workout) {
-        attachedWorkoutsMap.set(workout.id, {
-          id: workout.id,
-          name: workout.name,
-          description: workout.description,
-          type: workout.type,
-          difficulty: workout.difficulty,
-        });
-      }
-    }
-
-    // Fetch attached plans
-    const attachedPlanIds = [...new Set(resultMessages.filter((m) => m.attached_plan_id).map((m) => m.attached_plan_id!))];
-    const attachedPlansMap = new Map<string, AttachedPlanDTO>();
-    for (const planId of attachedPlanIds) {
-      const plan = await this.workoutPlanRepo.findById(planId);
-      if (plan) {
-        attachedPlansMap.set(plan.id, {
-          id: plan.id,
-          name: plan.name,
-          description: plan.description,
-          durationWeeks: plan.duration_weeks,
-          goal: plan.goal,
-        });
-      }
-    }
+    // Build maps using helper method
+    const { senderMap, workoutInfoMap, attachedWorkoutsMap, attachedPlansMap } =
+      await this.buildMessageLookupMaps(resultMessages);
 
     // Mark messages as read
     await this.messageRepo.markConversationAsRead(relationship.id, userId);
@@ -1728,6 +1594,72 @@ export class CoachingApiService {
 
     // Copy the plan and all its workouts to the user's library
     return this.workoutPlansService.copyPlanToUser(planId, userId);
+  }
+
+  /**
+   * Helper method to batch fetch all lookup data for messages (senders, schedules, workouts, plans)
+   * This replaces multiple N+1 query patterns with efficient batch fetches
+   */
+  private async buildMessageLookupMaps(messages: CoachingMessage[]): Promise<{
+    senderMap: Map<string, User>;
+    workoutInfoMap: Map<string, { name: string; scheduledDate: string }>;
+    attachedWorkoutsMap: Map<string, AttachedWorkoutDTO>;
+    attachedPlansMap: Map<string, AttachedPlanDTO>;
+  }> {
+    // Batch fetch senders
+    const senderIds = [...new Set(messages.map((m) => m.sender_id))];
+    const senders = await this.userRepo.findByIds(senderIds);
+    const senderMap = new Map(senders.map((s) => [s.id, s]));
+
+    // Batch fetch schedules and their workouts
+    const scheduleIds = [...new Set(messages.filter((m) => m.workout_schedule_id).map((m) => m.workout_schedule_id!))];
+    const schedules = await this.scheduleRepo.findByIds(scheduleIds);
+    const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
+
+    const scheduleWorkoutIds = [...new Set(schedules.map((s) => s.workout_id))];
+    const scheduleWorkouts = await this.workoutRepo.findByIds(scheduleWorkoutIds);
+    const scheduleWorkoutMap = new Map(scheduleWorkouts.map((w) => [w.id, w]));
+
+    const workoutInfoMap = new Map<string, { name: string; scheduledDate: string }>();
+    for (const schedule of schedules) {
+      const workout = scheduleWorkoutMap.get(schedule.workout_id);
+      if (workout) {
+        const scheduledDate = schedule.scheduled_date instanceof Date
+          ? formatDateToYMD(schedule.scheduled_date)
+          : String(schedule.scheduled_date);
+        workoutInfoMap.set(schedule.id, { name: workout.name, scheduledDate });
+      }
+    }
+
+    // Batch fetch attached workouts
+    const attachedWorkoutIds = [...new Set(messages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!))];
+    const attachedWorkouts = await this.workoutRepo.findByIds(attachedWorkoutIds);
+    const attachedWorkoutsMap = new Map<string, AttachedWorkoutDTO>();
+    for (const workout of attachedWorkouts) {
+      attachedWorkoutsMap.set(workout.id, {
+        id: workout.id,
+        name: workout.name,
+        description: workout.description,
+        type: workout.type,
+        difficulty: workout.difficulty,
+      });
+    }
+
+    // Batch fetch attached plans
+    const attachedPlanIds = [...new Set(messages.filter((m) => m.attached_plan_id).map((m) => m.attached_plan_id!))];
+    const attachedPlans = await this.workoutPlanRepo.findByIds(attachedPlanIds);
+    const attachedPlansMap = new Map<string, AttachedPlanDTO>();
+    for (const plan of attachedPlans) {
+      attachedPlansMap.set(plan.id, {
+        id: plan.id,
+        name: plan.name,
+        description: plan.description,
+        durationWeeks: plan.duration_weeks,
+        goal: plan.goal,
+      });
+    }
+
+    return { senderMap, workoutInfoMap, attachedWorkoutsMap, attachedPlansMap };
   }
 
   private mapToMessageDTO(

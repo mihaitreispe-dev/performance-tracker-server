@@ -21,6 +21,14 @@ export class ExerciseInstanceGroupRepository {
     return this.db.selectFrom('exercise_instance_groups').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
+  /**
+   * Bulk fetch exercise instance groups by IDs - more efficient than multiple findById calls
+   */
+  async findByIds(ids: string[]): Promise<ExerciseInstanceGroup[]> {
+    if (ids.length === 0) return [];
+    return this.db.selectFrom('exercise_instance_groups').where('id', 'in', ids).selectAll().execute();
+  }
+
   async deleteByIds(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await this.db.deleteFrom('exercise_instance_groups').where('id', 'in', ids).execute();

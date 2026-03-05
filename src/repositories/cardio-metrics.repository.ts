@@ -39,6 +39,37 @@ export class CardioMetricsRepository {
       .execute();
   }
 
+  /**
+   * Bulk fetch cardio metrics by execution IDs - more efficient than multiple findMany calls
+   */
+  async findByExecutionIds(
+    executionIds: string[],
+    metricType?: CardioMetricType,
+  ): Promise<Map<string, CardioMetric[]>> {
+    if (executionIds.length === 0) return new Map();
+
+    let query = this.db
+      .selectFrom('cardio_metrics')
+      .where('workout_execution_id', 'in', executionIds)
+      .selectAll()
+      .orderBy('workout_execution_id', 'asc')
+      .orderBy('recorded_at', 'asc');
+
+    if (metricType) {
+      query = query.where('metric_type', '=', metricType);
+    }
+
+    const results = await query.execute();
+
+    const map = new Map<string, CardioMetric[]>();
+    for (const metric of results) {
+      const existing = map.get(metric.workout_execution_id) || [];
+      existing.push(metric);
+      map.set(metric.workout_execution_id, existing);
+    }
+    return map;
+  }
+
   async findMany(options: CardioMetricFindManyOptions = {}): Promise<CardioMetric[]> {
     const { filter, sort, offset, limit } = options;
     let query = this.db.selectFrom('cardio_metrics').selectAll();

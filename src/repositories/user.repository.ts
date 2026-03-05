@@ -20,6 +20,16 @@ export class UserRepository {
     return { ...result, roles: parseSQLArray(result.roles) };
   }
 
+  /**
+   * Bulk fetch users by IDs - more efficient than multiple findById calls
+   */
+  async findByIds(ids: string[]): Promise<User[]> {
+    if (ids.length === 0) return [];
+
+    const results = await this.db.selectFrom('users').where('id', 'in', ids).selectAll().execute();
+    return results.map((r) => ({ ...r, roles: parseSQLArray(r.roles) }));
+  }
+
   async findByEmail(email: string): Promise<User | undefined> {
     const result = await this.db.selectFrom('users').where('email', '=', email).selectAll().executeTakeFirst();
     if (!result) {

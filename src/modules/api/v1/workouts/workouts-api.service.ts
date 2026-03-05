@@ -192,12 +192,72 @@ export class WorkoutsApiService {
 
   /**
    * Copy workout items from source to target workout
+   * Uses batch fetching to avoid N+1 queries
    */
   private async copyWorkoutItems(targetWorkoutId: string, sourceItems: WorkoutItem[]): Promise<void> {
+    // Collect all IDs for batch fetching
+    const exerciseInstanceIds: string[] = [];
+    const exerciseGroupIds: string[] = [];
+    const cardioStepIds: string[] = [];
+    const cardioStepGroupIds: string[] = [];
+
+    for (const item of sourceItems) {
+      if (item.exercise_instance_id) exerciseInstanceIds.push(item.exercise_instance_id);
+      if (item.exercise_instance_group_id) exerciseGroupIds.push(item.exercise_instance_group_id);
+      if (item.cardio_step_id) cardioStepIds.push(item.cardio_step_id);
+      if (item.cardio_step_group_id) cardioStepGroupIds.push(item.cardio_step_group_id);
+    }
+
+    // Batch fetch all source data
+    const [exerciseInstances, exerciseGroups, exerciseGroupItems, cardioSteps, cardioStepGroups, cardioStepGroupItems] =
+      await Promise.all([
+        this.exerciseInstanceRepo.findByIds(exerciseInstanceIds),
+        this.exerciseInstanceGroupRepo.findByIds(exerciseGroupIds),
+        this.exerciseInstanceGroupRepo.findGroupItemsByGroupIds(exerciseGroupIds),
+        this.cardioStepRepo.findByIds(cardioStepIds),
+        this.cardioStepGroupRepo.findByIds(cardioStepGroupIds),
+        this.cardioStepGroupRepo.findGroupItemsByGroupIds(cardioStepGroupIds),
+      ]);
+
+    // Build lookup maps
+    const instanceMap = new Map(exerciseInstances.map((i) => [i.id, i]));
+    const exerciseGroupMap = new Map(exerciseGroups.map((g) => [g.id, g]));
+    const cardioStepMap = new Map(cardioSteps.map((s) => [s.id, s]));
+    const cardioStepGroupMap = new Map(cardioStepGroups.map((g) => [g.id, g]));
+
+    // Map group items by group ID
+    const exerciseGroupItemsMap = new Map<string, typeof exerciseGroupItems>();
+    for (const gi of exerciseGroupItems) {
+      const existing = exerciseGroupItemsMap.get(gi.group_id) || [];
+      existing.push(gi);
+      exerciseGroupItemsMap.set(gi.group_id, existing);
+    }
+
+    const cardioStepGroupItemsMap = new Map<string, typeof cardioStepGroupItems>();
+    for (const gi of cardioStepGroupItems) {
+      const existing = cardioStepGroupItemsMap.get(gi.group_id) || [];
+      existing.push(gi);
+      cardioStepGroupItemsMap.set(gi.group_id, existing);
+    }
+
+    // Fetch instances in groups
+    const groupInstanceIds = exerciseGroupItems.map((gi) => gi.exercise_instance_id);
+    const groupInstances = await this.exerciseInstanceRepo.findByIds(groupInstanceIds);
+    for (const inst of groupInstances) {
+      instanceMap.set(inst.id, inst);
+    }
+
+    // Fetch cardio steps in groups
+    const groupCardioStepIds = cardioStepGroupItems.map((gi) => gi.cardio_step_id);
+    const groupCardioSteps = await this.cardioStepRepo.findByIds(groupCardioStepIds);
+    for (const step of groupCardioSteps) {
+      cardioStepMap.set(step.id, step);
+    }
+
+    // Now process items and create copies
     for (const item of sourceItems) {
       if (item.exercise_instance_id) {
-        // Copy single exercise instance
-        const sourceInstance = await this.exerciseInstanceRepo.findById(item.exercise_instance_id);
+        const sourceInstance = instanceMap.get(item.exercise_instance_id);
         if (!sourceInstance) continue;
 
         const newInstance = await this.exerciseInstanceRepo.create({
@@ -223,41 +283,43 @@ export class WorkoutsApiService {
           },
         ]);
       } else if (item.exercise_instance_group_id) {
-        // Copy exercise instance group
-        const sourceGroup = await this.exerciseInstanceGroupRepo.findById(item.exercise_instance_group_id);
+        const sourceGroup = exerciseGroupMap.get(item.exercise_instance_group_id);
         if (!sourceGroup) continue;
 
-        const sourceGroupItems = await this.exerciseInstanceGroupRepo.findGroupItemsByGroupIds([item.exercise_instance_group_id]);
+        const sourceGroupItems = exerciseGroupItemsMap.get(item.exercise_instance_group_id) || [];
 
         const newGroup = await this.exerciseInstanceGroupRepo.create({
           repeat: sourceGroup.repeat,
         });
 
-        // Copy all instances in the group
-        for (const gi of sourceGroupItems) {
-          const sourceInstance = await this.exerciseInstanceRepo.findById(gi.exercise_instance_id);
-          if (!sourceInstance) continue;
+        // Create all instances for the group in batch
+        const newInstances = await this.exerciseInstanceRepo.createMany(
+          sourceGroupItems
+            .map((gi) => {
+              const sourceInstance = instanceMap.get(gi.exercise_instance_id);
+              if (!sourceInstance) return null;
+              return {
+                exercise_id: sourceInstance.exercise_id,
+                mode: sourceInstance.mode,
+                sets: sourceInstance.sets,
+                reps: sourceInstance.reps,
+                execution_time: sourceInstance.execution_time,
+                load: sourceInstance.load,
+                intensity: sourceInstance.intensity,
+                tempo: sourceInstance.tempo,
+                notes: sourceInstance.notes,
+              };
+            })
+            .filter(Boolean) as any[],
+        );
 
-          const newInstance = await this.exerciseInstanceRepo.create({
-            exercise_id: sourceInstance.exercise_id,
-            mode: sourceInstance.mode,
-            sets: sourceInstance.sets,
-            reps: sourceInstance.reps,
-            execution_time: sourceInstance.execution_time,
-            load: sourceInstance.load,
-            intensity: sourceInstance.intensity,
-            tempo: sourceInstance.tempo,
-            notes: sourceInstance.notes,
-          });
-
-          await this.exerciseInstanceGroupRepo.createGroupItems([
-            {
-              group_id: newGroup.id,
-              exercise_instance_id: newInstance.id,
-              position: gi.position,
-            },
-          ]);
-        }
+        await this.exerciseInstanceGroupRepo.createGroupItems(
+          newInstances.map((inst, idx) => ({
+            group_id: newGroup.id,
+            exercise_instance_id: inst.id,
+            position: sourceGroupItems[idx]?.position ?? idx,
+          })),
+        );
 
         await this.workoutRepo.createWorkoutItems([
           {
@@ -270,8 +332,7 @@ export class WorkoutsApiService {
           },
         ]);
       } else if (item.cardio_step_id) {
-        // Copy single cardio step
-        const sourceStep = await this.cardioStepRepo.findById(item.cardio_step_id);
+        const sourceStep = cardioStepMap.get(item.cardio_step_id);
         if (!sourceStep) continue;
 
         const newStep = await this.cardioStepRepo.create({
@@ -305,49 +366,51 @@ export class WorkoutsApiService {
           },
         ]);
       } else if (item.cardio_step_group_id) {
-        // Copy cardio step group
-        const sourceGroup = await this.cardioStepGroupRepo.findById(item.cardio_step_group_id);
+        const sourceGroup = cardioStepGroupMap.get(item.cardio_step_group_id);
         if (!sourceGroup) continue;
 
-        const sourceGroupItems = await this.cardioStepGroupRepo.findGroupItemsByGroupIds([item.cardio_step_group_id]);
+        const sourceGroupItems = cardioStepGroupItemsMap.get(item.cardio_step_group_id) || [];
 
         const newGroup = await this.cardioStepGroupRepo.create({
           repeat: sourceGroup.repeat,
         });
 
-        // Copy all steps in the group
-        for (const gi of sourceGroupItems) {
-          const sourceStep = await this.cardioStepRepo.findById(gi.cardio_step_id);
-          if (!sourceStep) continue;
+        // Create all steps for the group in batch
+        const newSteps = await this.cardioStepRepo.createMany(
+          sourceGroupItems
+            .map((gi) => {
+              const sourceStep = cardioStepMap.get(gi.cardio_step_id);
+              if (!sourceStep) return null;
+              return {
+                type: sourceStep.type,
+                mode: sourceStep.mode,
+                duration: sourceStep.duration,
+                distance: sourceStep.distance,
+                hr_min: sourceStep.hr_min,
+                hr_max: sourceStep.hr_max,
+                hr_zone: sourceStep.hr_zone,
+                power_min: sourceStep.power_min,
+                power_max: sourceStep.power_max,
+                power_zone: sourceStep.power_zone,
+                pace_min: sourceStep.pace_min,
+                pace_max: sourceStep.pace_max,
+                pace_zone: sourceStep.pace_zone,
+                rpe_min: sourceStep.rpe_min,
+                rpe_max: sourceStep.rpe_max,
+                rpe_zone: sourceStep.rpe_zone,
+                notes: sourceStep.notes,
+              };
+            })
+            .filter(Boolean) as any[],
+        );
 
-          const newStep = await this.cardioStepRepo.create({
-            type: sourceStep.type,
-            mode: sourceStep.mode,
-            duration: sourceStep.duration,
-            distance: sourceStep.distance,
-            hr_min: sourceStep.hr_min,
-            hr_max: sourceStep.hr_max,
-            hr_zone: sourceStep.hr_zone,
-            power_min: sourceStep.power_min,
-            power_max: sourceStep.power_max,
-            power_zone: sourceStep.power_zone,
-            pace_min: sourceStep.pace_min,
-            pace_max: sourceStep.pace_max,
-            pace_zone: sourceStep.pace_zone,
-            rpe_min: sourceStep.rpe_min,
-            rpe_max: sourceStep.rpe_max,
-            rpe_zone: sourceStep.rpe_zone,
-            notes: sourceStep.notes,
-          });
-
-          await this.cardioStepGroupRepo.createGroupItems([
-            {
-              group_id: newGroup.id,
-              cardio_step_id: newStep.id,
-              position: gi.position,
-            },
-          ]);
-        }
+        await this.cardioStepGroupRepo.createGroupItems(
+          newSteps.map((step, idx) => ({
+            group_id: newGroup.id,
+            cardio_step_id: step.id,
+            position: sourceGroupItems[idx]?.position ?? idx,
+          })),
+        );
 
         await this.workoutRepo.createWorkoutItems([
           {
@@ -691,41 +754,47 @@ export class WorkoutsApiService {
       if (item.cardio_step_group_id) cardioStepGroupIds.push(item.cardio_step_group_id);
     }
 
-    // Fetch groups and their items
+    // Fetch groups and their items - batch fetch instead of N+1 queries
     const groupItemsByGroupId = new Map<string, ExerciseInstanceGroupItem[]>();
     const groupsById = new Map<string, ExerciseInstanceGroup>();
 
     if (groupIds.length > 0) {
-      const groupItems = await this.exerciseInstanceGroupRepo.findGroupItemsByGroupIds(groupIds);
+      const [groups, groupItems] = await Promise.all([
+        this.exerciseInstanceGroupRepo.findByIds(groupIds),
+        this.exerciseInstanceGroupRepo.findGroupItemsByGroupIds(groupIds),
+      ]);
+
+      for (const group of groups) {
+        groupsById.set(group.id, group);
+      }
+
       for (const gi of groupItems) {
         instanceIds.push(gi.exercise_instance_id);
         const existing = groupItemsByGroupId.get(gi.group_id) || [];
         existing.push(gi);
         groupItemsByGroupId.set(gi.group_id, existing);
       }
-
-      for (const groupId of groupIds) {
-        const group = await this.exerciseInstanceGroupRepo.findById(groupId);
-        if (group) groupsById.set(groupId, group);
-      }
     }
 
-    // Fetch cardio step groups and their items
+    // Fetch cardio step groups and their items - batch fetch instead of N+1 queries
     const cardioGroupItemsByGroupId = new Map<string, CardioStepGroupItem[]>();
     const cardioGroupsById = new Map<string, CardioStepGroup>();
 
     if (cardioStepGroupIds.length > 0) {
-      const cardioGroupItems = await this.cardioStepGroupRepo.findGroupItemsByGroupIds(cardioStepGroupIds);
+      const [cardioGroups, cardioGroupItems] = await Promise.all([
+        this.cardioStepGroupRepo.findByIds(cardioStepGroupIds),
+        this.cardioStepGroupRepo.findGroupItemsByGroupIds(cardioStepGroupIds),
+      ]);
+
+      for (const group of cardioGroups) {
+        cardioGroupsById.set(group.id, group);
+      }
+
       for (const gi of cardioGroupItems) {
         cardioStepIds.push(gi.cardio_step_id);
         const existing = cardioGroupItemsByGroupId.get(gi.group_id) || [];
         existing.push(gi);
         cardioGroupItemsByGroupId.set(gi.group_id, existing);
-      }
-
-      for (const groupId of cardioStepGroupIds) {
-        const group = await this.cardioStepGroupRepo.findById(groupId);
-        if (group) cardioGroupsById.set(groupId, group);
       }
     }
 

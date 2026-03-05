@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, HttpStatus, Patch, Post, Query, Req, Version } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpStatus, Patch, Post, Query, Req, UseGuards, Version } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
+import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
 import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
@@ -28,7 +29,10 @@ export class AuthApiController {
     type: AuthSessionResponse,
   })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.TOO_MANY_REQUESTS, type: ErrorResponse, description: 'Rate limit exceeded' })
   @DisableJwtAuthGuard()
+  @UseGuards(RateLimitGuard)
+  @RateLimit(RateLimitPresets.LOGIN)
   @Post('tokens')
   async createTokens(
     @Req() req: Request,
