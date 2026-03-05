@@ -7,6 +7,7 @@ import { WorkoutItemRepository } from 'src/repositories/workout-item.repository'
 import { WorkoutPlanRepository, WorkoutPlanSort } from 'src/repositories/workout-plan.repository';
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+import { WorkoutsApiService } from '../workouts/workouts-api.service';
 
 import {
   ActivatePlanBody,
@@ -24,6 +25,7 @@ import {
   WorkoutPlanListResponse,
   WorkoutPlanResponse,
   WorkoutPlanWithItemsDTO,
+  WorkoutPlanWithItemsListResponse,
   WorkoutPlanWithItemsResponse,
 } from './response.dto';
 
@@ -35,9 +37,13 @@ export class WorkoutPlansApiService {
     private readonly workoutRepo: WorkoutRepository,
     private readonly workoutScheduleRepo: WorkoutScheduleRepository,
     private readonly workoutItemRepo: WorkoutItemRepository,
+    private readonly workoutsService: WorkoutsApiService,
   ) {}
 
-  async list(req: Request & { user: AuthUser }, query: ListWorkoutPlansQuery): Promise<WorkoutPlanListResponse> {
+  async list(
+    req: Request & { user: AuthUser },
+    query: ListWorkoutPlansQuery,
+  ): Promise<WorkoutPlanListResponse | WorkoutPlanWithItemsListResponse> {
     const filter = {
       userId: req.user.id,
       q: query.q,
@@ -59,6 +65,62 @@ export class WorkoutPlansApiService {
       this.workoutPlanRepo.countMany(filter),
     ]);
 
+    // If includeItems is requested, fetch items for each plan
+    if (query.includeItems) {
+      const planIds = plans.map((p) => p.id);
+
+      // Fetch all items for all plans
+      const allItems = await Promise.all(
+        planIds.map((planId) =>
+          this.workoutPlanItemRepo.findMany({ filter: { workoutPlanId: planId } }),
+        ),
+      );
+
+      // Get unique workout IDs
+      const workoutIds = [
+        ...new Set(allItems.flat().map((item) => item.workout_id)),
+      ];
+
+      // Fetch all workouts
+      const workouts = await Promise.all(
+        workoutIds.map((wid) => this.workoutRepo.findById(wid)),
+      );
+      const workoutMap = new Map<string, Workout>();
+      for (const workout of workouts) {
+        if (workout) {
+          workoutMap.set(workout.id, workout);
+        }
+      }
+
+      // Fetch exercise counts
+      const exerciseCountMap = new Map<string, number>();
+      await Promise.all(
+        workoutIds.map(async (wid) => {
+          const count = await this.workoutItemRepo.countMany({ workoutId: wid });
+          exerciseCountMap.set(wid, count);
+        }),
+      );
+
+      const data: WorkoutPlanWithItemsDTO[] = plans.map((plan, index) => {
+        const items = allItems[index];
+        const itemDTOs = items.map((item) =>
+          this.mapItemToDTO(
+            item,
+            workoutMap.get(item.workout_id),
+            exerciseCountMap.get(item.workout_id) ?? 0,
+          ),
+        );
+        return this.mapPlanWithItemsToDTO(plan, itemDTOs);
+      });
+
+      return {
+        data,
+        offset: query.offset,
+        limit: query.limit,
+        totalCount,
+      };
+    }
+
     const data = plans.map((plan) => this.mapPlanToDTO(plan));
 
     return {
@@ -76,6 +138,46 @@ export class WorkoutPlansApiService {
     }
     if (plan.user_id !== req.user.id) {
       throw new ForbiddenException('Access denied');
+    }
+
+    const items = await this.workoutPlanItemRepo.findMany({
+      filter: { workoutPlanId: id },
+    });
+
+    // Fetch workouts for items
+    const workoutIds = [...new Set(items.map((item) => item.workout_id))];
+    const workouts = await Promise.all(workoutIds.map((wid) => this.workoutRepo.findById(wid)));
+    const workoutMap = new Map<string, Workout>();
+    for (const workout of workouts) {
+      if (workout) {
+        workoutMap.set(workout.id, workout);
+      }
+    }
+
+    // Fetch exercise counts for each workout
+    const exerciseCountMap = new Map<string, number>();
+    await Promise.all(
+      workoutIds.map(async (wid) => {
+        const count = await this.workoutItemRepo.countMany({ workoutId: wid });
+        exerciseCountMap.set(wid, count);
+      }),
+    );
+
+    const itemDTOs = items.map((item) =>
+      this.mapItemToDTO(item, workoutMap.get(item.workout_id), exerciseCountMap.get(item.workout_id) ?? 0),
+    );
+
+    return { data: this.mapPlanWithItemsToDTO(plan, itemDTOs) };
+  }
+
+  /**
+   * Get a workout plan by ID without access checks (for internal service use)
+   * Caller is responsible for verifying access permissions
+   */
+  async getByIdInternal(id: string): Promise<WorkoutPlanWithItemsResponse> {
+    const plan = await this.workoutPlanRepo.findById(id);
+    if (!plan) {
+      throw new NotFoundException('Workout plan not found');
     }
 
     const items = await this.workoutPlanItemRepo.findMany({
@@ -221,6 +323,67 @@ export class WorkoutPlansApiService {
     }
 
     await this.workoutPlanItemRepo.deleteById(itemId);
+  }
+
+  /**
+   * Copy a workout plan and all its workouts to a different user's library
+   * Used when athletes want to add a plan shared by their coach
+   */
+  async copyPlanToUser(sourcePlanId: string, targetUserId: string): Promise<WorkoutPlanWithItemsResponse> {
+    const sourcePlan = await this.workoutPlanRepo.findById(sourcePlanId);
+    if (!sourcePlan) {
+      throw new NotFoundException('Workout plan not found');
+    }
+
+    // Check if user already has a plan with the same name
+    const existingPlans = await this.workoutPlanRepo.findMany({
+      filter: { userId: targetUserId, q: sourcePlan.name },
+      limit: 100,
+    });
+    const exactMatch = existingPlans.find((p) => p.name === sourcePlan.name);
+    if (exactMatch) {
+      throw new BadRequestException(`You already have a plan named "${sourcePlan.name}"`);
+    }
+
+    // Get all items from the source plan
+    const sourceItems = await this.workoutPlanItemRepo.findMany({
+      filter: { workoutPlanId: sourcePlanId },
+    });
+
+    // Get unique workout IDs from plan items
+    const uniqueWorkoutIds = [...new Set(sourceItems.map((item) => item.workout_id))];
+
+    // Copy each unique workout to the target user and build a mapping
+    const workoutIdMapping = new Map<string, string>();
+    for (const sourceWorkoutId of uniqueWorkoutIds) {
+      const copiedWorkout = await this.workoutsService.copyWorkoutToUser(sourceWorkoutId, targetUserId);
+      workoutIdMapping.set(sourceWorkoutId, copiedWorkout.data.id);
+    }
+
+    // Create the new plan for the target user
+    const newPlan = await this.workoutPlanRepo.create({
+      user_id: targetUserId,
+      name: sourcePlan.name,
+      description: sourcePlan.description,
+      goal: sourcePlan.goal,
+      duration_weeks: sourcePlan.duration_weeks,
+    });
+
+    // Create plan items pointing to the copied workouts
+    for (const sourceItem of sourceItems) {
+      const newWorkoutId = workoutIdMapping.get(sourceItem.workout_id);
+      if (newWorkoutId) {
+        await this.workoutPlanItemRepo.create({
+          workout_plan_id: newPlan.id,
+          workout_id: newWorkoutId,
+          week_number: sourceItem.week_number,
+          day_of_week: sourceItem.day_of_week,
+        });
+      }
+    }
+
+    // Fetch the complete new plan with items
+    return this.getByIdInternal(newPlan.id);
   }
 
   async activate(

@@ -2,10 +2,7 @@ import { Kysely, sql } from 'kysely';
 
 export async function up(db: Kysely<unknown>): Promise<void> {
   // Create data export format enum
-  await db.schema
-    .createType('data_export_format')
-    .asEnum(['csv', 'json', 'fit'])
-    .execute();
+  await db.schema.createType('data_export_format').asEnum(['csv', 'json', 'fit']).execute();
 
   // Create data export category enum
   await db.schema
@@ -65,11 +62,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index for expired jobs cleanup
-  await db.schema
-    .createIndex('idx_data_export_jobs_expires')
-    .on('data_export_jobs')
-    .columns(['expires_at'])
-    .execute();
+  await db.schema.createIndex('idx_data_export_jobs_expires').on('data_export_jobs').columns(['expires_at']).execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

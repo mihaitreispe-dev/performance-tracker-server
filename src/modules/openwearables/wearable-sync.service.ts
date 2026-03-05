@@ -8,12 +8,12 @@ import {
   WearableProvider,
   WearableProviderConnection,
 } from 'src/database/interfaces';
-import type { OWActivityAggregate } from './openwearables.service';
 import { DailyHealthMetricRepository } from 'src/repositories/daily-health-metric.repository';
 import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
 import { WearableProviderConnectionRepository } from 'src/repositories/wearable-provider-connection.repository';
 import { WearableProviderPriorityRepository } from 'src/repositories/wearable-provider-priority.repository';
 
+import type { OWActivityAggregate } from './openwearables.service';
 import { OpenWearablesService, OWSleepSession, OWTimeSeries } from './openwearables.service';
 
 export interface SyncResult {

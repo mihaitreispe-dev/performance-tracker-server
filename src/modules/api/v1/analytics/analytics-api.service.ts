@@ -1,9 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { CardioMetricType, ExecutionWeather, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
+import { CardioMetricType, CoachAthleteStatus, ExecutionWeather, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-load.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
@@ -80,6 +82,8 @@ export class AnalyticsApiService {
     private readonly dailyTrainingLoadRepository: DailyTrainingLoadRepository,
     private readonly personalRecordRepository: PersonalRecordRepository,
     private readonly executionWeatherRepository: ExecutionWeatherRepository,
+    private readonly relationshipRepository: CoachAthleteRelationshipRepository,
+    private readonly privacySettingsRepository: AthletePrivacySettingsRepository,
   ) {}
 
   async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
@@ -168,8 +172,23 @@ export class AnalyticsApiService {
     if (!execution) {
       throw new NotFoundException('Workout execution not found');
     }
+
+    // Check if user owns the execution or is a coach with access
     if (execution.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
+      // Check if user is a coach with active relationship and athlete has shared analytics
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
     }
 
     // Get workout info

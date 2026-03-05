@@ -56,7 +56,18 @@ export class JwtAuthGuard implements CanActivate {
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
+    // First try Authorization header
     const [type, token] = request.headers['authorization']?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    if (type === 'Bearer' && token) {
+      return token;
+    }
+
+    // Fallback to query param (for SSE which doesn't support headers)
+    const queryToken = request.query?.token;
+    if (typeof queryToken === 'string') {
+      return queryToken;
+    }
+
+    return undefined;
   }
 }

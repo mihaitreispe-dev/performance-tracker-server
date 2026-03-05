@@ -132,4 +132,22 @@ export class WorkoutScheduleRepository {
   async deleteById(id: string): Promise<void> {
     await this.db.deleteFrom('workout_schedules').where('id', '=', id).execute();
   }
+
+  /**
+   * Find a schedule where:
+   * - The schedule belongs to the specified user (athlete)
+   * - The schedule is for the specified workout
+   * - The schedule was created by a coach (created_by_coach_id is not null)
+   *
+   * This is used to verify an athlete can view a workout that was scheduled for them by a coach.
+   */
+  async findCoachCreatedScheduleForUser(userId: string, workoutId: string): Promise<WorkoutSchedule | undefined> {
+    return this.db
+      .selectFrom('workout_schedules')
+      .where('user_id', '=', userId)
+      .where('workout_id', '=', workoutId)
+      .where('created_by_coach_id', 'is not', null)
+      .selectAll()
+      .executeTakeFirst();
+  }
 }

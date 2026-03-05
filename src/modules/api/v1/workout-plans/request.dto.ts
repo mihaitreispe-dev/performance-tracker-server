@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { WorkoutPlanGoal } from 'src/database/interfaces';
 import type { SortOptions } from 'src/lib/http/decorators/sort-param';
 import { SortParam } from 'src/lib/http/decorators/sort-param';
@@ -19,6 +19,12 @@ export class ListWorkoutPlansQuery extends PageQuery {
   @IsEnumString(WorkoutPlanGoal)
   @IsOptional()
   goal?: WorkoutPlanGoal;
+
+  @ApiPropertyOptional({ description: 'Include plan items in response' })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  includeItems?: boolean;
 
   @SortParam(WorkoutPlanSortField)
   sort?: SortOptions<'name' | 'duration_weeks' | 'created_at' | 'updated_at'>;

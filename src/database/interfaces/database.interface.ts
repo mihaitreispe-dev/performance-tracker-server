@@ -1,8 +1,14 @@
+import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
 import { CardioStepGroupsTable } from './cardio-step-groups-table.interface';
 import { CardioStepsTable } from './cardio-steps-table.interface';
+import { CoachAssignedWorkoutsTable } from './coach-assigned-workouts-table.interface';
+import { CoachAthleteLabelsTable } from './coach-athlete-labels-table.interface';
+import { CoachAthleteRelationshipsTable } from './coach-athlete-relationships-table.interface';
+import { CoachingMessagesTable } from './coaching-messages-table.interface';
+import { NotificationsTable } from './notifications-table.interface';
 import { DailyHealthMetricsTable } from './daily-health-metrics-table.interface';
 import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
 import { DataExportJobsTable } from './data-export-jobs-table.interface';
@@ -89,4 +95,10 @@ export interface Database {
   daily_health_metrics: DailyHealthMetricsTable;
   data_import_jobs: DataImportJobsTable;
   data_export_jobs: DataExportJobsTable;
+  coach_athlete_relationships: CoachAthleteRelationshipsTable;
+  athlete_privacy_settings: AthletePrivacySettingsTable;
+  coach_assigned_workouts: CoachAssignedWorkoutsTable;
+  coach_athlete_labels: CoachAthleteLabelsTable;
+  coaching_messages: CoachingMessagesTable;
+  notifications: NotificationsTable;
 }

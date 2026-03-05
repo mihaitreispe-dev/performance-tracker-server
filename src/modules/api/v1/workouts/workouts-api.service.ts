@@ -20,14 +20,18 @@ import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { CoachAthleteStatus } from 'src/database/interfaces';
+import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioCategoryRepository } from 'src/repositories/cardio-category.repository';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { CardioStepGroupRepository } from 'src/repositories/cardio-step-group.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { ExerciseInstanceGroupRepository } from 'src/repositories/exercise-instance-group.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import {
   CardioStepBody,
@@ -58,6 +62,9 @@ export class WorkoutsApiService {
     private readonly cardioStepRepo: CardioStepRepository,
     private readonly cardioStepGroupRepo: CardioStepGroupRepository,
     private readonly cardioCategoryRepo: CardioCategoryRepository,
+    private readonly workoutScheduleRepo: WorkoutScheduleRepository,
+    private readonly relationshipRepo: CoachAthleteRelationshipRepository,
+    private readonly privacySettingsRepo: AthletePrivacySettingsRepository,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
   ) {}
@@ -91,11 +98,269 @@ export class WorkoutsApiService {
 
   async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutResponse> {
     const workout = await this.workoutRepo.findById(id);
-    if (!workout || workout.user_id !== req.user.id) {
+    if (!workout) {
       throw new NotFoundException();
     }
 
+    // Allow access if user owns the workout
+    if (workout.user_id === req.user.id) {
+      return { data: await this.mapWorkoutToDTO(workout) };
+    }
+
+    // Also allow access if the workout was scheduled for this user by a coach
+    // Check if there's a schedule for this workout where the user is the athlete
+    // and the schedule was created by a coach
+    const coachSchedule = await this.workoutScheduleRepo.findCoachCreatedScheduleForUser(
+      req.user.id,
+      id,
+    );
+
+    if (coachSchedule) {
+      return { data: await this.mapWorkoutToDTO(workout) };
+    }
+
+    // Allow coach access to athlete's workout if:
+    // 1. Coach has active relationship with the workout owner
+    // 2. Athlete has shared workouts with coach
+    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(
+      req.user.id,
+      workout.user_id,
+    );
+
+    if (relationship && relationship.status === CoachAthleteStatus.ACTIVE) {
+      const settings = await this.privacySettingsRepo.findByUserId(workout.user_id);
+      if (settings?.share_workouts) {
+        return { data: await this.mapWorkoutToDTO(workout) };
+      }
+    }
+
+    throw new NotFoundException();
+  }
+
+  /**
+   * Get a workout by ID without access checks (for internal service use)
+   * Caller is responsible for verifying access permissions
+   */
+  async getWorkoutByIdInternal(id: string): Promise<WorkoutResponse> {
+    const workout = await this.workoutRepo.findById(id);
+    if (!workout) {
+      throw new NotFoundException();
+    }
     return { data: await this.mapWorkoutToDTO(workout) };
+  }
+
+  /**
+   * Copy a workout to a new user's library
+   * Creates a complete copy of the workout including all items
+   * @param sourceWorkoutId - The ID of the workout to copy
+   * @param targetUserId - The ID of the user to copy the workout to
+   * @returns The newly created workout
+   */
+  async copyWorkoutToUser(sourceWorkoutId: string, targetUserId: string): Promise<WorkoutResponse> {
+    const sourceWorkout = await this.workoutRepo.findById(sourceWorkoutId);
+    if (!sourceWorkout) {
+      throw new NotFoundException('Source workout not found');
+    }
+
+    // Check if the user already has a workout with this exact name
+    const existingWorkouts = await this.workoutRepo.findMany({
+      filter: { userId: targetUserId, search: sourceWorkout.name },
+      limit: 100,
+    });
+    const exactMatch = existingWorkouts.find((w) => w.name === sourceWorkout.name);
+    if (exactMatch) {
+      // Return the existing workout instead of creating a duplicate
+      return { data: await this.mapWorkoutToDTO(exactMatch) };
+    }
+
+    // Create the new workout (without cardio category - user can set their own)
+    const newWorkout = await this.workoutRepo.create({
+      name: sourceWorkout.name,
+      description: sourceWorkout.description,
+      difficulty: sourceWorkout.difficulty,
+      type: sourceWorkout.type,
+      user_id: targetUserId,
+      cardio_category_id: null,
+    });
+
+    // Copy all workout items
+    const sourceItems = await this.workoutRepo.findWorkoutItemsByWorkoutId(sourceWorkoutId);
+    await this.copyWorkoutItems(newWorkout.id, sourceItems);
+
+    return { data: await this.mapWorkoutToDTO(newWorkout) };
+  }
+
+  /**
+   * Copy workout items from source to target workout
+   */
+  private async copyWorkoutItems(targetWorkoutId: string, sourceItems: WorkoutItem[]): Promise<void> {
+    for (const item of sourceItems) {
+      if (item.exercise_instance_id) {
+        // Copy single exercise instance
+        const sourceInstance = await this.exerciseInstanceRepo.findById(item.exercise_instance_id);
+        if (!sourceInstance) continue;
+
+        const newInstance = await this.exerciseInstanceRepo.create({
+          exercise_id: sourceInstance.exercise_id,
+          mode: sourceInstance.mode,
+          sets: sourceInstance.sets,
+          reps: sourceInstance.reps,
+          execution_time: sourceInstance.execution_time,
+          load: sourceInstance.load,
+          intensity: sourceInstance.intensity,
+          tempo: sourceInstance.tempo,
+          notes: sourceInstance.notes,
+        });
+
+        await this.workoutRepo.createWorkoutItems([
+          {
+            workout_id: targetWorkoutId,
+            exercise_instance_id: newInstance.id,
+            exercise_instance_group_id: null,
+            cardio_step_id: null,
+            cardio_step_group_id: null,
+            position: item.position,
+          },
+        ]);
+      } else if (item.exercise_instance_group_id) {
+        // Copy exercise instance group
+        const sourceGroup = await this.exerciseInstanceGroupRepo.findById(item.exercise_instance_group_id);
+        if (!sourceGroup) continue;
+
+        const sourceGroupItems = await this.exerciseInstanceGroupRepo.findGroupItemsByGroupIds([item.exercise_instance_group_id]);
+
+        const newGroup = await this.exerciseInstanceGroupRepo.create({
+          repeat: sourceGroup.repeat,
+        });
+
+        // Copy all instances in the group
+        for (const gi of sourceGroupItems) {
+          const sourceInstance = await this.exerciseInstanceRepo.findById(gi.exercise_instance_id);
+          if (!sourceInstance) continue;
+
+          const newInstance = await this.exerciseInstanceRepo.create({
+            exercise_id: sourceInstance.exercise_id,
+            mode: sourceInstance.mode,
+            sets: sourceInstance.sets,
+            reps: sourceInstance.reps,
+            execution_time: sourceInstance.execution_time,
+            load: sourceInstance.load,
+            intensity: sourceInstance.intensity,
+            tempo: sourceInstance.tempo,
+            notes: sourceInstance.notes,
+          });
+
+          await this.exerciseInstanceGroupRepo.createGroupItems([
+            {
+              group_id: newGroup.id,
+              exercise_instance_id: newInstance.id,
+              position: gi.position,
+            },
+          ]);
+        }
+
+        await this.workoutRepo.createWorkoutItems([
+          {
+            workout_id: targetWorkoutId,
+            exercise_instance_id: null,
+            exercise_instance_group_id: newGroup.id,
+            cardio_step_id: null,
+            cardio_step_group_id: null,
+            position: item.position,
+          },
+        ]);
+      } else if (item.cardio_step_id) {
+        // Copy single cardio step
+        const sourceStep = await this.cardioStepRepo.findById(item.cardio_step_id);
+        if (!sourceStep) continue;
+
+        const newStep = await this.cardioStepRepo.create({
+          type: sourceStep.type,
+          mode: sourceStep.mode,
+          duration: sourceStep.duration,
+          distance: sourceStep.distance,
+          hr_min: sourceStep.hr_min,
+          hr_max: sourceStep.hr_max,
+          hr_zone: sourceStep.hr_zone,
+          power_min: sourceStep.power_min,
+          power_max: sourceStep.power_max,
+          power_zone: sourceStep.power_zone,
+          pace_min: sourceStep.pace_min,
+          pace_max: sourceStep.pace_max,
+          pace_zone: sourceStep.pace_zone,
+          rpe_min: sourceStep.rpe_min,
+          rpe_max: sourceStep.rpe_max,
+          rpe_zone: sourceStep.rpe_zone,
+          notes: sourceStep.notes,
+        });
+
+        await this.workoutRepo.createWorkoutItems([
+          {
+            workout_id: targetWorkoutId,
+            exercise_instance_id: null,
+            exercise_instance_group_id: null,
+            cardio_step_id: newStep.id,
+            cardio_step_group_id: null,
+            position: item.position,
+          },
+        ]);
+      } else if (item.cardio_step_group_id) {
+        // Copy cardio step group
+        const sourceGroup = await this.cardioStepGroupRepo.findById(item.cardio_step_group_id);
+        if (!sourceGroup) continue;
+
+        const sourceGroupItems = await this.cardioStepGroupRepo.findGroupItemsByGroupIds([item.cardio_step_group_id]);
+
+        const newGroup = await this.cardioStepGroupRepo.create({
+          repeat: sourceGroup.repeat,
+        });
+
+        // Copy all steps in the group
+        for (const gi of sourceGroupItems) {
+          const sourceStep = await this.cardioStepRepo.findById(gi.cardio_step_id);
+          if (!sourceStep) continue;
+
+          const newStep = await this.cardioStepRepo.create({
+            type: sourceStep.type,
+            mode: sourceStep.mode,
+            duration: sourceStep.duration,
+            distance: sourceStep.distance,
+            hr_min: sourceStep.hr_min,
+            hr_max: sourceStep.hr_max,
+            hr_zone: sourceStep.hr_zone,
+            power_min: sourceStep.power_min,
+            power_max: sourceStep.power_max,
+            power_zone: sourceStep.power_zone,
+            pace_min: sourceStep.pace_min,
+            pace_max: sourceStep.pace_max,
+            pace_zone: sourceStep.pace_zone,
+            rpe_min: sourceStep.rpe_min,
+            rpe_max: sourceStep.rpe_max,
+            rpe_zone: sourceStep.rpe_zone,
+            notes: sourceStep.notes,
+          });
+
+          await this.cardioStepGroupRepo.createGroupItems([
+            {
+              group_id: newGroup.id,
+              cardio_step_id: newStep.id,
+              position: gi.position,
+            },
+          ]);
+        }
+
+        await this.workoutRepo.createWorkoutItems([
+          {
+            workout_id: targetWorkoutId,
+            exercise_instance_id: null,
+            exercise_instance_group_id: null,
+            cardio_step_id: null,
+            cardio_step_group_id: newGroup.id,
+            position: item.position,
+          },
+        ]);
+      }
+    }
   }
 
   async create(req: Request & { user: AuthUser }, body: CreateWorkoutBody): Promise<WorkoutResponse> {

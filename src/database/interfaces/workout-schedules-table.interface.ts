@@ -9,6 +9,8 @@ export interface WorkoutSchedulesTable {
   scheduled_date: Date;
   completed_at: Timestamp | null;
   workout_plan_id: string | null;
+  coach_notes: string | null;
+  created_by_coach_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

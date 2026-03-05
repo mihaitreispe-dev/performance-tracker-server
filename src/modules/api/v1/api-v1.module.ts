@@ -12,7 +12,9 @@ import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-ap
 import { AnalyticsApiModule } from './analytics/analytics-api.module';
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
+import { CoachingApiModule } from './coaching/coaching-api.module';
 import { DataExportApiModule } from './data-export/data-export.module';
+import { NotificationsApiModule } from './notifications/notifications-api.module';
 import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
@@ -54,6 +56,8 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     WearablesApiModule.register(),
     DataImportApiModule.register(),
     DataExportApiModule.register(),
+    CoachingApiModule.register(),
+    NotificationsApiModule.register(),
   ],
   providers: [
     {

@@ -74,9 +74,7 @@ export class S3Service {
   async objectExists(opts: { bucket: string; key: string }): Promise<boolean> {
     try {
       const { bucket, key } = opts;
-      await this.s3Client.send(
-        new HeadObjectCommand({ Bucket: bucket, Key: key, RequestPayer: 'requester' }),
-      );
+      await this.s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key, RequestPayer: 'requester' }));
       return true;
     } catch (error) {
       if (error instanceof S3ServiceException && error.$metadata.httpStatusCode === 404) {

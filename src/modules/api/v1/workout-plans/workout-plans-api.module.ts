@@ -7,6 +7,7 @@ import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.rep
 
 import { WorkoutPlansApiController } from './workout-plans-api.controller';
 import { WorkoutPlansApiService } from './workout-plans-api.service';
+import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 
 @Module({})
 export class WorkoutPlansApiModule {
@@ -16,6 +17,7 @@ export class WorkoutPlansApiModule {
     if (!this.instance) {
       this.instance = {
         module: WorkoutPlansApiModule,
+        imports: [WorkoutsApiModule.register()],
         providers: [
           WorkoutPlansApiService,
           WorkoutPlanRepository,
@@ -25,6 +27,7 @@ export class WorkoutPlansApiModule {
           WorkoutItemRepository,
         ],
         controllers: [WorkoutPlansApiController],
+        exports: [WorkoutPlansApiService],
       };
     }
     return this.instance;

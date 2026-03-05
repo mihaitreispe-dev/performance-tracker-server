@@ -119,6 +119,13 @@ export class WorkoutPlanListResponse extends PageResponse<WorkoutPlanDTO> {
   declare data: WorkoutPlanDTO[];
 }
 
+export class WorkoutPlanWithItemsListResponse extends PageResponse<WorkoutPlanWithItemsDTO> {
+  @ApiProperty({ type: [WorkoutPlanWithItemsDTO] })
+  @IsArray({ always: true })
+  @ValidateNested()
+  declare data: WorkoutPlanWithItemsDTO[];
+}
+
 export class WorkoutPlanItemResponse extends ItemResponse<WorkoutPlanItemDTO> {
   @ApiProperty()
   @IsObject({ always: true })

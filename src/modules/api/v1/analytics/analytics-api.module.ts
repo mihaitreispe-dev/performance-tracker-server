@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { DailyTrainingLoadRepository } from 'src/repositories/daily-training-load.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
@@ -39,6 +41,8 @@ export class AnalyticsApiModule {
           DailyTrainingLoadRepository,
           PersonalRecordRepository,
           ExecutionWeatherRepository,
+          CoachAthleteRelationshipRepository,
+          AthletePrivacySettingsRepository,
         ],
         controllers: [AnalyticsApiController],
       };

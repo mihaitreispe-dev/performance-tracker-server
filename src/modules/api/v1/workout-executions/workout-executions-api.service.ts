@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { type Request } from 'express';
 import {
   CardioMetric,
+  CoachAthleteStatus,
   GeoJSONLineString,
   RouteMarker,
   SetCompletion,
@@ -13,7 +14,9 @@ import {
 } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { WeatherService } from 'src/modules/weather/weather.service';
+import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -66,6 +69,8 @@ export class WorkoutExecutionsApiService {
     private readonly personalRecordsDetectionService: PersonalRecordsDetectionService,
     private readonly weatherService: WeatherService,
     private readonly executionWeatherRepository: ExecutionWeatherRepository,
+    private readonly relationshipRepository: CoachAthleteRelationshipRepository,
+    private readonly privacySettingsRepository: AthletePrivacySettingsRepository,
   ) {}
 
   // Workout Executions
@@ -139,8 +144,23 @@ export class WorkoutExecutionsApiService {
     if (!execution) {
       throw new NotFoundException('Workout execution not found');
     }
+
+    // Check if user owns the execution or is a coach with access
     if (execution.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
+      // Check if user is a coach with active relationship and athlete has shared analytics
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
     }
 
     let workout: Workout | undefined;
@@ -313,8 +333,23 @@ export class WorkoutExecutionsApiService {
     if (!execution) {
       throw new NotFoundException('Workout execution not found');
     }
+
+    // Check if user owns the execution or is a coach with access
     if (execution.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
+      // Check if user is a coach with active relationship and athlete has shared analytics
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
     }
 
     const setCompletions = await this.setCompletionRepository.findMany({
@@ -370,8 +405,23 @@ export class WorkoutExecutionsApiService {
     if (!execution) {
       throw new NotFoundException('Workout execution not found');
     }
+
+    // Check if user owns the execution or is a coach with access
     if (execution.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
+      // Check if user is a coach with active relationship and athlete has shared analytics
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
     }
 
     const metrics = await this.cardioMetricsRepository.findMany({
@@ -441,8 +491,23 @@ export class WorkoutExecutionsApiService {
     if (!execution) {
       throw new NotFoundException('Workout execution not found');
     }
+
+    // Check if user owns the execution or is a coach with access
     if (execution.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
+      // Check if user is a coach with active relationship and athlete has shared analytics
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
     }
 
     const route = await this.workoutRouteRepository.findByExecutionId(executionId);
