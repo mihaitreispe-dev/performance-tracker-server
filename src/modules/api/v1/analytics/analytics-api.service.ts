@@ -1,6 +1,12 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { CardioMetricType, CoachAthleteStatus, ExecutionWeather, WorkoutExecution, WorkoutType } from 'src/database/interfaces';
+import {
+  CardioMetricType,
+  CoachAthleteStatus,
+  ExecutionWeather,
+  WorkoutExecution,
+  WorkoutType,
+} from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
@@ -499,7 +505,9 @@ export class AnalyticsApiService {
     const result = new Map<string, WorkoutType>();
 
     // Get schedule IDs and batch fetch schedules
-    const scheduleIds = [...new Set(executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!))];
+    const scheduleIds = [
+      ...new Set(executions.filter((e) => e.workout_schedule_id).map((e) => e.workout_schedule_id!)),
+    ];
     const schedules = await this.workoutScheduleRepository.findByIds(scheduleIds);
     const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
 
@@ -663,7 +671,10 @@ export class AnalyticsApiService {
 
     // Fetch all HR metrics for the executions - batch fetch instead of N+1 queries
     const executionIds = executions.map((e) => e.id);
-    const allMetricsMap = await this.cardioMetricsRepository.findByExecutionIds(executionIds, CardioMetricType.HEART_RATE);
+    const allMetricsMap = await this.cardioMetricsRepository.findByExecutionIds(
+      executionIds,
+      CardioMetricType.HEART_RATE,
+    );
     const allMetrics = executions.map((e) => allMetricsMap.get(e.id) || []);
 
     // Calculate time in each zone
@@ -1649,7 +1660,6 @@ export class AnalyticsApiService {
 
     // Batch fetch all exercise instances
     const allInstances = await this.exerciseInstanceRepository.findByIds([...allInstanceIds]);
-    const instanceLookup = new Map(allInstances.map((i) => [i.id, i]));
 
     // Find which instance IDs match our target exercise
     const matchingInstanceIds = new Set<string>();
