@@ -9,9 +9,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     )
     .addColumn('sender_id', 'uuid', (col) => col.notNull().references('users.id').onDelete('cascade'))
     .addColumn('content', 'text', (col) => col.notNull())
-    .addColumn('workout_schedule_id', 'uuid', (col) =>
-      col.references('workout_schedules.id').onDelete('set null'),
-    ) // Optional: link to specific workout
+    .addColumn('workout_schedule_id', 'uuid', (col) => col.references('workout_schedules.id').onDelete('set null')) // Optional: link to specific workout
     .addColumn('is_workout_note', 'boolean', (col) => col.notNull().defaultTo(false)) // Mark as workout note vs general message
     .addColumn('read_at', 'timestamptz')
     .addColumn('created_at', 'timestamptz', (col) => col.notNull().defaultTo(sql`now()`))
@@ -33,11 +31,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index for sender lookup
-  await db.schema
-    .createIndex('idx_coaching_messages_sender')
-    .on('coaching_messages')
-    .columns(['sender_id'])
-    .execute();
+  await db.schema.createIndex('idx_coaching_messages_sender').on('coaching_messages').columns(['sender_id']).execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

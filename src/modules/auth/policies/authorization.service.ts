@@ -137,11 +137,7 @@ export class AuthorizationService {
    * @param message - Custom error message
    * @throws ForbiddenException if privacy setting doesn't allow access
    */
-  async assertPrivacySetting(
-    athleteId: string,
-    privacyField: PrivacyField,
-    message?: string,
-  ): Promise<void> {
+  async assertPrivacySetting(athleteId: string, privacyField: PrivacyField, message?: string): Promise<void> {
     const allowed = await this.checkPrivacySetting(athleteId, privacyField);
     if (!allowed) {
       const fieldName = privacyField.replace('share_', '').replace(/_/g, ' ');
@@ -176,11 +172,7 @@ export class AuthorizationService {
    * @throws NotFoundException if no active relationship exists
    * @throws ForbiddenException if privacy setting doesn't allow access
    */
-  async assertCoachCanAccessAthleteData(
-    coachId: string,
-    athleteId: string,
-    privacyField: PrivacyField,
-  ): Promise<void> {
+  async assertCoachCanAccessAthleteData(coachId: string, athleteId: string, privacyField: PrivacyField): Promise<void> {
     await this.assertActiveCoachingRelationship(coachId, athleteId, 'No active coaching relationship found');
     await this.assertPrivacySetting(athleteId, privacyField);
   }

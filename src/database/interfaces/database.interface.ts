@@ -1,3 +1,4 @@
+import { AthleteIntakeTable } from './athlete-intake-table.interface';
 import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
@@ -7,8 +8,8 @@ import { CardioStepsTable } from './cardio-steps-table.interface';
 import { CoachAssignedWorkoutsTable } from './coach-assigned-workouts-table.interface';
 import { CoachAthleteLabelsTable } from './coach-athlete-labels-table.interface';
 import { CoachAthleteRelationshipsTable } from './coach-athlete-relationships-table.interface';
+import { CoachScheduledPromptsTable } from './coach-scheduled-prompts-table.interface';
 import { CoachingMessagesTable } from './coaching-messages-table.interface';
-import { NotificationsTable } from './notifications-table.interface';
 import { DailyHealthMetricsTable } from './daily-health-metrics-table.interface';
 import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
 import { DataExportJobsTable } from './data-export-jobs-table.interface';
@@ -25,11 +26,16 @@ import { ExerciseMuscleGroupsTable } from './exercise-muscle-groups-table.interf
 import { ExercisesTable } from './exercises-table.interface';
 import { FitnessFatigueDailyTable } from './fitness-fatigue-daily-table.interface';
 import { FitnessMetricsTable } from './fitness-metrics-table.interface';
+import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
+import { LoadModelParametersTable } from './load-model-parameters-table.interface';
+import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
+import { NotificationsTable } from './notifications-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
 import { PainLogsTable } from './pain-logs-table.interface';
 import { PersonalRecordHistoryTable } from './personal-record-history-table.interface';
 import { PersonalRecordsTable } from './personal-records-table.interface';
+import { RecoveryJournalEntriesTable } from './recovery-journal-entries-table.interface';
 import { RefreshTokensTable } from './refresh-tokens-table.interface';
 import { RouteMarkersTable } from './route-markers-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
@@ -97,8 +103,16 @@ export interface Database {
   data_export_jobs: DataExportJobsTable;
   coach_athlete_relationships: CoachAthleteRelationshipsTable;
   athlete_privacy_settings: AthletePrivacySettingsTable;
+  athlete_intake: AthleteIntakeTable;
   coach_assigned_workouts: CoachAssignedWorkoutsTable;
   coach_athlete_labels: CoachAthleteLabelsTable;
   coaching_messages: CoachingMessagesTable;
   notifications: NotificationsTable;
+  coach_scheduled_prompts: CoachScheduledPromptsTable;
+
+  // Multi-stream load modeling
+  multi_stream_load_daily: MultiStreamLoadDailyTable;
+  recovery_journal_entries: RecoveryJournalEntriesTable;
+  hrv_baseline_daily: HrvBaselineDailyTable;
+  load_model_parameters: LoadModelParametersTable;
 }

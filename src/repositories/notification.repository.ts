@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import type { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import type {
   Database,
-  Notification,
   NewNotification,
-  NotificationUpdate,
+  Notification,
   NotificationType,
+  NotificationUpdate,
 } from 'src/database/interfaces';
 
 export interface NotificationFilter {
@@ -68,7 +68,7 @@ export class NotificationRepository {
       .where('read_at', 'is', null)
       .executeTakeFirst();
 
-    return result ? parseInt(result.count, 10) : 0;
+    return result ? Number.parseInt(result.count, 10) : 0;
   }
 
   async create(data: NewNotification): Promise<Notification> {
@@ -81,12 +81,7 @@ export class NotificationRepository {
   }
 
   async updateById(id: string, data: NotificationUpdate): Promise<Notification | undefined> {
-    return this.db
-      .updateTable('notifications')
-      .set(data)
-      .where('id', '=', id)
-      .returningAll()
-      .executeTakeFirst();
+    return this.db.updateTable('notifications').set(data).where('id', '=', id).returningAll().executeTakeFirst();
   }
 
   async markAsRead(id: string): Promise<Notification | undefined> {

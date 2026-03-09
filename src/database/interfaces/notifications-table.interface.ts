@@ -1,4 +1,5 @@
 import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
+
 import type { Timestamp } from './timestamp';
 
 export const NotificationType = {
@@ -11,6 +12,16 @@ export const NotificationType = {
   INVITATION_DECLINED: 'invitation_declined',
   WORKOUT_COMPLETED: 'workout_completed',
   WORKOUT_MISSED: 'workout_missed',
+  INTAKE_REMINDER: 'intake_reminder',
+  CHECK_IN_REQUEST: 'check_in_request',
+  WORKOUT_NOTE_REQUEST: 'workout_note_request',
+  SCHEDULED_PROMPT: 'scheduled_prompt',
+  // Coach alert notification types
+  COACH_ALERT_MISSED_WORKOUT: 'coach_alert_missed_workout',
+  COACH_ALERT_HIGH_PAIN: 'coach_alert_high_pain',
+  COACH_ALERT_LOW_COMPLIANCE: 'coach_alert_low_compliance',
+  COACH_ALERT_INCOMPLETE_INTAKE: 'coach_alert_incomplete_intake',
+  COACH_ALERT_HEALTH_CONCERN: 'coach_alert_health_concern',
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -24,6 +35,17 @@ export interface NotificationData {
   relationshipId?: string;
   workoutName?: string;
   senderName?: string;
+  scheduledPromptId?: string;
+  promptType?: string;
+  // Coach alert data
+  athleteName?: string;
+  alertType?: string;
+  painLevel?: number;
+  bodyPart?: string;
+  compliancePercentage?: number;
+  missedDate?: string;
+  metricType?: string;
+  metricValue?: number;
 }
 
 export interface NotificationsTable {

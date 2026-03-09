@@ -1,4 +1,5 @@
 import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
+
 import type { Timestamp } from './timestamp';
 
 export interface CoachingMessagesTable {

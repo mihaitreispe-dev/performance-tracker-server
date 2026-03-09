@@ -1,4 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.repository';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
 import { CoachAthleteLabelRepository } from 'src/repositories/coach-athlete-label.repository';
@@ -12,11 +13,14 @@ import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.re
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
-import { WorkoutsApiModule } from '../workouts/workouts-api.module';
+import { AdvancedMetricsApiModule } from '../advanced-metrics/advanced-metrics-api.module';
+import { AnalyticsApiModule } from '../analytics/analytics-api.module';
 import { WorkoutPlansApiModule } from '../workout-plans/workout-plans-api.module';
+import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 import { CoachingApiController } from './coaching-api.controller';
 import { CoachingApiService } from './coaching-api.service';
 import { CoachAthleteRelationshipGuard } from './guards/coach-athlete-relationship.guard';
+import { ScheduledPromptsModule } from './scheduled-prompts/scheduled-prompts.module';
 
 @Module({})
 export class CoachingApiModule {
@@ -25,12 +29,19 @@ export class CoachingApiModule {
     if (!this.instance) {
       this.instance = {
         module: CoachingApiModule,
-        imports: [WorkoutsApiModule.register(), WorkoutPlansApiModule.register()],
+        imports: [
+          WorkoutsApiModule.register(),
+          WorkoutPlansApiModule.register(),
+          AnalyticsApiModule.register(),
+          AdvancedMetricsApiModule.register(),
+          ScheduledPromptsModule.register(),
+        ],
         providers: [
           CoachingApiService,
           CoachAthleteRelationshipGuard,
           CoachAthleteRelationshipRepository,
           AthletePrivacySettingsRepository,
+          AthleteIntakeRepository,
           CoachAssignedWorkoutRepository,
           CoachAthleteLabelRepository,
           CoachingMessageRepository,

@@ -45,6 +45,7 @@ export class AnalyticsApiModule {
           AthletePrivacySettingsRepository,
         ],
         controllers: [AnalyticsApiController],
+        exports: [AnalyticsApiService],
       };
     }
     return this.instance;

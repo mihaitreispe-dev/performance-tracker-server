@@ -78,10 +78,7 @@ export class SetCompletionRepository {
   /**
    * Bulk fetch set completions by execution IDs - more efficient than multiple findMany calls
    */
-  async findByExecutionIds(
-    executionIds: string[],
-    skipped?: boolean,
-  ): Promise<Map<string, SetCompletion[]>> {
+  async findByExecutionIds(executionIds: string[], skipped?: boolean): Promise<Map<string, SetCompletion[]>> {
     if (executionIds.length === 0) return new Map();
 
     let query = this.db

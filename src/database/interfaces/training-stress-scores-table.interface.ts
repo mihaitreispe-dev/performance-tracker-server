@@ -25,6 +25,13 @@ export interface TrainingStressScoresTable {
   normalized_power: ColumnType<string | null, string | number | null, string | number | null>; // For cycling
   normalized_pace: ColumnType<string | null, string | number | null, string | number | null>; // For running (min/km)
   hrss: ColumnType<string | null, string | number | null, string | number | null>; // Heart Rate Stress Score
+
+  // Multi-stream load columns
+  aerobic_load: ColumnType<string | null, string | number | null, string | number | null>;
+  msk_load: ColumnType<string | null, string | number | null, string | number | null>;
+  neural_load: ColumnType<string | null, string | number | null, string | number | null>;
+  sport_type: ColumnType<string | null, string | null, string | null>;
+
   metadata: ColumnType<TrainingStressMetadata | null, TrainingStressMetadata | null, TrainingStressMetadata | null>;
   calculated_at: ColumnType<Date, Date | string, Date | string>;
   created_at: ColumnType<Date, never, never>;

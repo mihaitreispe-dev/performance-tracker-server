@@ -15,12 +15,12 @@ import {
   Workout,
   WorkoutItem,
 } from 'src/database/interfaces';
+import { CoachAthleteStatus } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
-import { CoachAthleteStatus } from 'src/database/interfaces';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioCategoryRepository } from 'src/repositories/cardio-category.repository';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
@@ -110,10 +110,7 @@ export class WorkoutsApiService {
     // Also allow access if the workout was scheduled for this user by a coach
     // Check if there's a schedule for this workout where the user is the athlete
     // and the schedule was created by a coach
-    const coachSchedule = await this.workoutScheduleRepo.findCoachCreatedScheduleForUser(
-      req.user.id,
-      id,
-    );
+    const coachSchedule = await this.workoutScheduleRepo.findCoachCreatedScheduleForUser(req.user.id, id);
 
     if (coachSchedule) {
       return { data: await this.mapWorkoutToDTO(workout) };
@@ -122,10 +119,7 @@ export class WorkoutsApiService {
     // Allow coach access to athlete's workout if:
     // 1. Coach has active relationship with the workout owner
     // 2. Athlete has shared workouts with coach
-    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(
-      req.user.id,
-      workout.user_id,
-    );
+    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(req.user.id, workout.user_id);
 
     if (relationship && relationship.status === CoachAthleteStatus.ACTIVE) {
       const settings = await this.privacySettingsRepo.findByUserId(workout.user_id);

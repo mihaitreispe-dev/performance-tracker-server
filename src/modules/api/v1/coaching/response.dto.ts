@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { CoachAthleteStatus } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -700,4 +710,131 @@ export class NotificationsListResponse {
   @ApiProperty()
   @IsNumber()
   totalCount: number;
+}
+
+// Athlete Intake DTOs
+export class AthleteIntakeDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsUUID()
+  userId: string;
+
+  @ApiProperty()
+  @IsUUID()
+  coachId: string;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  primaryGoals: string[];
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  trainingDaysPerWeek?: number | null;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  preferredSessionDuration?: number | null;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  availableDays?: string[] | null;
+
+  @ApiPropertyOptional({ enum: ['beginner', 'intermediate', 'advanced'] })
+  @IsString()
+  @IsIn(['beginner', 'intermediate', 'advanced'])
+  @IsOptional()
+  experienceLevel?: 'beginner' | 'intermediate' | 'advanced' | null;
+
+  @ApiPropertyOptional({ enum: ['sedentary', 'lightly_active', 'moderately_active', 'very_active'] })
+  @IsString()
+  @IsIn(['sedentary', 'lightly_active', 'moderately_active', 'very_active'])
+  @IsOptional()
+  currentActivityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  injuriesLimitations?: string | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  medicalConditions?: string | null;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  equipmentAccess?: string[] | null;
+
+  @ApiPropertyOptional({ enum: ['home', 'gym', 'outdoor', 'mixed'] })
+  @IsString()
+  @IsIn(['home', 'gym', 'outdoor', 'mixed'])
+  @IsOptional()
+  trainingLocation?: 'home' | 'gym' | 'outdoor' | 'mixed' | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  primarySport?: string | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  competitiveEvents?: string | null;
+
+  @ApiPropertyOptional({ enum: ['running', 'cycling', 'swimming', 'triathlon', 'other'] })
+  @IsString()
+  @IsIn(['running', 'cycling', 'swimming', 'triathlon', 'other'])
+  @IsOptional()
+  enduranceSport?: 'running' | 'cycling' | 'swimming' | 'triathlon' | 'other' | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  enduranceSportOther?: string | null;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  targetEvents?: string[] | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  targetEventOther?: string | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  additionalNotes?: string | null;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  completedAt?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  createdAt: string;
+
+  @ApiProperty()
+  @IsString()
+  updatedAt: string;
+}
+
+export class AthleteIntakeResponse extends ItemResponse<AthleteIntakeDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: AthleteIntakeDTO;
 }

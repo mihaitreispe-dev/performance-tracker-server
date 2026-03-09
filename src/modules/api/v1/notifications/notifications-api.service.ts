@@ -1,22 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Request } from 'express';
-import {
-  Notification,
-  NotificationData,
-  NotificationType,
-} from 'src/database/interfaces';
+import { Subject } from 'rxjs';
+import { Notification, NotificationData, NotificationType } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { NotificationRepository } from 'src/repositories/notification.repository';
 import { UserRepository } from 'src/repositories/user.repository';
-import { Subject } from 'rxjs';
 
-import {
-  NotificationDTO,
-  NotificationsListResponse,
-  NotificationResponse,
-  UnreadCountResponse,
-} from './response.dto';
 import { ListNotificationsQuery } from './request.dto';
+import { NotificationDTO, NotificationResponse, NotificationsListResponse, UnreadCountResponse } from './response.dto';
 
 // SSE event emitter for real-time notifications
 export interface NotificationEvent {
@@ -48,10 +39,7 @@ export class NotificationsApiService {
     const offset = query.offset || 0;
 
     const [notifications, unreadCount] = await Promise.all([
-      this.notificationRepo.findMany(
-        { userId, unreadOnly: query.unreadOnly },
-        { limit, offset },
-      ),
+      this.notificationRepo.findMany({ userId, unreadOnly: query.unreadOnly }, { limit, offset }),
       this.notificationRepo.countUnread(userId),
     ]);
 
@@ -67,10 +55,7 @@ export class NotificationsApiService {
     return { unreadCount: count };
   }
 
-  async markAsRead(
-    req: Request & { user: AuthUser },
-    notificationId: string,
-  ): Promise<NotificationResponse> {
+  async markAsRead(req: Request & { user: AuthUser }, notificationId: string): Promise<NotificationResponse> {
     const notification = await this.notificationRepo.findById(notificationId);
     if (!notification || notification.user_id !== req.user.id) {
       throw new Error('Notification not found');
@@ -156,12 +141,11 @@ export class NotificationsApiService {
       title: notification.title,
       body: notification.body,
       data: notification.data,
-      readAt: notification.read_at instanceof Date
-        ? notification.read_at.toISOString()
-        : notification.read_at,
-      createdAt: notification.created_at instanceof Date
-        ? notification.created_at.toISOString()
-        : String(notification.created_at),
+      readAt: notification.read_at instanceof Date ? notification.read_at.toISOString() : notification.read_at,
+      createdAt:
+        notification.created_at instanceof Date
+          ? notification.created_at.toISOString()
+          : String(notification.created_at),
     };
   }
 }

@@ -14,15 +14,16 @@ import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
 import { CoachingApiModule } from './coaching/coaching-api.module';
 import { DataExportApiModule } from './data-export/data-export.module';
-import { NotificationsApiModule } from './notifications/notifications-api.module';
 import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
+import { NotificationsApiModule } from './notifications/notifications-api.module';
 import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
+import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
 import { VoiceApiModule } from './voice/voice.module';
 import { WearablesApiModule } from './wearables/wearables-api.module';
@@ -58,6 +59,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     DataExportApiModule.register(),
     CoachingApiModule.register(),
     NotificationsApiModule.register(),
+    RecoveryJournalModule.register(),
   ],
   providers: [
     {

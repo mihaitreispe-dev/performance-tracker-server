@@ -3,6 +3,7 @@ import { AuthModule } from 'src/modules/auth/auth.module';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
@@ -18,7 +19,13 @@ export class AuthApiModule {
       this.instance = {
         module: AuthApiModule,
         imports: [AuthModule.register(), FirebaseModule.register(), S3Module.register(), AppConfigModule.register()],
-        providers: [AuthApiService, UserRepository, RefreshTokenRepository, UserSettingsRepository],
+        providers: [
+          AuthApiService,
+          UserRepository,
+          RefreshTokenRepository,
+          UserSettingsRepository,
+          CoachAthleteRelationshipRepository,
+        ],
         controllers: [AuthApiController],
       };
     }

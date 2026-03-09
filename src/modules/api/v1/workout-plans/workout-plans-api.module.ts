@@ -5,9 +5,9 @@ import { WorkoutPlanRepository } from 'src/repositories/workout-plan.repository'
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
+import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 import { WorkoutPlansApiController } from './workout-plans-api.controller';
 import { WorkoutPlansApiService } from './workout-plans-api.service';
-import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 
 @Module({})
 export class WorkoutPlansApiModule {

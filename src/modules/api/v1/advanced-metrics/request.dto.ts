@@ -18,6 +18,18 @@ export class HistoryQuery {
   days?: number;
 }
 
+export class DateQuery {
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date',
+    description: 'Date to query (default: today)',
+    example: '2024-01-15',
+  })
+  @IsString()
+  @IsOptional()
+  date?: string;
+}
+
 export class WorkoutIdParam {
   @ApiProperty({ description: 'Workout execution ID' })
   @IsUUID()

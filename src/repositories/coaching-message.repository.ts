@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import type { Kysely } from 'kysely';
-import type {
-  Database,
-  CoachingMessage,
-  NewCoachingMessage,
-  CoachingMessageUpdate,
-} from 'src/database/interfaces';
+import { InjectKysely } from 'nestjs-kysely';
+import type { CoachingMessage, CoachingMessageUpdate, Database, NewCoachingMessage } from 'src/database/interfaces';
 
 export interface CoachingMessageFilter {
   relationshipId?: string;
@@ -101,7 +96,7 @@ export class CoachingMessageRepository {
       .where('read_at', 'is', null)
       .executeTakeFirst();
 
-    return result ? parseInt(result.count, 10) : 0;
+    return result ? Number.parseInt(result.count, 10) : 0;
   }
 
   async create(data: NewCoachingMessage): Promise<CoachingMessage> {
@@ -154,10 +149,7 @@ export class CoachingMessageRepository {
       .executeTakeFirst();
   }
 
-  async findByAttachedPlanInRelationship(
-    planId: string,
-    relationshipId: string,
-  ): Promise<CoachingMessage | undefined> {
+  async findByAttachedPlanInRelationship(planId: string, relationshipId: string): Promise<CoachingMessage | undefined> {
     return this.db
       .selectFrom('coaching_messages')
       .where('attached_plan_id', '=', planId)

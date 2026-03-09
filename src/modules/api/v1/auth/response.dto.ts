@@ -34,6 +34,11 @@ class AuthUserDTO {
   @IsArray()
   @IsString({ each: true })
   roles: UserRole[];
+
+  @ApiPropertyOptional({ type: String })
+  @IsUUID()
+  @IsOptional()
+  coachId?: string | null;
 }
 
 class AuthSessionDTO {

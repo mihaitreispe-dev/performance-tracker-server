@@ -20,6 +20,22 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
+import {
+  FitnessFatiguePredictionResponse,
+  FitnessFatigueResponse,
+  Vo2MaxHistoryResponse,
+  Vo2MaxResponse,
+} from '../advanced-metrics/response.dto';
+import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
+import {
+  CurrentTrainingLoadResponse,
+  RacePredictionsResponse,
+  StrengthProgressionResponse,
+  TrackedExercisesResponse,
+  TrainingLoadHistoryResponse,
+} from '../analytics/response.dto';
+import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
+import { WorkoutResponse } from '../workouts/response.dto';
 import { CoachingApiService } from './coaching-api.service';
 import { CoachAthleteRelationshipGuard } from './guards/coach-athlete-relationship.guard';
 import {
@@ -30,6 +46,8 @@ import {
   CreateAthleteLabelBody,
   CreateAthleteScheduleBody,
   DeployPlanBody,
+  FitnessFatiguePredictionBody,
+  FitnessFatigueQuery,
   InvitationIdParam,
   InviteAthleteBody,
   LabelIdParam,
@@ -40,15 +58,15 @@ import {
   SendMessageBody,
   SharedPlanIdParam,
   SharedWorkoutIdParam,
+  UpdateAthleteIntakeBody,
   UpdateAthleteLabelBody,
   UpdatePrivacySettingsBody,
 } from './request.dto';
-import { WorkoutResponse } from '../workouts/response.dto';
-import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
 import {
   AssignedWorkoutListResponse,
   AssignedWorkoutResponse,
   AthleteComplianceResponse,
+  AthleteIntakeResponse,
   AthleteLabelResponse,
   AthleteLabelsResponse,
   AthleteListResponse,
@@ -174,6 +192,22 @@ export class CoachingApiController {
     return this.service.removeAthlete(req, params.athleteId);
   }
 
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's intake form (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteIntakeResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not authorized' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Intake not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/intake')
+  async getAthleteIntake(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AthleteIdParam,
+  ): Promise<AthleteIntakeResponse> {
+    return this.service.getAthleteIntake(req, params.athleteId, req.user.id);
+  }
+
   // Athlete's Coach
   @Version('1')
   @ApiOperation({ summary: "Get current user's coach" })
@@ -193,6 +227,53 @@ export class CoachingApiController {
   @Delete('my-coach')
   async leaveCoach(@Req() req: Request & { user: AuthUser }): Promise<void> {
     return this.service.leaveCoach(req);
+  }
+
+  // Athlete Intake (for athletes)
+  @Version('1')
+  @ApiOperation({ summary: 'Get own intake form (athlete)' })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteIntakeResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'No active coach or intake not found',
+  })
+  @Get('my-coach/intake')
+  async getMyIntake(@Req() req: Request & { user: AuthUser }): Promise<AthleteIntakeResponse> {
+    return this.service.getMyIntake(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Update own intake form (athlete)' })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteIntakeResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'No active coach or intake not found',
+  })
+  @Patch('my-coach/intake')
+  async updateMyIntake(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: UpdateAthleteIntakeBody,
+  ): Promise<AthleteIntakeResponse> {
+    return this.service.updateMyIntake(req, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Complete/submit intake form (athlete)' })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteIntakeResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'No active coach or intake not found',
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Already completed' })
+  @Post('my-coach/intake/complete')
+  async completeMyIntake(@Req() req: Request & { user: AuthUser }): Promise<AthleteIntakeResponse> {
+    return this.service.completeMyIntake(req);
   }
 
   // Workout Assignment
@@ -247,12 +328,192 @@ export class CoachingApiController {
 
   // Privacy Settings
   @Version('1')
-  @ApiOperation({ summary: "Get athlete's privacy settings" })
+  @ApiOperation({ summary: "Get current user's privacy settings" })
   @ApiResponse({ status: HttpStatus.OK, type: PrivacySettingsResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('privacy-settings')
   async getPrivacySettings(@Req() req: Request & { user: AuthUser }): Promise<PrivacySettingsResponse> {
     return this.service.getPrivacySettings(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's privacy settings (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: PrivacySettingsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not authorized' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/privacy-settings')
+  async getAthletePrivacySettings(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AthleteIdParam,
+  ): Promise<PrivacySettingsResponse> {
+    return this.service.getAthletePrivacySettings(req, params.athleteId);
+  }
+
+  // ==================== ATHLETE ANALYTICS (Coach viewing) ====================
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's race predictions (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: RacePredictionsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/analytics/race-predictions')
+  async getAthleteRacePredictions(@Param() params: AthleteIdParam): Promise<RacePredictionsResponse> {
+    return this.service.getAthleteRacePredictions(params.athleteId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's tracked exercises (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: TrackedExercisesResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/analytics/strength/exercises')
+  async getAthleteTrackedExercises(@Param() params: AthleteIdParam): Promise<TrackedExercisesResponse> {
+    return this.service.getAthleteTrackedExercises(params.athleteId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's strength progression for an exercise (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: StrengthProgressionResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Exercise not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/analytics/strength/:exerciseId')
+  async getAthleteStrengthProgression(
+    @Param('athleteId') athleteId: string,
+    @Param('exerciseId') exerciseId: string,
+    @Query() query: StrengthProgressionQuery,
+  ): Promise<StrengthProgressionResponse> {
+    return this.service.getAthleteStrengthProgression(athleteId, exerciseId, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's current training load (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: CurrentTrainingLoadResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/analytics/training-load')
+  async getAthleteTrainingLoad(@Param() params: AthleteIdParam): Promise<CurrentTrainingLoadResponse> {
+    return this.service.getAthleteTrainingLoad(params.athleteId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's training load history (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: TrainingLoadHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/analytics/training-load/history')
+  async getAthleteTrainingLoadHistory(
+    @Param() params: AthleteIdParam,
+    @Query() query: TrainingLoadHistoryQuery,
+  ): Promise<TrainingLoadHistoryResponse> {
+    return this.service.getAthleteTrainingLoadHistory(params.athleteId, query);
+  }
+
+  // ==================== ATHLETE FITNESS-FATIGUE / PMC (Coach viewing) ====================
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's fitness-fatigue (PMC) chart data (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: FitnessFatigueResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/fitness-fatigue')
+  async getAthleteFitnessFatigue(
+    @Param() params: AthleteIdParam,
+    @Query() query: FitnessFatigueQuery,
+  ): Promise<FitnessFatigueResponse> {
+    return this.service.getAthleteFitnessFatigue(params.athleteId, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Predict athlete's future fitness-fatigue based on planned training (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: FitnessFatiguePredictionResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Post('athletes/:athleteId/fitness-fatigue/predict')
+  async predictAthleteFitnessFatigue(
+    @Param() params: AthleteIdParam,
+    @Body() body: FitnessFatiguePredictionBody,
+  ): Promise<FitnessFatiguePredictionResponse> {
+    return this.service.predictAthleteFitnessFatigue(params.athleteId, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's current VO2 max (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/vo2max')
+  async getAthleteVo2Max(@Param() params: AthleteIdParam): Promise<Vo2MaxResponse> {
+    return this.service.getAthleteVo2Max(params.athleteId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's VO2 max history (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/vo2max/history')
+  async getAthleteVo2MaxHistory(
+    @Param() params: AthleteIdParam,
+    @Query() query: FitnessFatigueQuery,
+  ): Promise<Vo2MaxHistoryResponse> {
+    return this.service.getAthleteVo2MaxHistory(params.athleteId, query);
   }
 
   @Version('1')
@@ -420,10 +681,14 @@ export class CoachingApiController {
 
   // Deploy Workout Plan to Athlete
   @Version('1')
-  @ApiOperation({ summary: 'Deploy a workout plan to an athlete\'s calendar' })
+  @ApiOperation({ summary: "Deploy a workout plan to an athlete's calendar" })
   @ApiResponse({ status: HttpStatus.CREATED, type: DeployPlanResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not authorized or athlete has not shared calendar' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or athlete has not shared calendar',
+  })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Plan not found' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Plan is empty' })
   @Roles(UserRole.COACH)
@@ -544,9 +809,7 @@ export class CoachingApiController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'No coach found' })
   @Get('my-coach/messages/unread-count')
-  async getUnreadMessageCountFromCoach(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<UnreadCountResponse> {
+  async getUnreadMessageCountFromCoach(@Req() req: Request & { user: AuthUser }): Promise<UnreadCountResponse> {
     return this.service.getUnreadMessageCountFromCoach(req);
   }
 
@@ -556,7 +819,11 @@ export class CoachingApiController {
   @ApiOperation({ summary: 'Get a workout shared by coach in messages' })
   @ApiResponse({ status: HttpStatus.OK, type: WorkoutResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Workout not found or not shared with you' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'Workout not found or not shared with you',
+  })
   @Get('my-coach/shared-workout/:workoutId')
   async getSharedWorkout(
     @Req() req: Request & { user: AuthUser },
@@ -569,7 +836,11 @@ export class CoachingApiController {
   @ApiOperation({ summary: 'Get a workout plan shared by coach in messages' })
   @ApiResponse({ status: HttpStatus.OK, type: WorkoutPlanWithItemsResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Plan not found or not shared with you' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'Plan not found or not shared with you',
+  })
   @Get('my-coach/shared-plan/:planId')
   async getSharedPlan(
     @Req() req: Request & { user: AuthUser },
@@ -582,7 +853,11 @@ export class CoachingApiController {
   @ApiOperation({ summary: 'Copy a shared workout to my library' })
   @ApiResponse({ status: HttpStatus.CREATED, type: WorkoutResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Workout not found or not shared with you' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'Workout not found or not shared with you',
+  })
   @Post('my-coach/shared-workout/:workoutId/copy')
   async copySharedWorkoutToLibrary(
     @Req() req: Request & { user: AuthUser },
@@ -595,7 +870,11 @@ export class CoachingApiController {
   @ApiOperation({ summary: 'Copy a shared plan to my library' })
   @ApiResponse({ status: HttpStatus.CREATED, type: WorkoutPlanWithItemsResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
-  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Plan not found or not shared with you' })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    type: ErrorResponse,
+    description: 'Plan not found or not shared with you',
+  })
   @Post('my-coach/shared-plan/:planId/copy')
   async copySharedPlanToLibrary(
     @Req() req: Request & { user: AuthUser },

@@ -1,6 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEmail, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class InviteAthleteBody {
   @ApiProperty({ description: 'Email of the athlete to invite' })
@@ -244,7 +257,7 @@ export class SendMessageBody {
 
 export class ListMessagesQuery {
   @ApiPropertyOptional({ description: 'Limit number of messages' })
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number.parseInt(value, 10))
   @IsInt()
   @Min(1)
   @IsOptional()
@@ -280,14 +293,14 @@ export class MessageIdParam {
 // Notification DTOs
 export class ListNotificationsQuery {
   @ApiPropertyOptional({ description: 'Limit number of notifications' })
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number.parseInt(value, 10))
   @IsInt()
   @Min(1)
   @IsOptional()
   limit?: number;
 
   @ApiPropertyOptional({ description: 'Offset for pagination' })
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }) => Number.parseInt(value, 10))
   @IsInt()
   @Min(0)
   @IsOptional()
@@ -316,4 +329,155 @@ export class SharedPlanIdParam {
   @ApiProperty({ description: 'Plan ID' })
   @IsUUID()
   planId: string;
+}
+
+// Fitness/Fatigue (PMC) Query
+export class FitnessFatigueQuery {
+  @ApiPropertyOptional({ description: 'Number of days to fetch (default: 90)' })
+  @Transform(({ value }) => Number.parseInt(value, 10))
+  @IsInt()
+  @Min(7)
+  @Max(365)
+  @IsOptional()
+  days?: number;
+}
+
+// Fitness/Fatigue Prediction Body
+export class FitnessFatiguePredictionBody {
+  @ApiProperty({
+    description: 'Array of planned daily TSS values for prediction',
+    type: [Number],
+    example: [50, 75, 100, 0, 60, 80, 0],
+  })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  plannedDailyTSS: number[];
+}
+
+// Athlete Intake DTOs
+export class UpdateAthleteIntakeBody {
+  @ApiPropertyOptional({
+    description: 'Primary fitness goals (from WorkoutPlanGoal enum values)',
+    type: [String],
+    example: ['build_muscle', 'improve_endurance'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  primaryGoals?: string[];
+
+  @ApiPropertyOptional({ description: 'Number of training days per week (1-7)', example: 4 })
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  @IsOptional()
+  trainingDaysPerWeek?: number;
+
+  @ApiPropertyOptional({ description: 'Preferred session duration in minutes', example: 60 })
+  @IsInt()
+  @Min(15)
+  @Max(240)
+  @IsOptional()
+  preferredSessionDuration?: number;
+
+  @ApiPropertyOptional({
+    description: 'Available training days',
+    type: [String],
+    example: ['monday', 'wednesday', 'friday'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  availableDays?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Experience level',
+    enum: ['beginner', 'intermediate', 'advanced'],
+  })
+  @IsString()
+  @IsIn(['beginner', 'intermediate', 'advanced'])
+  @IsOptional()
+  experienceLevel?: 'beginner' | 'intermediate' | 'advanced';
+
+  @ApiPropertyOptional({
+    description: 'Current activity level',
+    enum: ['sedentary', 'lightly_active', 'moderately_active', 'very_active'],
+  })
+  @IsString()
+  @IsIn(['sedentary', 'lightly_active', 'moderately_active', 'very_active'])
+  @IsOptional()
+  currentActivityLevel?: 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active';
+
+  @ApiPropertyOptional({ description: 'Current injuries or physical limitations' })
+  @IsString()
+  @IsOptional()
+  injuriesLimitations?: string;
+
+  @ApiPropertyOptional({ description: 'Relevant medical conditions' })
+  @IsString()
+  @IsOptional()
+  medicalConditions?: string;
+
+  @ApiPropertyOptional({
+    description: 'Available equipment',
+    type: [String],
+    example: ['dumbbells', 'barbell', 'machines'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  equipmentAccess?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Primary training location',
+    enum: ['home', 'gym', 'outdoor', 'mixed'],
+  })
+  @IsString()
+  @IsIn(['home', 'gym', 'outdoor', 'mixed'])
+  @IsOptional()
+  trainingLocation?: 'home' | 'gym' | 'outdoor' | 'mixed';
+
+  @ApiPropertyOptional({ description: 'Primary sport or activity (legacy field)', example: 'Running' })
+  @IsString()
+  @IsOptional()
+  primarySport?: string;
+
+  @ApiPropertyOptional({ description: 'Upcoming competitive events or races (legacy field)' })
+  @IsString()
+  @IsOptional()
+  competitiveEvents?: string;
+
+  @ApiPropertyOptional({
+    description: 'Primary endurance sport',
+    enum: ['running', 'cycling', 'swimming', 'triathlon', 'other'],
+  })
+  @IsString()
+  @IsIn(['running', 'cycling', 'swimming', 'triathlon', 'other'])
+  @IsOptional()
+  enduranceSport?: 'running' | 'cycling' | 'swimming' | 'triathlon' | 'other';
+
+  @ApiPropertyOptional({ description: 'Custom sport name when enduranceSport is "other"' })
+  @IsString()
+  @IsOptional()
+  enduranceSportOther?: string;
+
+  @ApiPropertyOptional({
+    description: 'Target events/distances for the selected sport',
+    type: [String],
+    example: ['marathon', 'half_marathon'],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  targetEvents?: string[];
+
+  @ApiPropertyOptional({ description: 'Custom event description when "other" is selected' })
+  @IsString()
+  @IsOptional()
+  targetEventOther?: string;
+
+  @ApiPropertyOptional({ description: 'Additional notes or context for the coach' })
+  @IsString()
+  @IsOptional()
+  additionalNotes?: string;
 }

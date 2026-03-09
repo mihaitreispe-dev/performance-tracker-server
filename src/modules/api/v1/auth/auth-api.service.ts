@@ -11,6 +11,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { FirebaseService } from 'src/modules/firebase/firebase.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
@@ -36,6 +37,7 @@ export class AuthApiService {
     private readonly userRepo: UserRepository,
     private readonly refreshTokenRepo: RefreshTokenRepository,
     private readonly userSettingsRepo: UserSettingsRepository,
+    private readonly relationshipRepo: CoachAthleteRelationshipRepository,
   ) {}
 
   async createTokens(
@@ -182,6 +184,11 @@ export class AuthApiService {
     if (!user) {
       throw new NotFoundException();
     }
+
+    // Get coach relationship if exists
+    const relationship = await this.relationshipRepo.findActiveByAthleteId(req.user.id);
+    const coachId = relationship?.coach_id ?? null;
+
     return {
       data: {
         id: user.id,
@@ -195,6 +202,7 @@ export class AuthApiService {
           user.picture_s3_key,
         ),
         roles: user.roles,
+        coachId,
       },
     };
   }

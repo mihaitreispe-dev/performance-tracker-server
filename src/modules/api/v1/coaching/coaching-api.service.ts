@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import {
+  AthleteIntake,
   CoachAthleteLabelRow,
   CoachAthleteRelationship,
   CoachAthleteStatus,
@@ -13,6 +14,7 @@ import {
 } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.repository';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
 import { CoachAthleteLabelRepository } from 'src/repositories/coach-athlete-label.repository';
@@ -25,23 +27,42 @@ import { WorkoutPlanRepository } from 'src/repositories/workout-plan.repository'
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+
+import { AdvancedMetricsApiService } from '../advanced-metrics/advanced-metrics-api.service';
+import {
+  FitnessFatiguePredictionResponse,
+  FitnessFatigueResponse,
+  Vo2MaxHistoryResponse,
+  Vo2MaxResponse,
+} from '../advanced-metrics/response.dto';
+import { AnalyticsApiService } from '../analytics/analytics-api.service';
+import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
+import {
+  CurrentTrainingLoadResponse,
+  RacePredictionsResponse,
+  StrengthProgressionResponse,
+  TrackedExercisesResponse,
+  TrainingLoadHistoryResponse,
+} from '../analytics/response.dto';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
-import { WorkoutsApiService } from '../workouts/workouts-api.service';
+import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
 import { WorkoutPlansApiService } from '../workout-plans/workout-plans-api.service';
 import { WorkoutResponse } from '../workouts/response.dto';
-import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
-
+import { WorkoutsApiService } from '../workouts/workouts-api.service';
 import {
   AssignWorkoutBody,
   ComplianceQuery,
   CreateAthleteLabelBody,
   CreateAthleteScheduleBody,
   DeployPlanBody,
+  FitnessFatiguePredictionBody,
+  FitnessFatigueQuery,
   InviteAthleteBody,
   ListAthleteLabelsQuery,
   ListAthleteSchedulesQuery,
   ListMessagesQuery,
   SendMessageBody,
+  UpdateAthleteIntakeBody,
   UpdateAthleteLabelBody,
   UpdatePrivacySettingsBody,
 } from './request.dto';
@@ -52,6 +73,8 @@ import {
   AthleteComplianceDTO,
   AthleteComplianceResponse,
   AthleteDTO,
+  AthleteIntakeDTO,
+  AthleteIntakeResponse,
   AthleteLabelDTO,
   AthleteLabelResponse,
   AthleteLabelsResponse,
@@ -85,6 +108,7 @@ export class CoachingApiService {
     private readonly userRepo: UserRepository,
     private readonly relationshipRepo: CoachAthleteRelationshipRepository,
     private readonly privacySettingsRepo: AthletePrivacySettingsRepository,
+    private readonly intakeRepo: AthleteIntakeRepository,
     private readonly assignedWorkoutRepo: CoachAssignedWorkoutRepository,
     private readonly labelRepo: CoachAthleteLabelRepository,
     private readonly workoutRepo: WorkoutRepository,
@@ -97,6 +121,8 @@ export class CoachingApiService {
     private readonly notificationsService: NotificationsApiService,
     private readonly workoutsService: WorkoutsApiService,
     private readonly workoutPlansService: WorkoutPlansApiService,
+    private readonly analyticsService: AnalyticsApiService,
+    private readonly advancedMetricsService: AdvancedMetricsApiService,
   ) {}
 
   // Become Coach
@@ -198,6 +224,12 @@ export class CoachingApiService {
 
     // Initialize privacy settings for the athlete
     await this.privacySettingsRepo.getOrCreateDefault(req.user.id);
+
+    // Create intake record for the athlete to fill out
+    await this.intakeRepo.create({
+      user_id: req.user.id,
+      coach_id: updated.coach_id,
+    });
 
     return {
       data: this.mapToInvitationDTO(updated, coach!),
@@ -373,6 +405,112 @@ export class CoachingApiService {
     };
   }
 
+  async getAthletePrivacySettings(
+    _req: Request & { user: AuthUser },
+    athleteId: string,
+  ): Promise<PrivacySettingsResponse> {
+    // Relationship is verified by guard
+    const settings = await this.privacySettingsRepo.getOrCreateDefault(athleteId);
+
+    return {
+      data: {
+        shareWorkouts: settings.share_workouts,
+        shareExecutions: settings.share_executions,
+        shareAnalytics: settings.share_analytics,
+        shareCalendar: settings.share_calendar,
+        sharePersonalRecords: settings.share_personal_records,
+        shareSleepData: settings.share_sleep_data,
+        shareTrainingLoad: settings.share_training_load,
+      },
+    };
+  }
+
+  // ==================== ATHLETE ANALYTICS (Coach viewing) ====================
+
+  async getAthleteRacePredictions(athleteId: string): Promise<RacePredictionsResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_analytics) {
+      throw new ForbiddenException('Athlete has not shared analytics with you');
+    }
+    return this.analyticsService.getRacePredictionsForUser(athleteId);
+  }
+
+  async getAthleteTrackedExercises(athleteId: string): Promise<TrackedExercisesResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_analytics) {
+      throw new ForbiddenException('Athlete has not shared analytics with you');
+    }
+    return this.analyticsService.getTrackedExercisesForUser(athleteId);
+  }
+
+  async getAthleteStrengthProgression(
+    athleteId: string,
+    exerciseId: string,
+    query: StrengthProgressionQuery,
+  ): Promise<StrengthProgressionResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_analytics) {
+      throw new ForbiddenException('Athlete has not shared analytics with you');
+    }
+    return this.analyticsService.getStrengthProgressionForUser(athleteId, exerciseId, query);
+  }
+
+  async getAthleteTrainingLoad(athleteId: string): Promise<CurrentTrainingLoadResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.analyticsService.getCurrentTrainingLoadForUser(athleteId);
+  }
+
+  async getAthleteTrainingLoadHistory(
+    athleteId: string,
+    query: TrainingLoadHistoryQuery,
+  ): Promise<TrainingLoadHistoryResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.analyticsService.getTrainingLoadHistoryForUser(athleteId, query);
+  }
+
+  // ==================== ATHLETE FITNESS-FATIGUE / PMC (Coach viewing) ====================
+
+  async getAthleteFitnessFatigue(athleteId: string, query: FitnessFatigueQuery): Promise<FitnessFatigueResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getFitnessFatigueForUser(athleteId, query.days ?? 90);
+  }
+
+  async predictAthleteFitnessFatigue(
+    athleteId: string,
+    body: FitnessFatiguePredictionBody,
+  ): Promise<FitnessFatiguePredictionResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.predictFitnessFatigueForUser(athleteId, body);
+  }
+
+  async getAthleteVo2Max(athleteId: string): Promise<Vo2MaxResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getVo2MaxForUser(athleteId);
+  }
+
+  async getAthleteVo2MaxHistory(athleteId: string, query: FitnessFatigueQuery): Promise<Vo2MaxHistoryResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getVo2MaxHistoryForUser(athleteId, query.days ?? 90);
+  }
+
   async updatePrivacySettings(
     req: Request & { user: AuthUser },
     body: UpdatePrivacySettingsBody,
@@ -399,6 +537,171 @@ export class CoachingApiService {
         shareSleepData: settings.share_sleep_data,
         shareTrainingLoad: settings.share_training_load,
       },
+    };
+  }
+
+  // ==================== ATHLETE INTAKE ====================
+
+  // Get own intake form (athlete view)
+  async getMyIntake(req: Request & { user: AuthUser }): Promise<AthleteIntakeResponse> {
+    // Find active coach relationship
+    const relationship = await this.relationshipRepo.findActiveByAthleteId(req.user.id);
+    if (!relationship) {
+      throw new NotFoundException('You do not have an active coach');
+    }
+
+    const intake = await this.intakeRepo.findByUserAndCoach(req.user.id, relationship.coach_id);
+    if (!intake) {
+      throw new NotFoundException('Intake form not found');
+    }
+
+    return {
+      data: this.mapToAthleteIntakeDTO(intake),
+    };
+  }
+
+  // Update own intake form (athlete)
+  async updateMyIntake(
+    req: Request & { user: AuthUser },
+    body: UpdateAthleteIntakeBody,
+  ): Promise<AthleteIntakeResponse> {
+    // Find active coach relationship
+    const relationship = await this.relationshipRepo.findActiveByAthleteId(req.user.id);
+    if (!relationship) {
+      throw new NotFoundException('You do not have an active coach');
+    }
+
+    const existing = await this.intakeRepo.findByUserAndCoach(req.user.id, relationship.coach_id);
+    if (!existing) {
+      throw new NotFoundException('Intake form not found');
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {};
+    if (body.primaryGoals !== undefined) updateData.primary_goals = body.primaryGoals;
+    if (body.trainingDaysPerWeek !== undefined) updateData.training_days_per_week = body.trainingDaysPerWeek;
+    if (body.preferredSessionDuration !== undefined) {
+      updateData.preferred_session_duration = body.preferredSessionDuration;
+    }
+    if (body.availableDays !== undefined) updateData.available_days = body.availableDays;
+    if (body.experienceLevel !== undefined) updateData.experience_level = body.experienceLevel;
+    if (body.currentActivityLevel !== undefined) updateData.current_activity_level = body.currentActivityLevel;
+    if (body.injuriesLimitations !== undefined) updateData.injuries_limitations = body.injuriesLimitations;
+    if (body.medicalConditions !== undefined) updateData.medical_conditions = body.medicalConditions;
+    if (body.equipmentAccess !== undefined) updateData.equipment_access = body.equipmentAccess;
+    if (body.trainingLocation !== undefined) updateData.training_location = body.trainingLocation;
+    if (body.primarySport !== undefined) updateData.primary_sport = body.primarySport;
+    if (body.competitiveEvents !== undefined) updateData.competitive_events = body.competitiveEvents;
+    if (body.enduranceSport !== undefined) updateData.endurance_sport = body.enduranceSport;
+    if (body.enduranceSportOther !== undefined) updateData.endurance_sport_other = body.enduranceSportOther;
+    if (body.targetEvents !== undefined) updateData.target_events = body.targetEvents;
+    if (body.targetEventOther !== undefined) updateData.target_event_other = body.targetEventOther;
+    if (body.additionalNotes !== undefined) updateData.additional_notes = body.additionalNotes;
+
+    const updated = await this.intakeRepo.updateById(existing.id, updateData);
+
+    return {
+      data: this.mapToAthleteIntakeDTO(updated),
+    };
+  }
+
+  // Complete intake form (athlete)
+  async completeMyIntake(req: Request & { user: AuthUser }): Promise<AthleteIntakeResponse> {
+    // Find active coach relationship
+    const relationship = await this.relationshipRepo.findActiveByAthleteId(req.user.id);
+    if (!relationship) {
+      throw new NotFoundException('You do not have an active coach');
+    }
+
+    const existing = await this.intakeRepo.findByUserAndCoach(req.user.id, relationship.coach_id);
+    if (!existing) {
+      throw new NotFoundException('Intake form not found');
+    }
+
+    if (existing.completed_at) {
+      throw new BadRequestException('Intake form has already been completed');
+    }
+
+    const completed = await this.intakeRepo.markCompleted(existing.id);
+
+    // Notify coach that athlete completed intake
+    const athlete = await this.userRepo.findById(req.user.id);
+    const athleteName = athlete?.display_name || athlete?.email || 'Your athlete';
+    await this.notificationsService.createNotification(
+      relationship.coach_id,
+      NotificationType.MESSAGE,
+      `${athleteName} completed their intake form`,
+      'Review their goals, availability, and training preferences.',
+      {
+        athleteId: req.user.id,
+        coachId: relationship.coach_id,
+        relationshipId: relationship.id,
+      },
+    );
+
+    return {
+      data: this.mapToAthleteIntakeDTO(completed),
+    };
+  }
+
+  // Get athlete's intake (coach view)
+  async getAthleteIntake(
+    _req: Request & { user: AuthUser },
+    athleteId: string,
+    coachId: string,
+  ): Promise<AthleteIntakeResponse> {
+    // Relationship is verified by guard
+
+    const intake = await this.intakeRepo.findByUserAndCoach(athleteId, coachId);
+    if (!intake) {
+      throw new NotFoundException('Intake form not found for this athlete');
+    }
+
+    return {
+      data: this.mapToAthleteIntakeDTO(intake),
+    };
+  }
+
+  private mapToAthleteIntakeDTO(intake: AthleteIntake): AthleteIntakeDTO {
+    const completedAt = intake.completed_at
+      ? intake.completed_at instanceof Date
+        ? intake.completed_at.toISOString()
+        : String(intake.completed_at)
+      : null;
+
+    const createdAt = intake.created_at instanceof Date ? intake.created_at.toISOString() : String(intake.created_at);
+
+    const updatedAt = intake.updated_at instanceof Date ? intake.updated_at.toISOString() : String(intake.updated_at);
+
+    return {
+      id: intake.id,
+      userId: intake.user_id,
+      coachId: intake.coach_id,
+      primaryGoals: intake.primary_goals,
+      trainingDaysPerWeek: intake.training_days_per_week,
+      preferredSessionDuration: intake.preferred_session_duration,
+      availableDays: intake.available_days,
+      experienceLevel: intake.experience_level as 'beginner' | 'intermediate' | 'advanced' | null,
+      currentActivityLevel: intake.current_activity_level as
+        | 'sedentary'
+        | 'lightly_active'
+        | 'moderately_active'
+        | 'very_active'
+        | null,
+      injuriesLimitations: intake.injuries_limitations,
+      medicalConditions: intake.medical_conditions,
+      equipmentAccess: intake.equipment_access,
+      trainingLocation: intake.training_location as 'home' | 'gym' | 'outdoor' | 'mixed' | null,
+      primarySport: intake.primary_sport,
+      competitiveEvents: intake.competitive_events,
+      enduranceSport: intake.endurance_sport as 'running' | 'cycling' | 'swimming' | 'triathlon' | 'other' | null,
+      enduranceSportOther: intake.endurance_sport_other,
+      targetEvents: intake.target_events,
+      targetEventOther: intake.target_event_other,
+      additionalNotes: intake.additional_notes,
+      completedAt,
+      createdAt,
+      updatedAt,
     };
   }
 
@@ -1009,8 +1312,9 @@ export class CoachingApiService {
     const userId = req.user.id;
 
     // Find the relationship
-    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)
-      || await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId);
+    const relationship =
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)) ||
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId));
 
     if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
       throw new ForbiddenException('No active coaching relationship found');
@@ -1028,9 +1332,10 @@ export class CoachingApiService {
         throw new NotFoundException('Workout schedule not found');
       }
       const workout = await this.workoutRepo.findById(schedule.workout_id);
-      const scheduledDate = schedule.scheduled_date instanceof Date
-        ? formatDateToYMD(schedule.scheduled_date)
-        : String(schedule.scheduled_date);
+      const scheduledDate =
+        schedule.scheduled_date instanceof Date
+          ? formatDateToYMD(schedule.scheduled_date)
+          : String(schedule.scheduled_date);
       workoutInfo = {
         name: workout?.name || 'Unknown',
         scheduledDate,
@@ -1094,28 +1399,18 @@ export class CoachingApiService {
 
     // Create notification for recipient
     const notificationType = body.isWorkoutNote ? NotificationType.WORKOUT_NOTE : NotificationType.MESSAGE;
-    const title = body.isWorkoutNote
-      ? `New workout note from ${senderName}`
-      : `New message from ${senderName}`;
-    const notificationBody = body.content.length > 100
-      ? body.content.substring(0, 100) + '...'
-      : body.content;
+    const title = body.isWorkoutNote ? `New workout note from ${senderName}` : `New message from ${senderName}`;
+    const notificationBody = body.content.length > 100 ? body.content.substring(0, 100) + '...' : body.content;
 
-    await this.notificationsService.createNotification(
-      recipientId,
-      notificationType,
-      title,
-      notificationBody,
-      {
-        messageId: message.id,
-        relationshipId: relationship.id,
-        senderName,
-        workoutScheduleId: body.workoutScheduleId,
-        workoutName: workoutInfo?.name || undefined,
-        athleteId,
-        coachId: relationship.coach_id,
-      },
-    );
+    await this.notificationsService.createNotification(recipientId, notificationType, title, notificationBody, {
+      messageId: message.id,
+      relationshipId: relationship.id,
+      senderName,
+      workoutScheduleId: body.workoutScheduleId,
+      workoutName: workoutInfo?.name || undefined,
+      athleteId,
+      coachId: relationship.coach_id,
+    });
 
     return {
       data: this.mapToMessageDTO(message, sender!, workoutInfo, attachedWorkout, attachedPlan),
@@ -1130,8 +1425,9 @@ export class CoachingApiService {
     const userId = req.user.id;
 
     // Find the relationship
-    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)
-      || await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId);
+    const relationship =
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)) ||
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId));
 
     if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
       throw new ForbiddenException('No active coaching relationship found');
@@ -1183,8 +1479,9 @@ export class CoachingApiService {
     const userId = req.user.id;
 
     // Find the relationship
-    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)
-      || await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId);
+    const relationship =
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)) ||
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId));
 
     if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
       throw new ForbiddenException('No active coaching relationship found');
@@ -1197,18 +1494,16 @@ export class CoachingApiService {
     }
 
     const workout = await this.workoutRepo.findById(schedule.workout_id);
-    const scheduledDate = schedule.scheduled_date instanceof Date
-      ? formatDateToYMD(schedule.scheduled_date)
-      : String(schedule.scheduled_date);
-    const workoutInfo = workout
-      ? { name: workout.name, scheduledDate }
-      : null;
+    const scheduledDate =
+      schedule.scheduled_date instanceof Date
+        ? formatDateToYMD(schedule.scheduled_date)
+        : String(schedule.scheduled_date);
+    const workoutInfo = workout ? { name: workout.name, scheduledDate } : null;
 
     const messages = await this.messageRepo.findWorkoutNotes(workoutScheduleId);
 
     // Build maps using helper method
-    const { senderMap, attachedWorkoutsMap, attachedPlansMap } =
-      await this.buildMessageLookupMaps(messages);
+    const { senderMap, attachedWorkoutsMap, attachedPlansMap } = await this.buildMessageLookupMaps(messages);
 
     return {
       data: messages.map((m) =>
@@ -1224,15 +1519,13 @@ export class CoachingApiService {
     };
   }
 
-  async getUnreadMessageCount(
-    req: Request & { user: AuthUser },
-    athleteId: string,
-  ): Promise<UnreadCountResponse> {
+  async getUnreadMessageCount(req: Request & { user: AuthUser }, athleteId: string): Promise<UnreadCountResponse> {
     const userId = req.user.id;
 
     // Find the relationship
-    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)
-      || await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId);
+    const relationship =
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(userId, athleteId)) ||
+      (await this.relationshipRepo.findActiveByCoachAndAthlete(athleteId, userId));
 
     if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
       throw new ForbiddenException('No active coaching relationship found');
@@ -1245,10 +1538,7 @@ export class CoachingApiService {
 
   // ==================== ATHLETE MESSAGING TO COACH ====================
 
-  async sendMessageToCoach(
-    req: Request & { user: AuthUser },
-    body: SendMessageBody,
-  ): Promise<MessageResponse> {
+  async sendMessageToCoach(req: Request & { user: AuthUser }, body: SendMessageBody): Promise<MessageResponse> {
     const userId = req.user.id;
 
     // Find relationship where current user is athlete
@@ -1266,9 +1556,10 @@ export class CoachingApiService {
         throw new NotFoundException('Workout schedule not found');
       }
       const workout = await this.workoutRepo.findById(schedule.workout_id);
-      const scheduledDate = schedule.scheduled_date instanceof Date
-        ? formatDateToYMD(schedule.scheduled_date)
-        : String(schedule.scheduled_date);
+      const scheduledDate =
+        schedule.scheduled_date instanceof Date
+          ? formatDateToYMD(schedule.scheduled_date)
+          : String(schedule.scheduled_date);
       workoutInfo = {
         name: workout?.name || 'Unknown',
         scheduledDate,
@@ -1332,12 +1623,8 @@ export class CoachingApiService {
 
     // Create notification for coach
     const notificationType = body.isWorkoutNote ? NotificationType.WORKOUT_NOTE : NotificationType.MESSAGE;
-    const title = body.isWorkoutNote
-      ? `New workout note from ${senderName}`
-      : `New message from ${senderName}`;
-    const notificationBody = body.content.length > 100
-      ? body.content.substring(0, 100) + '...'
-      : body.content;
+    const title = body.isWorkoutNote ? `New workout note from ${senderName}` : `New message from ${senderName}`;
+    const notificationBody = body.content.length > 100 ? body.content.substring(0, 100) + '...' : body.content;
 
     await this.notificationsService.createNotification(
       relationship.coach_id,
@@ -1411,9 +1698,7 @@ export class CoachingApiService {
     };
   }
 
-  async getUnreadMessageCountFromCoach(
-    req: Request & { user: AuthUser },
-  ): Promise<UnreadCountResponse> {
+  async getUnreadMessageCountFromCoach(req: Request & { user: AuthUser }): Promise<UnreadCountResponse> {
     const userId = req.user.id;
 
     // Find relationship where current user is athlete
@@ -1430,10 +1715,7 @@ export class CoachingApiService {
 
   // ==================== SHARED RESOURCE ACCESS ====================
 
-  async getSharedWorkout(
-    req: Request & { user: AuthUser },
-    workoutId: string,
-  ): Promise<WorkoutResponse> {
+  async getSharedWorkout(req: Request & { user: AuthUser }, workoutId: string): Promise<WorkoutResponse> {
     const userId = req.user.id;
 
     // First check if user owns the workout
@@ -1459,10 +1741,7 @@ export class CoachingApiService {
     }
 
     // Verify the workout was actually shared in a message in this relationship
-    const sharedMessage = await this.messageRepo.findByAttachedWorkoutInRelationship(
-      workoutId,
-      relationship.id,
-    );
+    const sharedMessage = await this.messageRepo.findByAttachedWorkoutInRelationship(workoutId, relationship.id);
 
     if (!sharedMessage) {
       throw new NotFoundException('Workout not found or not shared with you');
@@ -1471,10 +1750,7 @@ export class CoachingApiService {
     return this.workoutsService.getWorkoutByIdInternal(workoutId);
   }
 
-  async getSharedPlan(
-    req: Request & { user: AuthUser },
-    planId: string,
-  ): Promise<WorkoutPlanWithItemsResponse> {
+  async getSharedPlan(req: Request & { user: AuthUser }, planId: string): Promise<WorkoutPlanWithItemsResponse> {
     const userId = req.user.id;
 
     // First check if user owns the plan
@@ -1500,10 +1776,7 @@ export class CoachingApiService {
     }
 
     // Verify the plan was actually shared in a message in this relationship
-    const sharedMessage = await this.messageRepo.findByAttachedPlanInRelationship(
-      planId,
-      relationship.id,
-    );
+    const sharedMessage = await this.messageRepo.findByAttachedPlanInRelationship(planId, relationship.id);
 
     if (!sharedMessage) {
       throw new NotFoundException('Plan not found or not shared with you');
@@ -1512,10 +1785,7 @@ export class CoachingApiService {
     return this.workoutPlansService.getByIdInternal(planId);
   }
 
-  async copySharedWorkoutToLibrary(
-    req: Request & { user: AuthUser },
-    workoutId: string,
-  ): Promise<WorkoutResponse> {
+  async copySharedWorkoutToLibrary(req: Request & { user: AuthUser }, workoutId: string): Promise<WorkoutResponse> {
     const userId = req.user.id;
 
     // First check if user owns the workout (no need to copy)
@@ -1541,10 +1811,7 @@ export class CoachingApiService {
     }
 
     // Verify the workout was actually shared in a message in this relationship
-    const sharedMessage = await this.messageRepo.findByAttachedWorkoutInRelationship(
-      workoutId,
-      relationship.id,
-    );
+    const sharedMessage = await this.messageRepo.findByAttachedWorkoutInRelationship(workoutId, relationship.id);
 
     if (!sharedMessage) {
       throw new NotFoundException('Workout not found or not shared with you');
@@ -1583,10 +1850,7 @@ export class CoachingApiService {
     }
 
     // Verify the plan was actually shared in a message in this relationship
-    const sharedMessage = await this.messageRepo.findByAttachedPlanInRelationship(
-      planId,
-      relationship.id,
-    );
+    const sharedMessage = await this.messageRepo.findByAttachedPlanInRelationship(planId, relationship.id);
 
     if (!sharedMessage) {
       throw new NotFoundException('Plan not found or not shared with you');
@@ -1624,15 +1888,18 @@ export class CoachingApiService {
     for (const schedule of schedules) {
       const workout = scheduleWorkoutMap.get(schedule.workout_id);
       if (workout) {
-        const scheduledDate = schedule.scheduled_date instanceof Date
-          ? formatDateToYMD(schedule.scheduled_date)
-          : String(schedule.scheduled_date);
+        const scheduledDate =
+          schedule.scheduled_date instanceof Date
+            ? formatDateToYMD(schedule.scheduled_date)
+            : String(schedule.scheduled_date);
         workoutInfoMap.set(schedule.id, { name: workout.name, scheduledDate });
       }
     }
 
     // Batch fetch attached workouts
-    const attachedWorkoutIds = [...new Set(messages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!))];
+    const attachedWorkoutIds = [
+      ...new Set(messages.filter((m) => m.attached_workout_id).map((m) => m.attached_workout_id!)),
+    ];
     const attachedWorkouts = await this.workoutRepo.findByIds(attachedWorkoutIds);
     const attachedWorkoutsMap = new Map<string, AttachedWorkoutDTO>();
     for (const workout of attachedWorkouts) {

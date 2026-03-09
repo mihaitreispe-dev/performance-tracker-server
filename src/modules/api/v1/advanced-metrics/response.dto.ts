@@ -295,3 +295,208 @@ export class FitnessFatiguePredictionResponse extends ItemResponse<FitnessFatigu
   @ValidateNested()
   declare data: FitnessFatiguePredictionDTO;
 }
+
+// Multi-Stream Load
+
+export class StreamLoadDTO {
+  @ApiProperty({ description: 'Chronic Training Load' })
+  @IsNumber()
+  ctl: number;
+
+  @ApiProperty({ description: 'Acute Training Load' })
+  @IsNumber()
+  atl: number;
+
+  @ApiProperty({ description: 'Training Stress Balance' })
+  @IsNumber()
+  tsb: number;
+
+  @ApiProperty({ description: 'Daily load contribution' })
+  @IsNumber()
+  dailyLoad: number;
+}
+
+export class MultiStreamLoadDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ type: StreamLoadDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => StreamLoadDTO)
+  aerobic: StreamLoadDTO;
+
+  @ApiProperty({ type: StreamLoadDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => StreamLoadDTO)
+  msk: StreamLoadDTO;
+
+  @ApiProperty({ type: StreamLoadDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => StreamLoadDTO)
+  neural: StreamLoadDTO;
+
+  @ApiPropertyOptional({ type: Number, description: 'Composite readiness score (0-100)' })
+  @IsNumber()
+  @IsOptional()
+  readinessScore?: number | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Reason for readiness override' })
+  @IsString()
+  @IsOptional()
+  readinessOverrideReason?: string | null;
+}
+
+export class MultiStreamLoadResponse extends ItemResponse<MultiStreamLoadDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: MultiStreamLoadDTO;
+}
+
+export class MultiStreamLoadHistoryDTO {
+  @ApiProperty({ type: [MultiStreamLoadDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MultiStreamLoadDTO)
+  data: MultiStreamLoadDTO[];
+}
+
+export class MultiStreamLoadHistoryResponse extends ItemResponse<MultiStreamLoadHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: MultiStreamLoadHistoryDTO;
+}
+
+// HRV Baseline
+
+export class HrvBaselineDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  hrvValue?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  restingHr?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  hrv7DayAvg?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  hrv7DayStd?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  hrvZscore?: number | null;
+
+  @ApiProperty({ description: 'Whether HRV is suppressed' })
+  @IsOptional()
+  isSuppressed?: boolean;
+
+  @ApiPropertyOptional({ type: String, enum: ['mild', 'moderate', 'severe'] })
+  @IsString()
+  @IsOptional()
+  suppressionSeverity?: string | null;
+}
+
+export class HrvBaselineResponse extends ItemResponse<HrvBaselineDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: HrvBaselineDTO;
+}
+
+export class HrvBaselineHistoryDTO {
+  @ApiProperty({ type: [HrvBaselineDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HrvBaselineDTO)
+  data: HrvBaselineDTO[];
+}
+
+export class HrvBaselineHistoryResponse extends ItemResponse<HrvBaselineHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: HrvBaselineHistoryDTO;
+}
+
+// Readiness
+
+export class DailyReadinessDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Composite readiness score (0-100)' })
+  @IsNumber()
+  readinessScore: number;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  hrvZscore?: number | null;
+
+  @ApiProperty({ description: 'Aerobic TSB' })
+  @IsNumber()
+  aerobicTsb: number;
+
+  @ApiProperty({ description: 'Musculoskeletal TSB' })
+  @IsNumber()
+  mskTsb: number;
+
+  @ApiProperty({ description: 'Neural TSB' })
+  @IsNumber()
+  neuralTsb: number;
+
+  @ApiPropertyOptional({ type: String, enum: ['aerobic', 'msk', 'neural', 'hrv'] })
+  @IsString()
+  @IsOptional()
+  limitingFactor?: string | null;
+
+  @ApiProperty({ description: 'Whether HRV override was applied' })
+  @IsOptional()
+  hrvOverride?: boolean;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsNumber()
+  @IsOptional()
+  journalContribution?: number | null;
+}
+
+export class DailyReadinessResponse extends ItemResponse<DailyReadinessDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: DailyReadinessDTO;
+}
+
+export class ReadinessHistoryDTO {
+  @ApiProperty({ type: [DailyReadinessDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DailyReadinessDTO)
+  data: DailyReadinessDTO[];
+}
+
+export class ReadinessHistoryResponse extends ItemResponse<ReadinessHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: ReadinessHistoryDTO;
+}

@@ -77,9 +77,7 @@ export class MuscleGroupRepository {
   /**
    * Bulk fetch muscle groups for multiple exercises - more efficient than multiple findByExerciseId calls
    */
-  async findByExerciseIds(
-    exerciseIds: string[],
-  ): Promise<Map<string, (MuscleGroup & { is_primary: boolean })[]>> {
+  async findByExerciseIds(exerciseIds: string[]): Promise<Map<string, (MuscleGroup & { is_primary: boolean })[]>> {
     if (exerciseIds.length === 0) return new Map();
 
     const results = await this.db

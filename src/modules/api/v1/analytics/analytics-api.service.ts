@@ -844,11 +844,15 @@ export class AnalyticsApiService {
   // ==================== Training Load Methods ====================
 
   async getCurrentTrainingLoad(req: Request & { user: AuthUser }): Promise<CurrentTrainingLoadResponse> {
+    return this.getCurrentTrainingLoadForUser(req.user.id);
+  }
+
+  async getCurrentTrainingLoadForUser(userId: string): Promise<CurrentTrainingLoadResponse> {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
 
     // Calculate and store training load for recent days if needed
-    await this.updateTrainingLoadHistory(req.user.id, 35); // 28 days + buffer
+    await this.updateTrainingLoadHistory(userId, 35); // 28 days + buffer
 
     // Get the 7-day (acute) and 28-day (chronic) loads
     const acutePeriodStart = new Date(today);
@@ -861,7 +865,7 @@ export class AnalyticsApiService {
 
     const recentLoads = await this.dailyTrainingLoadRepository.findMany({
       filter: {
-        userId: req.user.id,
+        userId,
         dateFrom: chronicPeriodStart,
         dateTo: today,
       },
@@ -951,6 +955,13 @@ export class AnalyticsApiService {
     req: Request & { user: AuthUser },
     query: TrainingLoadHistoryQuery,
   ): Promise<TrainingLoadHistoryResponse> {
+    return this.getTrainingLoadHistoryForUser(req.user.id, query);
+  }
+
+  async getTrainingLoadHistoryForUser(
+    userId: string,
+    query: TrainingLoadHistoryQuery,
+  ): Promise<TrainingLoadHistoryResponse> {
     const days = query.days || 90;
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -960,12 +971,12 @@ export class AnalyticsApiService {
     periodStart.setHours(0, 0, 0, 0);
 
     // Update training load history
-    await this.updateTrainingLoadHistory(req.user.id, days + 28);
+    await this.updateTrainingLoadHistory(userId, days + 28);
 
     // Fetch stored data
     const loads = await this.dailyTrainingLoadRepository.findMany({
       filter: {
-        userId: req.user.id,
+        userId,
         dateFrom: periodStart,
         dateTo: today,
       },
@@ -1436,8 +1447,12 @@ export class AnalyticsApiService {
   ];
 
   async getRacePredictions(req: Request & { user: AuthUser }): Promise<RacePredictionsResponse> {
+    return this.getRacePredictionsForUser(req.user.id);
+  }
+
+  async getRacePredictionsForUser(userId: string): Promise<RacePredictionsResponse> {
     // Try to find the best data source for predictions
-    const dataSource = await this.findBestRaceDataSource(req.user.id);
+    const dataSource = await this.findBestRaceDataSource(userId);
 
     if (!dataSource) {
       const data: RacePredictionsDTO = {
@@ -1624,6 +1639,14 @@ export class AnalyticsApiService {
     exerciseId: string,
     query: StrengthProgressionQuery,
   ): Promise<StrengthProgressionResponse> {
+    return this.getStrengthProgressionForUser(req.user.id, exerciseId, query);
+  }
+
+  async getStrengthProgressionForUser(
+    userId: string,
+    exerciseId: string,
+    query: StrengthProgressionQuery,
+  ): Promise<StrengthProgressionResponse> {
     const days = query.days || 90;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -1638,7 +1661,7 @@ export class AnalyticsApiService {
     // Get all completed workout executions for the user in the period
     const executions = await this.workoutExecutionRepository.findMany({
       filter: {
-        userId: req.user.id,
+        userId,
         completedDateFrom: startDate,
         completedDateTo: new Date(),
         completed: true,
@@ -1778,10 +1801,14 @@ export class AnalyticsApiService {
   }
 
   async getTrackedExercises(req: Request & { user: AuthUser }): Promise<TrackedExercisesResponse> {
+    return this.getTrackedExercisesForUser(req.user.id);
+  }
+
+  async getTrackedExercisesForUser(userId: string): Promise<TrackedExercisesResponse> {
     // Get all completed workout executions for the user
     const executions = await this.workoutExecutionRepository.findMany({
       filter: {
-        userId: req.user.id,
+        userId,
         completed: true,
       },
       sort: [{ field: 'completed_at', direction: 'desc' }],

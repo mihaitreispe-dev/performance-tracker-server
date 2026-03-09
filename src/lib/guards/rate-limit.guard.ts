@@ -33,9 +33,17 @@ export const RateLimitPresets = {
   /** Login specifically: 10 requests per 15 minutes */
   LOGIN: { limit: 10, windowSeconds: 900, message: 'Too many login attempts. Please try again in 15 minutes.' },
   /** File upload: 10 requests per minute */
-  FILE_UPLOAD: { limit: 10, windowSeconds: 60, message: 'Too many upload attempts. Please wait before uploading more files.' },
+  FILE_UPLOAD: {
+    limit: 10,
+    windowSeconds: 60,
+    message: 'Too many upload attempts. Please wait before uploading more files.',
+  },
   /** Export: 5 requests per 5 minutes */
-  EXPORT: { limit: 5, windowSeconds: 300, message: 'Too many export requests. Please wait before requesting another export.' },
+  EXPORT: {
+    limit: 5,
+    windowSeconds: 300,
+    message: 'Too many export requests. Please wait before requesting another export.',
+  },
   /** General API: 100 requests per minute */
   GENERAL: { limit: 100, windowSeconds: 60, message: 'Rate limit exceeded. Please slow down your requests.' },
 } as const;

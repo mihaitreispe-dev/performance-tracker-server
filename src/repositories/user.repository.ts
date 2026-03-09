@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Database, NewUser, User, UserRole, UserUpdate } from 'src/database/interfaces/index';
+import { formatDateToYMD } from 'src/lib/util';
 import parseSQLArray from 'src/lib/util/parse-sql-array';
 
 @Injectable()
@@ -78,5 +79,21 @@ export class UserRepository {
       return [];
     }
     return parseSQLArray(result.roles);
+  }
+
+  /**
+   * Find users who have been active recently (updated within the specified number of days)
+   */
+  async findRecentlyActive(days: number): Promise<User[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const results = await this.db
+      .selectFrom('users')
+      .where(sql`updated_at`, '>=', sql`${cutoffDate.toISOString()}::timestamptz`)
+      .selectAll()
+      .execute();
+
+    return results.map((r) => ({ ...r, roles: parseSQLArray(r.roles) }));
   }
 }

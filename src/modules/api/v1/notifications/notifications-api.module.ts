@@ -16,11 +16,7 @@ export class NotificationsApiModule {
       this.instance = {
         module: NotificationsApiModule,
         imports: [AuthModule.register()],
-        providers: [
-          NotificationsApiService,
-          NotificationRepository,
-          UserRepository,
-        ],
+        providers: [NotificationsApiService, NotificationRepository, UserRepository],
         controllers: [NotificationsApiController],
         exports: [NotificationsApiService], // Export so other modules can use it
       };

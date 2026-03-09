@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, HttpStatus, Patch, Post, Query, Req, UseGuards, Version } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
-import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
+import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 

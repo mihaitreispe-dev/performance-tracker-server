@@ -7,8 +7,8 @@ import { WorkoutItemRepository } from 'src/repositories/workout-item.repository'
 import { WorkoutPlanRepository, WorkoutPlanSort } from 'src/repositories/workout-plan.repository';
 import { WorkoutPlanItemRepository } from 'src/repositories/workout-plan-item.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
-import { WorkoutsApiService } from '../workouts/workouts-api.service';
 
+import { WorkoutsApiService } from '../workouts/workouts-api.service';
 import {
   ActivatePlanBody,
   AddWorkoutPlanItemBody,
@@ -71,20 +71,14 @@ export class WorkoutPlansApiService {
 
       // Fetch all items for all plans
       const allItems = await Promise.all(
-        planIds.map((planId) =>
-          this.workoutPlanItemRepo.findMany({ filter: { workoutPlanId: planId } }),
-        ),
+        planIds.map((planId) => this.workoutPlanItemRepo.findMany({ filter: { workoutPlanId: planId } })),
       );
 
       // Get unique workout IDs
-      const workoutIds = [
-        ...new Set(allItems.flat().map((item) => item.workout_id)),
-      ];
+      const workoutIds = [...new Set(allItems.flat().map((item) => item.workout_id))];
 
       // Fetch all workouts
-      const workouts = await Promise.all(
-        workoutIds.map((wid) => this.workoutRepo.findById(wid)),
-      );
+      const workouts = await Promise.all(workoutIds.map((wid) => this.workoutRepo.findById(wid)));
       const workoutMap = new Map<string, Workout>();
       for (const workout of workouts) {
         if (workout) {
@@ -104,11 +98,7 @@ export class WorkoutPlansApiService {
       const data: WorkoutPlanWithItemsDTO[] = plans.map((plan, index) => {
         const items = allItems[index];
         const itemDTOs = items.map((item) =>
-          this.mapItemToDTO(
-            item,
-            workoutMap.get(item.workout_id),
-            exerciseCountMap.get(item.workout_id) ?? 0,
-          ),
+          this.mapItemToDTO(item, workoutMap.get(item.workout_id), exerciseCountMap.get(item.workout_id) ?? 0),
         );
         return this.mapPlanWithItemsToDTO(plan, itemDTOs);
       });

@@ -5,10 +5,16 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
-import { FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
+import { DateQuery, FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
 import {
+  DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
+  HrvBaselineHistoryResponse,
+  HrvBaselineResponse,
+  MultiStreamLoadHistoryResponse,
+  MultiStreamLoadResponse,
+  ReadinessHistoryResponse,
   ThresholdOverrideResponse,
   ThresholdsResponse,
   TrainingStressResponse,
@@ -112,5 +118,89 @@ export class AdvancedMetricsApiController {
     @Body() body: FitnessFatiguePredictionBody,
   ): Promise<FitnessFatiguePredictionResponse> {
     return this.service.predictFitnessFatigue(req, body);
+  }
+
+  // ==========================================
+  // Multi-Stream Load endpoints
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get multi-stream training load for a specific date' })
+  @ApiResponse({ status: HttpStatus.OK, type: MultiStreamLoadResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('multi-stream-load')
+  async getMultiStreamLoad(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: DateQuery,
+  ): Promise<MultiStreamLoadResponse> {
+    return this.service.getMultiStreamLoad(req, query.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get multi-stream training load history' })
+  @ApiResponse({ status: HttpStatus.OK, type: MultiStreamLoadHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('multi-stream-load/history')
+  async getMultiStreamLoadHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<MultiStreamLoadHistoryResponse> {
+    return this.service.getMultiStreamLoadHistory(req, query.days);
+  }
+
+  // ==========================================
+  // HRV Baseline endpoints
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get HRV baseline for a specific date' })
+  @ApiResponse({ status: HttpStatus.OK, type: HrvBaselineResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('hrv-baseline')
+  async getHrvBaseline(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: DateQuery,
+  ): Promise<HrvBaselineResponse> {
+    return this.service.getHrvBaseline(req, query.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get HRV baseline history' })
+  @ApiResponse({ status: HttpStatus.OK, type: HrvBaselineHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('hrv-baseline/history')
+  async getHrvBaselineHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<HrvBaselineHistoryResponse> {
+    return this.service.getHrvBaselineHistory(req, query.days);
+  }
+
+  // ==========================================
+  // Readiness endpoints
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get daily readiness score for a specific date' })
+  @ApiResponse({ status: HttpStatus.OK, type: DailyReadinessResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('readiness')
+  async getDailyReadiness(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: DateQuery,
+  ): Promise<DailyReadinessResponse> {
+    return this.service.getDailyReadiness(req, query.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get readiness history' })
+  @ApiResponse({ status: HttpStatus.OK, type: ReadinessHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('readiness/history')
+  async getReadinessHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<ReadinessHistoryResponse> {
+    return this.service.getReadinessHistory(req, query.days);
   }
 }
