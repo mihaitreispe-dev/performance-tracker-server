@@ -21,8 +21,11 @@ export interface ParsedLap {
   lapNumber: number;
   startTime: Date;
   totalTimeSeconds: number;
+  /** Elapsed time excluding pauses (moving time) */
+  elapsedTimeSeconds: number;
   distanceMeters: number;
   avgHeartRate?: number;
+  /** Average pace calculated from elapsed time (excluding pauses) */
   avgPaceSecondsPerKm?: number;
   startLatitude?: number;
   startLongitude?: number;
@@ -48,6 +51,8 @@ export interface ParsedWorkoutFile {
   startTime: Date;
   endTime?: Date;
   totalDurationSeconds?: number;
+  /** Total elapsed time excluding pauses (moving time) */
+  elapsedDurationSeconds?: number;
   totalDistanceMeters?: number;
   elevationGainMeters?: number;
   elevationLossMeters?: number;
@@ -125,6 +130,7 @@ export class WorkoutFileParserService {
     let endTime: Date | undefined;
     let totalDistance = 0;
     let totalDuration = 0;
+    let elapsedDuration = 0; // Moving time without pauses
     let elevationGain = 0;
     let elevationLoss = 0;
     let lastElevation: number | undefined;
@@ -141,6 +147,12 @@ export class WorkoutFileParserService {
       const session = data.sessions[0];
       if (session.start_time) startTime = new Date(session.start_time);
       if (session.total_elapsed_time) totalDuration = session.total_elapsed_time;
+      // total_timer_time is moving time (excludes pauses)
+      if (session.total_timer_time) {
+        elapsedDuration = session.total_timer_time;
+      } else if (session.total_elapsed_time) {
+        elapsedDuration = session.total_elapsed_time;
+      }
       if (session.total_distance) totalDistance = session.total_distance;
       if (session.total_ascent) elevationGain = session.total_ascent;
       if (session.total_descent) elevationLoss = session.total_descent;
@@ -264,10 +276,14 @@ export class WorkoutFileParserService {
 
       for (const lap of data.laps) {
         const lapStartTime = lap.start_time ? new Date(lap.start_time) : startTime;
-        const lapDuration = lap.total_elapsed_time || lap.total_timer_time || 0;
+        // total_elapsed_time includes pauses, total_timer_time is moving time
+        const lapTotalTime = lap.total_elapsed_time || lap.total_timer_time || 0;
+        // Prefer total_timer_time for elapsed time (moving time without pauses)
+        const lapElapsedTime = lap.total_timer_time || lap.total_elapsed_time || 0;
         const lapDistance = lap.total_distance || 0;
 
-        const avgPace = lapDistance > 0 ? (lapDuration / lapDistance) * 1000 : undefined;
+        // Calculate pace from elapsed time (excluding pauses) for accurate pace
+        const avgPace = lapDistance > 0 ? (lapElapsedTime / lapDistance) * 1000 : undefined;
 
         // Extract intensity from FIT lap data
         const intensity = this.mapFitIntensity(lap.intensity);
@@ -276,7 +292,8 @@ export class WorkoutFileParserService {
         laps.push({
           lapNumber,
           startTime: lapStartTime!,
-          totalTimeSeconds: lapDuration,
+          totalTimeSeconds: lapTotalTime,
+          elapsedTimeSeconds: lapElapsedTime,
           distanceMeters: lapDistance,
           avgHeartRate: lap.avg_heart_rate,
           avgPaceSecondsPerKm: avgPace,
@@ -301,6 +318,7 @@ export class WorkoutFileParserService {
       startTime,
       endTime,
       totalDurationSeconds: totalDuration || (endTime ? (endTime.getTime() - startTime.getTime()) / 1000 : undefined),
+      elapsedDurationSeconds: elapsedDuration || undefined,
       totalDistanceMeters: totalDistance || undefined,
       elevationGainMeters: elevationGain || undefined,
       elevationLossMeters: elevationLoss || undefined,
@@ -541,6 +559,7 @@ export class WorkoutFileParserService {
 
       if (!startTime && lapStartTime) startTime = lapStartTime;
 
+      // TCX TotalTimeSeconds is typically moving/timer time (already excludes pauses)
       const lapTotalTime = this.getElementFloat(lapEl, 'TotalTimeSeconds') || 0;
       const lapDistance = this.getElementFloat(lapEl, 'DistanceMeters') || 0;
       const lapAvgHr = this.getElementFloat(lapEl, 'AverageHeartRateBpm/Value');
@@ -548,7 +567,10 @@ export class WorkoutFileParserService {
       totalDuration += lapTotalTime;
       totalDistance += lapDistance;
 
-      const avgPace = lapDistance > 0 ? (lapTotalTime / lapDistance) * 1000 : undefined;
+      // TCX TotalTimeSeconds is already moving time, use it as elapsed time
+      const lapElapsedTime = lapTotalTime;
+      // Calculate pace from elapsed time (TCX already has moving time)
+      const avgPace = lapDistance > 0 ? (lapElapsedTime / lapDistance) * 1000 : undefined;
 
       // Extract intensity from TCX Lap element
       const intensityEl = lapEl.getElementsByTagName('Intensity')[0];
@@ -560,6 +582,7 @@ export class WorkoutFileParserService {
         lapNumber,
         startTime: lapStartTime || startTime || new Date(),
         totalTimeSeconds: lapTotalTime,
+        elapsedTimeSeconds: lapElapsedTime,
         distanceMeters: lapDistance,
         avgHeartRate: lapAvgHr,
         avgPaceSecondsPerKm: avgPace,
@@ -657,10 +680,12 @@ export class WorkoutFileParserService {
     // Detect pauses from timestamp gaps in TCX
     const pauses = this.detectPausesFromTimestampGaps(metrics);
 
+    // TCX totalDuration is already moving time (sum of lap TotalTimeSeconds)
     return {
       startTime,
       endTime,
       totalDurationSeconds: totalDuration || undefined,
+      elapsedDurationSeconds: totalDuration || undefined,
       totalDistanceMeters: totalDistance || undefined,
       elevationGainMeters: elevationGain || undefined,
       elevationLossMeters: elevationLoss || undefined,
@@ -875,6 +900,12 @@ export class WorkoutFileParserService {
 
     const totalDuration = endTime ? (endTime.getTime() - startTime.getTime()) / 1000 : undefined;
 
+    // Detect pauses from timestamp gaps FIRST (before creating km splits)
+    // so we can calculate elapsed time correctly
+    const pauses = this.detectPausesFromTimestampGaps(metrics);
+    const totalPauseDuration = pauses.reduce((sum, p) => sum + p.durationSeconds, 0);
+    const elapsedDuration = totalDuration ? totalDuration - totalPauseDuration : undefined;
+
     // Create kilometer splits as laps
     if (routePoints.length > 0) {
       let lapDistance = 0;
@@ -896,12 +927,23 @@ export class WorkoutFileParserService {
 
         if (lapDistance >= kmMarker) {
           const lapDuration = (currPoint.timestamp.getTime() - lapStartTime.getTime()) / 1000;
-          const avgPace = lapDuration / 1; // 1 km
+
+          // Calculate elapsed time by subtracting pauses that overlap with this lap
+          const lapPauseDuration = this.calculateOverlappingPauseDuration(
+            pauses,
+            lapStartTime,
+            currPoint.timestamp,
+          );
+          const lapElapsedTime = lapDuration - lapPauseDuration;
+
+          // Calculate pace from elapsed time (excluding pauses)
+          const avgPace = lapElapsedTime > 0 ? lapElapsedTime / 1 : lapDuration / 1; // 1 km
 
           laps.push({
             lapNumber,
             startTime: lapStartTime,
             totalTimeSeconds: lapDuration,
+            elapsedTimeSeconds: lapElapsedTime,
             distanceMeters: 1000,
             avgPaceSecondsPerKm: avgPace,
             startLatitude: lapStartPoint.latitude,
@@ -917,13 +959,11 @@ export class WorkoutFileParserService {
       }
     }
 
-    // Detect pauses from timestamp gaps in GPX
-    const pauses = this.detectPausesFromTimestampGaps(metrics);
-
     return {
       startTime,
       endTime,
       totalDurationSeconds: totalDuration,
+      elapsedDurationSeconds: elapsedDuration,
       totalDistanceMeters: totalDistance || undefined,
       elevationGainMeters: elevationGain || undefined,
       elevationLossMeters: elevationLoss || undefined,
@@ -1001,6 +1041,29 @@ export class WorkoutFileParserService {
 
   private toRad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  /**
+   * Calculate total pause duration that overlaps with a given time range
+   */
+  private calculateOverlappingPauseDuration(
+    pauses: PausePeriod[],
+    rangeStart: Date,
+    rangeEnd: Date,
+  ): number {
+    let totalOverlap = 0;
+
+    for (const pause of pauses) {
+      // Calculate overlap between pause period and the time range
+      const overlapStart = Math.max(pause.startTime.getTime(), rangeStart.getTime());
+      const overlapEnd = Math.min(pause.endTime.getTime(), rangeEnd.getTime());
+
+      if (overlapEnd > overlapStart) {
+        totalOverlap += (overlapEnd - overlapStart) / 1000; // Convert to seconds
+      }
+    }
+
+    return totalOverlap;
   }
 
   /**

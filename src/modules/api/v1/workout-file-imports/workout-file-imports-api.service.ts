@@ -348,6 +348,7 @@ export class WorkoutFileImportsApiService {
     const rawLaps: ParsedLapDTO[] = parsedData.laps.map((lap) => ({
       lapNumber: lap.lapNumber,
       durationSeconds: Math.round(lap.totalTimeSeconds),
+      elapsedTimeSeconds: Math.round(lap.elapsedTimeSeconds),
       distanceMeters: Math.round(lap.distanceMeters),
       avgHeartRate: lap.avgHeartRate ? Math.round(lap.avgHeartRate) : undefined,
       avgPaceSecondsPerKm: lap.avgPaceSecondsPerKm ? Math.round(lap.avgPaceSecondsPerKm) : undefined,
@@ -376,6 +377,9 @@ export class WorkoutFileImportsApiService {
         endTime: parsedData.endTime?.toISOString(),
         totalDurationSeconds: parsedData.totalDurationSeconds
           ? Math.round(parsedData.totalDurationSeconds)
+          : undefined,
+        elapsedDurationSeconds: parsedData.elapsedDurationSeconds
+          ? Math.round(parsedData.elapsedDurationSeconds)
           : undefined,
         totalDistanceMeters: parsedData.totalDistanceMeters
           ? Math.round(parsedData.totalDistanceMeters)
@@ -1060,13 +1064,19 @@ export class WorkoutFileImportsApiService {
    */
   private combineLaps(base: ParsedLapDTO, addition: ParsedLapDTO): ParsedLapDTO {
     const totalDuration = base.durationSeconds + addition.durationSeconds;
+    const totalElapsedTime =
+      (base.elapsedTimeSeconds ?? base.durationSeconds) + (addition.elapsedTimeSeconds ?? addition.durationSeconds);
     const totalDistance = base.distanceMeters + addition.distanceMeters;
 
-    // Weighted average for heart rate (by duration)
+    // Use elapsed time for weighted averages (moving time, more accurate)
+    const baseElapsed = base.elapsedTimeSeconds ?? base.durationSeconds;
+    const additionElapsed = addition.elapsedTimeSeconds ?? addition.durationSeconds;
+
+    // Weighted average for heart rate (by elapsed time)
     let avgHeartRate: number | undefined;
     if (base.avgHeartRate !== undefined && addition.avgHeartRate !== undefined) {
       avgHeartRate = Math.round(
-        (base.avgHeartRate * base.durationSeconds + addition.avgHeartRate * addition.durationSeconds) / totalDuration,
+        (base.avgHeartRate * baseElapsed + addition.avgHeartRate * additionElapsed) / totalElapsedTime,
       );
     } else if (base.avgHeartRate !== undefined) {
       avgHeartRate = base.avgHeartRate;
@@ -1090,6 +1100,7 @@ export class WorkoutFileImportsApiService {
     return {
       ...base,
       durationSeconds: totalDuration,
+      elapsedTimeSeconds: totalElapsedTime,
       distanceMeters: totalDistance,
       avgHeartRate,
       avgPaceSecondsPerKm,

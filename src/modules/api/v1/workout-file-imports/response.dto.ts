@@ -167,10 +167,15 @@ export class ImportPreviewDTO {
   @IsString()
   endTime?: string;
 
-  @ApiPropertyOptional({ description: 'Total duration in seconds' })
+  @ApiPropertyOptional({ description: 'Total duration in seconds (including pauses)' })
   @IsOptional()
   @IsNumber()
   totalDurationSeconds?: number;
+
+  @ApiPropertyOptional({ description: 'Elapsed duration excluding pauses (moving time)' })
+  @IsOptional()
+  @IsNumber()
+  elapsedDurationSeconds?: number;
 
   @ApiPropertyOptional({ description: 'Total distance in meters' })
   @IsOptional()

@@ -124,6 +124,7 @@ export class WorkoutSchedulesApiService {
       if (!execution.workout_schedule_id) continue;
 
       const distanceMeters = route ? Number.parseFloat(route.total_distance_meters) : null;
+      const elevationGainMeters = route?.elevation_gain_meters ? Number.parseFloat(route.elevation_gain_meters) : null;
       const durationSeconds = execution.duration_seconds ?? null;
 
       let paceSecondsPerKm: number | null = null;
@@ -134,11 +135,24 @@ export class WorkoutSchedulesApiService {
       const startedAt =
         execution.started_at instanceof Date ? execution.started_at.toISOString() : String(execution.started_at);
 
+      const completedAt = execution.completed_at
+        ? execution.completed_at instanceof Date
+          ? execution.completed_at.toISOString()
+          : String(execution.completed_at)
+        : null;
+
       result.set(execution.workout_schedule_id, {
+        id: execution.id,
         durationSeconds,
         distanceMeters,
         paceSecondsPerKm,
         startedAt,
+        completedAt,
+        avgHeartRate: null,
+        maxHeartRate: null,
+        minHeartRate: null,
+        elevationGainMeters,
+        caloriesBurned: null,
       });
     }
 

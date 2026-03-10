@@ -69,9 +69,14 @@ export class ParsedLapDTO {
   @IsNumber()
   lapNumber: number;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Total duration including pauses' })
   @IsNumber()
   durationSeconds: number;
+
+  @ApiPropertyOptional({ description: 'Elapsed time excluding pauses (moving time)' })
+  @IsOptional()
+  @IsNumber()
+  elapsedTimeSeconds?: number;
 
   @ApiProperty()
   @IsNumber()
@@ -82,7 +87,7 @@ export class ParsedLapDTO {
   @IsNumber()
   avgHeartRate?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Average pace calculated from elapsed time' })
   @IsOptional()
   @IsNumber()
   avgPaceSecondsPerKm?: number;

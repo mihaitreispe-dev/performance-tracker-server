@@ -10,6 +10,7 @@ import { UserRepository } from 'src/repositories/user.repository';
 
 import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-api.module';
 import { AnalyticsApiModule } from './analytics/analytics-api.module';
+import { WorkoutComparisonModule } from './analytics/workout-comparison/workout-comparison.module';
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
 import { CoachingApiModule } from './coaching/coaching-api.module';
@@ -47,6 +48,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     WorkoutFileImportsApiModule.register(),
     CardioCategoriesApiModule.register(),
     AnalyticsApiModule.register(),
+    WorkoutComparisonModule.register(),
     AdvancedMetricsApiModule.register(),
     IntegrationsApiModule.register(),
     WorkoutPlansApiModule.register(),

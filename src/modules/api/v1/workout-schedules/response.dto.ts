@@ -29,6 +29,10 @@ export class WorkoutInfoDTO {
 }
 
 export class ExecutionSummaryDTO {
+  @ApiProperty({ description: 'Execution ID' })
+  @IsUUID()
+  id: string;
+
   @ApiPropertyOptional({ type: Number, description: 'Duration in seconds' })
   @IsOptional()
   durationSeconds?: number | null;
@@ -45,6 +49,31 @@ export class ExecutionSummaryDTO {
   @IsString()
   @IsOptional()
   startedAt?: string | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Workout execution completion time' })
+  @IsString()
+  @IsOptional()
+  completedAt?: string | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Average heart rate in bpm' })
+  @IsOptional()
+  avgHeartRate?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Max heart rate in bpm' })
+  @IsOptional()
+  maxHeartRate?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Min heart rate in bpm' })
+  @IsOptional()
+  minHeartRate?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Elevation gain in meters' })
+  @IsOptional()
+  elevationGainMeters?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Calories burned' })
+  @IsOptional()
+  caloriesBurned?: number | null;
 }
 
 export class WorkoutScheduleDTO {
