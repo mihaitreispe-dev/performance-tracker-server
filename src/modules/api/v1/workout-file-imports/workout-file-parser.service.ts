@@ -27,6 +27,21 @@ export interface ParsedLap {
   startLatitude?: number;
   startLongitude?: number;
   startElevation?: number;
+  /** Detected step name/type (e.g., "Warm Up", "Interval", "Recovery", "Cool Down") */
+  name?: string;
+  /** Intensity level if detected (active, rest, warmup, cooldown) */
+  intensity?: 'active' | 'rest' | 'warmup' | 'cooldown';
+}
+
+export type DetectedSportType = 'run' | 'cycling' | 'swimming' | 'unknown';
+
+export interface PausePeriod {
+  /** Start time of the pause */
+  startTime: Date;
+  /** End time of the pause */
+  endTime: Date;
+  /** Duration in seconds */
+  durationSeconds: number;
 }
 
 export interface ParsedWorkoutFile {
@@ -39,6 +54,12 @@ export interface ParsedWorkoutFile {
   metrics: ParsedMetric[];
   routePoints: ParsedRoutePoint[];
   laps: ParsedLap[];
+  /** Detected sport type from file metadata */
+  sportType: DetectedSportType;
+  /** Original sport name from the file (e.g., "trail_running", "road_cycling") */
+  sportName?: string;
+  /** Detected pause periods during the workout */
+  pauses: PausePeriod[];
 }
 
 @Injectable()
@@ -107,6 +128,8 @@ export class WorkoutFileParserService {
     let elevationGain = 0;
     let elevationLoss = 0;
     let lastElevation: number | undefined;
+    let sportType: DetectedSportType = 'unknown';
+    let sportName: string | undefined;
 
     // Log first record for debugging
     if (data.records && data.records.length > 0) {
@@ -121,6 +144,13 @@ export class WorkoutFileParserService {
       if (session.total_distance) totalDistance = session.total_distance;
       if (session.total_ascent) elevationGain = session.total_ascent;
       if (session.total_descent) elevationLoss = session.total_descent;
+
+      // Detect sport type from session
+      if (session.sport !== undefined) {
+        sportName = session.sub_sport ? `${session.sport}_${session.sub_sport}` : session.sport;
+        sportType = this.mapFitSportToType(session.sport, session.sub_sport);
+        this.logger.debug(`Detected sport: ${session.sport}, sub_sport: ${session.sub_sport} -> ${sportType}`);
+      }
     }
 
     // Extract from activity
@@ -239,6 +269,10 @@ export class WorkoutFileParserService {
 
         const avgPace = lapDistance > 0 ? (lapDuration / lapDistance) * 1000 : undefined;
 
+        // Extract intensity from FIT lap data
+        const intensity = this.mapFitIntensity(lap.intensity);
+        const stepName = this.deriveStepName(intensity, lap.lap_trigger, lapNumber);
+
         laps.push({
           lapNumber,
           startTime: lapStartTime!,
@@ -248,6 +282,8 @@ export class WorkoutFileParserService {
           avgPaceSecondsPerKm: avgPace,
           startLatitude: lap.start_position_lat,
           startLongitude: lap.start_position_long,
+          name: stepName,
+          intensity,
         });
 
         lapNumber++;
@@ -257,6 +293,9 @@ export class WorkoutFileParserService {
     if (!startTime) {
       startTime = new Date();
     }
+
+    // Detect pauses from FIT events or timestamp gaps
+    const pauses = this.detectPausesFromFIT(data, metrics);
 
     return {
       startTime,
@@ -268,7 +307,197 @@ export class WorkoutFileParserService {
       metrics,
       routePoints,
       laps,
+      sportType,
+      sportName,
+      pauses,
     };
+  }
+
+  /**
+   * Detect pause periods from FIT event records or timestamp gaps
+   */
+  private detectPausesFromFIT(data: any, metrics: ParsedMetric[]): PausePeriod[] {
+    const pauses: PausePeriod[] = [];
+
+    // Method 1: Look for timer events in FIT data
+    if (data.events && Array.isArray(data.events)) {
+      let pauseStart: Date | null = null;
+
+      for (const event of data.events) {
+        const eventType = String(event.event || '').toLowerCase();
+        const eventAction = String(event.event_type || '').toLowerCase();
+
+        // Timer stop events indicate pause start
+        if (
+          (eventType === 'timer' && (eventAction === 'stop_all' || eventAction === 'stop')) ||
+          eventType === 'stop_all'
+        ) {
+          if (event.timestamp && !pauseStart) {
+            pauseStart = new Date(event.timestamp);
+          }
+        }
+
+        // Timer start events indicate pause end
+        if (
+          (eventType === 'timer' && eventAction === 'start') ||
+          eventType === 'start'
+        ) {
+          if (event.timestamp && pauseStart) {
+            const pauseEnd = new Date(event.timestamp);
+            const durationSeconds = (pauseEnd.getTime() - pauseStart.getTime()) / 1000;
+            if (durationSeconds > 2) {
+              // Only count pauses longer than 2 seconds
+              pauses.push({
+                startTime: pauseStart,
+                endTime: pauseEnd,
+                durationSeconds,
+              });
+            }
+            pauseStart = null;
+          }
+        }
+      }
+    }
+
+    // Method 2: If no events found, detect pauses from timestamp gaps with zero/low speed
+    if (pauses.length === 0 && metrics.length > 0) {
+      const paceMetrics = metrics
+        .filter((m) => m.metricType === CardioMetricType.PACE || m.metricType === CardioMetricType.SPEED)
+        .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+
+      if (paceMetrics.length > 1) {
+        const PAUSE_GAP_THRESHOLD_MS = 30000; // 30 seconds gap indicates pause
+        const SLOW_PACE_THRESHOLD = 1800; // 30 min/km is essentially stopped
+
+        for (let i = 1; i < paceMetrics.length; i++) {
+          const prev = paceMetrics[i - 1];
+          const curr = paceMetrics[i];
+          const prevTime = new Date(prev.recordedAt).getTime();
+          const currTime = new Date(curr.recordedAt).getTime();
+          const gap = currTime - prevTime;
+
+          // If there's a large gap in data, treat it as a pause
+          if (gap > PAUSE_GAP_THRESHOLD_MS) {
+            pauses.push({
+              startTime: new Date(prev.recordedAt),
+              endTime: new Date(curr.recordedAt),
+              durationSeconds: gap / 1000,
+            });
+          }
+          // Or if pace is very slow (essentially stopped) for multiple consecutive points
+          else if (
+            prev.metricType === CardioMetricType.PACE &&
+            prev.value > SLOW_PACE_THRESHOLD &&
+            curr.value > SLOW_PACE_THRESHOLD
+          ) {
+            // This could be a pause - but we need consecutive slow points
+            // For simplicity, we rely more on the gap detection
+          }
+        }
+      }
+    }
+
+    return pauses;
+  }
+
+  /**
+   * Map FIT sport and sub_sport fields to our sport type enum
+   */
+  private mapFitSportToType(sport: string | number, subSport?: string | number): DetectedSportType {
+    // FIT sport values can be strings or numbers depending on the parser
+    const sportStr = String(sport).toLowerCase();
+    const subSportStr = subSport ? String(subSport).toLowerCase() : undefined;
+
+    // Running sports
+    if (
+      sportStr === 'running' ||
+      sportStr === 'run' ||
+      sportStr === '1' || // FIT enum value for running
+      subSportStr === 'trail' ||
+      subSportStr === 'track' ||
+      subSportStr === 'treadmill'
+    ) {
+      return 'run';
+    }
+
+    // Cycling sports
+    if (
+      sportStr === 'cycling' ||
+      sportStr === 'biking' ||
+      sportStr === '2' || // FIT enum value for cycling
+      subSportStr === 'road' ||
+      subSportStr === 'mountain' ||
+      subSportStr === 'gravel' ||
+      subSportStr === 'indoor_cycling' ||
+      subSportStr === 'spin'
+    ) {
+      return 'cycling';
+    }
+
+    // Swimming sports
+    if (
+      sportStr === 'swimming' ||
+      sportStr === 'swim' ||
+      sportStr === '5' || // FIT enum value for swimming
+      subSportStr === 'lap_swimming' ||
+      subSportStr === 'open_water'
+    ) {
+      return 'swimming';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Map FIT intensity field to our intensity type
+   * FIT intensity values: 0=active, 1=rest, 2=warmup, 3=cooldown
+   */
+  private mapFitIntensity(intensity: string | number | undefined): ParsedLap['intensity'] | undefined {
+    if (intensity === undefined || intensity === null) return undefined;
+
+    const intensityStr = String(intensity).toLowerCase();
+
+    // Handle both string and numeric values
+    if (intensityStr === 'warmup' || intensityStr === '2' || intensityStr === 'warm_up') {
+      return 'warmup';
+    }
+    if (intensityStr === 'cooldown' || intensityStr === '3' || intensityStr === 'cool_down') {
+      return 'cooldown';
+    }
+    if (intensityStr === 'rest' || intensityStr === '1' || intensityStr === 'recovery') {
+      return 'rest';
+    }
+    if (intensityStr === 'active' || intensityStr === '0') {
+      return 'active';
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Derive a human-readable step name from intensity and lap context
+   */
+  private deriveStepName(
+    intensity: ParsedLap['intensity'] | undefined,
+    lapTrigger: string | number | undefined,
+    lapNumber: number,
+  ): string | undefined {
+    // First priority: derive from intensity
+    if (intensity === 'warmup') return 'Warm Up';
+    if (intensity === 'cooldown') return 'Cool Down';
+    if (intensity === 'rest') return 'Recovery';
+
+    // For active laps, check if it might be an interval based on lap trigger
+    if (intensity === 'active' && lapTrigger) {
+      const triggerStr = String(lapTrigger).toLowerCase();
+      // manual lap press often indicates intervals
+      if (triggerStr === 'manual' || triggerStr === '1') {
+        return 'Interval';
+      }
+    }
+
+    // No specific name detected
+    return undefined;
   }
 
   private parseTCX(buffer: Buffer): ParsedWorkoutFile {
@@ -287,6 +516,19 @@ export class WorkoutFileParserService {
     let elevationGain = 0;
     let elevationLoss = 0;
     let lastElevation: number | undefined;
+    let sportType: DetectedSportType = 'unknown';
+    let sportName: string | undefined;
+
+    // Detect sport from Activity element
+    const activityElements = doc.getElementsByTagName('Activity');
+    if (activityElements.length > 0) {
+      const sportAttr = activityElements[0].getAttribute('Sport');
+      if (sportAttr) {
+        sportName = sportAttr;
+        sportType = this.mapTcxSportToType(sportAttr);
+        this.logger.debug(`TCX detected sport: ${sportAttr} -> ${sportType}`);
+      }
+    }
 
     // Find all Lap elements
     const lapElements = doc.getElementsByTagName('Lap');
@@ -308,6 +550,12 @@ export class WorkoutFileParserService {
 
       const avgPace = lapDistance > 0 ? (lapTotalTime / lapDistance) * 1000 : undefined;
 
+      // Extract intensity from TCX Lap element
+      const intensityEl = lapEl.getElementsByTagName('Intensity')[0];
+      const tcxIntensity = intensityEl?.textContent?.toLowerCase();
+      const intensity = this.mapTcxIntensity(tcxIntensity);
+      const stepName = this.deriveTcxStepName(intensity, lapNumber, lapElements.length);
+
       laps.push({
         lapNumber,
         startTime: lapStartTime || startTime || new Date(),
@@ -315,6 +563,8 @@ export class WorkoutFileParserService {
         distanceMeters: lapDistance,
         avgHeartRate: lapAvgHr,
         avgPaceSecondsPerKm: avgPace,
+        name: stepName,
+        intensity,
       });
 
       lapNumber++;
@@ -404,6 +654,9 @@ export class WorkoutFileParserService {
       startTime = new Date();
     }
 
+    // Detect pauses from timestamp gaps in TCX
+    const pauses = this.detectPausesFromTimestampGaps(metrics);
+
     return {
       startTime,
       endTime,
@@ -414,7 +667,72 @@ export class WorkoutFileParserService {
       metrics,
       routePoints,
       laps,
+      sportType,
+      sportName,
+      pauses,
     };
+  }
+
+  /**
+   * Map TCX Sport attribute to our sport type enum
+   */
+  private mapTcxSportToType(sport: string): DetectedSportType {
+    const sportLower = sport.toLowerCase();
+
+    if (sportLower === 'running' || sportLower === 'run') {
+      return 'run';
+    }
+
+    if (sportLower === 'biking' || sportLower === 'cycling') {
+      return 'cycling';
+    }
+
+    if (sportLower === 'swimming' || sportLower === 'swim') {
+      return 'swimming';
+    }
+
+    // TCX also uses "Other" for many activities
+    return 'unknown';
+  }
+
+  /**
+   * Map TCX Intensity element to our intensity type
+   * TCX intensity values: "Active" or "Resting"
+   */
+  private mapTcxIntensity(intensity: string | undefined): ParsedLap['intensity'] | undefined {
+    if (!intensity) return undefined;
+
+    const intensityLower = intensity.toLowerCase();
+
+    if (intensityLower === 'resting' || intensityLower === 'rest') {
+      return 'rest';
+    }
+    if (intensityLower === 'active') {
+      return 'active';
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Derive step name for TCX laps based on intensity and position
+   */
+  private deriveTcxStepName(
+    intensity: ParsedLap['intensity'] | undefined,
+    lapNumber: number,
+    totalLaps: number,
+  ): string | undefined {
+    // Rest laps are recovery intervals
+    if (intensity === 'rest') return 'Recovery';
+
+    // Try to infer warmup/cooldown from position (heuristic)
+    // First lap with active intensity might be warmup if there are multiple laps
+    if (intensity === 'active' && totalLaps > 2) {
+      if (lapNumber === 1) return 'Warm Up';
+      if (lapNumber === totalLaps) return 'Cool Down';
+    }
+
+    return undefined;
   }
 
   private parseGPX(buffer: Buffer): ParsedWorkoutFile {
@@ -433,6 +751,26 @@ export class WorkoutFileParserService {
     let elevationLoss = 0;
     let lastElevation: number | undefined;
     let lastPoint: { lat: number; lon: number } | undefined;
+    let sportType: DetectedSportType = 'unknown';
+    let sportName: string | undefined;
+
+    // Try to detect sport from track name or type
+    const trkElements = doc.getElementsByTagName('trk');
+    if (trkElements.length > 0) {
+      const trkNameEl = trkElements[0].getElementsByTagName('name')[0];
+      const trkTypeEl = trkElements[0].getElementsByTagName('type')[0];
+
+      if (trkTypeEl?.textContent) {
+        sportName = trkTypeEl.textContent;
+        sportType = this.inferSportFromName(trkTypeEl.textContent);
+      } else if (trkNameEl?.textContent) {
+        // Try to infer from track name
+        sportType = this.inferSportFromName(trkNameEl.textContent);
+        if (sportType !== 'unknown') {
+          sportName = trkNameEl.textContent;
+        }
+      }
+    }
 
     // Find all track segments
     const trksegs = doc.getElementsByTagName('trkseg');
@@ -579,6 +917,9 @@ export class WorkoutFileParserService {
       }
     }
 
+    // Detect pauses from timestamp gaps in GPX
+    const pauses = this.detectPausesFromTimestampGaps(metrics);
+
     return {
       startTime,
       endTime,
@@ -589,7 +930,47 @@ export class WorkoutFileParserService {
       metrics,
       routePoints,
       laps,
+      sportType,
+      sportName,
+      pauses,
     };
+  }
+
+  /**
+   * Infer sport type from a name/type string (for GPX files)
+   */
+  private inferSportFromName(name: string): DetectedSportType {
+    const lower = name.toLowerCase();
+
+    // Running keywords
+    if (
+      lower.includes('run') ||
+      lower.includes('jog') ||
+      lower.includes('trail') ||
+      lower.includes('marathon') ||
+      lower.includes('5k') ||
+      lower.includes('10k')
+    ) {
+      return 'run';
+    }
+
+    // Cycling keywords
+    if (
+      lower.includes('cycling') ||
+      lower.includes('bike') ||
+      lower.includes('ride') ||
+      lower.includes('biking') ||
+      lower.includes('cycle')
+    ) {
+      return 'cycling';
+    }
+
+    // Swimming keywords
+    if (lower.includes('swim') || lower.includes('pool') || lower.includes('lap')) {
+      return 'swimming';
+    }
+
+    return 'unknown';
   }
 
   private getElementFloat(parent: Element, path: string): number | undefined {
@@ -620,5 +1001,42 @@ export class WorkoutFileParserService {
 
   private toRad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  /**
+   * Detect pauses from timestamp gaps in metrics (for TCX and GPX files)
+   */
+  private detectPausesFromTimestampGaps(metrics: ParsedMetric[]): PausePeriod[] {
+    const pauses: PausePeriod[] = [];
+
+    if (metrics.length < 2) return pauses;
+
+    // Sort metrics by timestamp
+    const sortedMetrics = [...metrics].sort(
+      (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
+    );
+
+    // Get unique timestamps to detect gaps
+    const uniqueTimestamps = [...new Set(sortedMetrics.map((m) => new Date(m.recordedAt).getTime()))].sort(
+      (a, b) => a - b,
+    );
+
+    const PAUSE_GAP_THRESHOLD_MS = 30000; // 30 seconds gap indicates pause
+
+    for (let i = 1; i < uniqueTimestamps.length; i++) {
+      const prev = uniqueTimestamps[i - 1];
+      const curr = uniqueTimestamps[i];
+      const gap = curr - prev;
+
+      if (gap > PAUSE_GAP_THRESHOLD_MS) {
+        pauses.push({
+          startTime: new Date(prev),
+          endTime: new Date(curr),
+          durationSeconds: gap / 1000,
+        });
+      }
+    }
+
+    return pauses;
   }
 }

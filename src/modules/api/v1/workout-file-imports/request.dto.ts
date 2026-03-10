@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { WorkoutFileFormat } from 'src/database/interfaces';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -28,4 +39,93 @@ export class WorkoutFileImportIdParam {
   @ApiProperty()
   @IsUUID()
   id: string;
+}
+
+/** Workout type for imported activities - matches WorkoutType enum */
+export enum ImportSportType {
+  RUN = 'run',
+  CYCLING = 'cycling',
+  SWIMMING = 'swimming',
+  STRENGTH = 'strength',
+  CARDIO = 'cardio',
+  FLEXIBILITY = 'flexibility',
+  HIIT = 'hiit',
+  CIRCUIT = 'circuit',
+  WALKING = 'walking',
+  CUSTOM = 'custom',
+}
+
+/** Intensity level for lap/step */
+export enum LapIntensity {
+  ACTIVE = 'active',
+  REST = 'rest',
+  WARMUP = 'warmup',
+  COOLDOWN = 'cooldown',
+}
+
+/** Parsed lap/step data for preview */
+export class ParsedLapDTO {
+  @ApiProperty()
+  @IsNumber()
+  lapNumber: number;
+
+  @ApiProperty()
+  @IsNumber()
+  durationSeconds: number;
+
+  @ApiProperty()
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  avgHeartRate?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  avgPaceSecondsPerKm?: number;
+
+  @ApiPropertyOptional({ description: 'Detected step name (e.g., "Warm Up", "Interval", "Recovery")' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Intensity level', enum: LapIntensity })
+  @IsOptional()
+  @IsEnum(LapIntensity)
+  intensity?: LapIntensity;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+/** Request body for confirming an import with (possibly modified) workout data */
+export class ConfirmImportBody {
+  @ApiProperty({ description: 'Workout name' })
+  @IsString()
+  workoutName: string;
+
+  @ApiPropertyOptional({ description: 'Workout description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiProperty({ description: 'Sport type', enum: ImportSportType })
+  @IsEnum(ImportSportType)
+  sportType: ImportSportType;
+
+  @ApiProperty({ description: 'Laps/steps for the workout', type: [ParsedLapDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParsedLapDTO)
+  laps: ParsedLapDTO[];
+
+  @ApiPropertyOptional({ description: 'Optional workout schedule ID to link import to' })
+  @IsOptional()
+  @IsUUID()
+  workoutScheduleId?: string;
 }

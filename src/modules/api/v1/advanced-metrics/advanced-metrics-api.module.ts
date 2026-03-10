@@ -1,5 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { DailyHealthMetricRepository } from 'src/repositories/daily-health-metric.repository';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
@@ -15,8 +17,14 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
+import { CoachAthleteRelationshipGuard } from '../coaching/guards/coach-athlete-relationship.guard';
+
 import { AdvancedMetricsApiController } from './advanced-metrics-api.controller';
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
+import { PowerCurveController, PowerCurveCoachController } from './power-curve/power-curve.controller';
+import { PowerCurveService } from './power-curve/power-curve.service';
+import { RunningPowerController, RunningPowerCoachController } from './running-power/running-power.controller';
+import { RunningPowerService } from './running-power/running-power.service';
 import { BayesianParameterService } from './services/bayesian-parameter.service';
 import { FitnessFatigueService } from './services/fitness-fatigue.service';
 import { HrvBaselineService } from './services/hrv-baseline.service';
@@ -24,6 +32,8 @@ import { MultiStreamLoadService } from './services/multi-stream-load.service';
 import { ReadinessService } from './services/readiness.service';
 import { TrainingStressService } from './services/training-stress.service';
 import { Vo2MaxService } from './services/vo2max.service';
+import { SwimMetricsController, SwimMetricsCoachController } from './swim-metrics/swim-metrics.controller';
+import { SwimMetricsService } from './swim-metrics/swim-metrics.service';
 
 @Module({})
 export class AdvancedMetricsApiModule {
@@ -44,6 +54,12 @@ export class AdvancedMetricsApiModule {
           MultiStreamLoadService,
           ReadinessService,
           BayesianParameterService,
+          // Sport-specific analytics services
+          PowerCurveService,
+          RunningPowerService,
+          SwimMetricsService,
+          // Guards
+          CoachAthleteRelationshipGuard,
           // Repositories
           FitnessMetricsRepository,
           TrainingStressRepository,
@@ -60,8 +76,18 @@ export class AdvancedMetricsApiModule {
           DailyHealthMetricRepository,
           SetCompletionRepository,
           WorkoutScheduleRepository,
+          CoachAthleteRelationshipRepository,
+          AthletePrivacySettingsRepository,
         ],
-        controllers: [AdvancedMetricsApiController],
+        controllers: [
+          AdvancedMetricsApiController,
+          PowerCurveController,
+          PowerCurveCoachController,
+          RunningPowerController,
+          RunningPowerCoachController,
+          SwimMetricsController,
+          SwimMetricsCoachController,
+        ],
         exports: [
           AdvancedMetricsApiService,
           HrvBaselineService,
@@ -69,6 +95,9 @@ export class AdvancedMetricsApiModule {
           ReadinessService,
           BayesianParameterService,
           LoadModelParametersRepository,
+          PowerCurveService,
+          RunningPowerService,
+          SwimMetricsService,
         ],
       };
     }

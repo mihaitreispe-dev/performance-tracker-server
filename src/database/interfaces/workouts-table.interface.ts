@@ -19,6 +19,7 @@ export enum WorkoutType {
   RUN = 'run',
   CYCLING = 'cycling',
   SWIMMING = 'swimming',
+  WALKING = 'walking',
 }
 
 export interface WorkoutsTable {
