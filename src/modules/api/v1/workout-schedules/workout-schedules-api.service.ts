@@ -148,6 +148,8 @@ export class WorkoutSchedulesApiService {
         paceSecondsPerKm,
         startedAt,
         completedAt,
+        // TODO: Populate these from cardio metrics data when available
+        // Currently set to null as placeholders for future enhancement
         avgHeartRate: null,
         maxHeartRate: null,
         minHeartRate: null,
