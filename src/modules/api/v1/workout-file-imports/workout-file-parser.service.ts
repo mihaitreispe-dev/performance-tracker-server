@@ -228,6 +228,56 @@ export class WorkoutFileParserService {
           });
         }
 
+        // Stride Length (FIT stores in mm, convert to m)
+        if (record.stride_length !== undefined && record.stride_length !== null && record.stride_length > 0) {
+          metrics.push({
+            metricType: CardioMetricType.STRIDE_LENGTH,
+            recordedAt: timestamp,
+            value: record.stride_length / 1000,
+            unit: 'm',
+          });
+        }
+
+        // Vertical Oscillation (FIT stores in mm, convert to cm)
+        if (record.vertical_oscillation !== undefined && record.vertical_oscillation !== null) {
+          metrics.push({
+            metricType: CardioMetricType.VERTICAL_OSCILLATION,
+            recordedAt: timestamp,
+            value: record.vertical_oscillation / 10,
+            unit: 'cm',
+          });
+        }
+
+        // Vertical Ratio (FIT stores as 0-10000, convert to %)
+        if (record.vertical_ratio !== undefined && record.vertical_ratio !== null) {
+          metrics.push({
+            metricType: CardioMetricType.VERTICAL_RATIO,
+            recordedAt: timestamp,
+            value: record.vertical_ratio / 100,
+            unit: '%',
+          });
+        }
+
+        // Ground Contact Time (stance_time in ms)
+        if (record.stance_time !== undefined && record.stance_time !== null) {
+          metrics.push({
+            metricType: CardioMetricType.GROUND_CONTACT_TIME,
+            recordedAt: timestamp,
+            value: record.stance_time,
+            unit: 'ms',
+          });
+        }
+
+        // Ground Contact Balance (stance_time_percent as %)
+        if (record.stance_time_percent !== undefined && record.stance_time_percent !== null) {
+          metrics.push({
+            metricType: CardioMetricType.GROUND_CONTACT_BALANCE,
+            recordedAt: timestamp,
+            value: record.stance_time_percent,
+            unit: '%',
+          });
+        }
+
         // GPS coordinates
         if (record.position_lat !== undefined && record.position_long !== undefined) {
           // FIT files store coordinates in semicircles, convert to degrees

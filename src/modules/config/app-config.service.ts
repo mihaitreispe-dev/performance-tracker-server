@@ -188,12 +188,6 @@ export class AppConfigService {
     return this.configService.get('GARMIN_REDIRECT_URI');
   }
 
-  // Google Maps
-
-  get googleMapsApiKey(): string | undefined {
-    return this.configService.get('GOOGLE_MAPS_API_KEY');
-  }
-
   // CORS
 
   get corsOrigins(): string[] {

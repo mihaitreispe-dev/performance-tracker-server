@@ -13,6 +13,8 @@ export enum CardioMetricType {
   GROUND_CONTACT_BALANCE = 'ground_contact_balance',
   ELEVATION = 'elevation',
   SPEED = 'speed',
+  VERTICAL_RATIO = 'vertical_ratio',
+  GROUND_CONTACT_TIME = 'ground_contact_time',
 }
 
 export interface CardioMetricsTable {

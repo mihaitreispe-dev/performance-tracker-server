@@ -33,7 +33,6 @@ These are sensitive values that should never be exposed:
 | `STRAVA_WEBHOOK_VERIFY_TOKEN` | Token for Strava webhook verification |
 | `GARMIN_CONSUMER_KEY` | Garmin OAuth consumer key |
 | `GARMIN_CONSUMER_SECRET` | Garmin OAuth consumer secret |
-| `GOOGLE_MAPS_API_KEY` | Google Maps API key |
 
 ## GitHub Variables (Repository Settings → Secrets and variables → Actions → Variables)
 

@@ -172,11 +172,6 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   GARMIN_REDIRECT_URI?: string;
 
-  // Google Maps
-
-  @IsString()
-  GOOGLE_MAPS_API_KEY: string;
-
   // CORS
 
   @IsString()

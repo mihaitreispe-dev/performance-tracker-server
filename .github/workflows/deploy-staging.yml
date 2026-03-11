@@ -71,8 +71,6 @@ jobs:
             GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY_STAGING }}
             GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET_STAGING }}
             GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI_STAGING }}
-            # Google Maps
-            GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY_STAGING }}
           EOF
 
       - name: Configure AWS credentials
