@@ -250,6 +250,16 @@ export class GeoJSONLineStringBody {
   coordinates: number[][];
 }
 
+// Session RPE
+
+export class UpdateSessionRPEBody {
+  @ApiProperty({ type: Number, description: 'Session RPE (1-10)', minimum: 1, maximum: 10 })
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  sessionRpe: number;
+}
+
 export class UploadRouteBody {
   @ApiProperty({ type: GeoJSONLineStringBody, description: 'Route as GeoJSON LineString' })
   @ValidateNested()

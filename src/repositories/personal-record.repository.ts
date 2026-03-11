@@ -8,12 +8,14 @@ import {
   PersonalRecord,
   PersonalRecordHistory,
   PersonalRecordType,
+  WorkoutType,
 } from 'src/database/interfaces';
 
 export interface FindManyFilter {
   userId: string;
   recordType?: PersonalRecordType;
   exerciseId?: string;
+  workoutType?: WorkoutType;
   category?: 'strength' | 'cardio_distance' | 'cardio_other';
 }
 
@@ -45,17 +47,17 @@ const STRENGTH_TYPES: PersonalRecordType[] = [
 ];
 
 const CARDIO_DISTANCE_TYPES: PersonalRecordType[] = [
-  PersonalRecordType.FASTEST_1K,
-  PersonalRecordType.FASTEST_5K,
-  PersonalRecordType.FASTEST_10K,
+  PersonalRecordType.LONGEST_DISTANCE,
   PersonalRecordType.FASTEST_HALF_MARATHON,
   PersonalRecordType.FASTEST_MARATHON,
-  PersonalRecordType.FASTEST_KM_SPLIT,
-  PersonalRecordType.FASTEST_MILE_SPLIT,
 ];
 
 const CARDIO_OTHER_TYPES: PersonalRecordType[] = [
-  PersonalRecordType.LONGEST_DISTANCE,
+  PersonalRecordType.FASTEST_1K,
+  PersonalRecordType.FASTEST_5K,
+  PersonalRecordType.FASTEST_10K,
+  PersonalRecordType.FASTEST_KM_SPLIT,
+  PersonalRecordType.FASTEST_MILE_SPLIT,
   PersonalRecordType.MAX_ELEVATION_GAIN,
   PersonalRecordType.LONGEST_DURATION,
 ];
@@ -79,6 +81,10 @@ export class PersonalRecordRepository {
       query = query.where('exercise_id', '=', filter.exerciseId);
     }
 
+    if (filter.workoutType) {
+      query = query.where('workout_type', '=', filter.workoutType);
+    }
+
     if (filter.category === 'strength') {
       query = query.where('record_type', 'in', STRENGTH_TYPES);
     } else if (filter.category === 'cardio_distance') {
@@ -90,10 +96,11 @@ export class PersonalRecordRepository {
     return query.orderBy('achieved_at', 'desc').execute();
   }
 
-  async findByUserTypeAndExercise(
+  async findByUserTypeExerciseAndWorkoutType(
     userId: string,
     recordType: PersonalRecordType,
     exerciseId: string | null,
+    workoutType: WorkoutType | null,
   ): Promise<PersonalRecord | undefined> {
     let query = this.db
       .selectFrom('personal_records')
@@ -105,6 +112,12 @@ export class PersonalRecordRepository {
       query = query.where('exercise_id', '=', exerciseId);
     } else {
       query = query.where('exercise_id', 'is', null);
+    }
+
+    if (workoutType) {
+      query = query.where('workout_type', '=', workoutType);
+    } else {
+      query = query.where('workout_type', 'is', null);
     }
 
     return query.executeTakeFirst();
@@ -129,7 +142,7 @@ export class PersonalRecordRepository {
       .insertInto('personal_records')
       .values(data)
       .onConflict((oc) =>
-        oc.columns(['user_id', 'record_type', 'exercise_id']).doUpdateSet({
+        oc.columns(['user_id', 'record_type', 'exercise_id', 'workout_type']).doUpdateSet({
           value: data.value,
           unit: data.unit,
           workout_execution_id: data.workout_execution_id,
@@ -229,5 +242,50 @@ export class PersonalRecordRepository {
     ]);
 
     return { period1Count, period2Count, period1PRs, period2PRs };
+  }
+
+  /**
+   * Get all historical records for a specific record type, sorted by value.
+   * For time-based records (fastest times), sorts ascending (lower is better).
+   * For other records (max weight, longest distance), sorts descending (higher is better).
+   */
+  async findAllHistory(filter: {
+    userId: string;
+    recordType: PersonalRecordType;
+    exerciseId?: string;
+    workoutType?: WorkoutType;
+  }): Promise<PersonalRecordHistory[]> {
+    let query = this.db
+      .selectFrom('personal_record_history')
+      .selectAll()
+      .where('user_id', '=', filter.userId)
+      .where('record_type', '=', filter.recordType);
+
+    if (filter.exerciseId) {
+      query = query.where('exercise_id', '=', filter.exerciseId);
+    } else {
+      query = query.where('exercise_id', 'is', null);
+    }
+
+    if (filter.workoutType) {
+      query = query.where('workout_type', '=', filter.workoutType);
+    }
+
+    // Determine sort order based on record type
+    const isTimeBased = [
+      PersonalRecordType.FASTEST_1K,
+      PersonalRecordType.FASTEST_5K,
+      PersonalRecordType.FASTEST_10K,
+      PersonalRecordType.FASTEST_HALF_MARATHON,
+      PersonalRecordType.FASTEST_MARATHON,
+      PersonalRecordType.FASTEST_KM_SPLIT,
+      PersonalRecordType.FASTEST_MILE_SPLIT,
+    ].includes(filter.recordType);
+
+    // For time-based records, lower is better (ascending)
+    // For all other records, higher is better (descending)
+    const sortDirection = isTimeBased ? 'asc' : 'desc';
+
+    return query.orderBy(sql`CAST(value AS DECIMAL)`, sortDirection).execute();
   }
 }

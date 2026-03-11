@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import {
   LimitingStream,
   LoadModelParameterValues,
@@ -17,6 +17,7 @@ import { TrainingStressRepository } from 'src/repositories/training-stress.repos
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+import { TrainingStressService } from './training-stress.service';
 
 export interface StreamLoads {
   aerobic: number;
@@ -37,6 +38,8 @@ interface WorkoutWithStress {
   stress: TrainingStressScore | null;
   workoutType: WorkoutType | null;
   avgRpe: number | null;
+  sessionRpe: number | null;
+  srpeTss: number | null;
 }
 
 @Injectable()
@@ -49,6 +52,8 @@ export class MultiStreamLoadService {
     private readonly workoutScheduleRepository: WorkoutScheduleRepository,
     private readonly loadModelParametersRepository: LoadModelParametersRepository,
     private readonly setCompletionRepository: SetCompletionRepository,
+    @Inject(forwardRef(() => TrainingStressService))
+    private readonly trainingStressService: TrainingStressService,
   ) {}
 
   /**
@@ -106,11 +111,18 @@ export class MultiStreamLoadService {
           }
         }
         const avgRpe = await this.getAverageRpe(execution.id);
+
+        // Get session RPE data from execution
+        const sessionRpe = execution.session_rpe ?? null;
+        const srpeTss = execution.srpe_tss ? parseFloat(execution.srpe_tss) : null;
+
         return {
           execution,
           stress: stress ?? null,
           workoutType,
           avgRpe,
+          sessionRpe,
+          srpeTss,
         };
       }),
     );
@@ -199,6 +211,7 @@ export class MultiStreamLoadService {
 
   /**
    * Calculate stream-specific loads from workout data
+   * Integrates session RPE (sRPE-TSS) when available using Foster method
    */
   private calculateStreamLoads(
     workouts: WorkoutWithStress[],
@@ -209,9 +222,32 @@ export class MultiStreamLoadService {
     let neural = 0;
 
     for (const workout of workouts) {
-      aerobic += this.calculateAerobicLoad(workout, params);
-      msk += this.calculateMskLoad(workout);
-      neural += this.calculateNeuralLoad(workout);
+      let workoutAerobic = this.calculateAerobicLoad(workout, params);
+      const workoutMsk = this.calculateMskLoad(workout);
+      let workoutNeural = this.calculateNeuralLoad(workout);
+
+      // Integrate session RPE when available
+      if (workout.sessionRpe && workout.srpeTss) {
+        const calculatedTss = workout.stress?.tss ? parseFloat(workout.stress.tss) : null;
+
+        // Use sRPE as neural load indicator for all workout types (not just strength)
+        const durationMin = (workout.execution.duration_seconds || 0) / 60;
+        const rpeNeuralContribution = (workout.sessionRpe ** 2 / 10) * (durationMin / 30);
+        workoutNeural += rpeNeuralContribution;
+
+        // If RPE:TSS ratio > 1.2, athlete is perceiving the workout as harder
+        // Adjust aerobic load upward by 10% to account for perceived difficulty
+        if (calculatedTss && calculatedTss > 0) {
+          const rpeTssRatio = workout.srpeTss / calculatedTss;
+          if (rpeTssRatio > 1.2) {
+            workoutAerobic *= 1.1; // 10% adjustment for perceived difficulty
+          }
+        }
+      }
+
+      aerobic += workoutAerobic;
+      msk += workoutMsk;
+      neural += workoutNeural;
     }
 
     return { aerobic, msk, neural };
@@ -274,12 +310,15 @@ export class MultiStreamLoadService {
   /**
    * Calculate neural/CNS load contribution
    * NEURAL: time_>90%HR + heavy_compound×RPE² + racing×1.5
+   * Now uses session RPE for all workout types when available
    */
   private calculateNeuralLoad(workout: WorkoutWithStress): number {
     const sportType = this.getSportType(workout.workoutType);
     const duration = workout.execution.duration_seconds || 0;
     const durationMinutes = duration / 60;
-    const rpe = workout.avgRpe || 5; // Default to 5 if no RPE
+
+    // Use session RPE if available, otherwise use average set RPE, otherwise default to 5
+    const rpe = workout.sessionRpe ?? workout.avgRpe ?? 5;
 
     // Anaerobic TE indicates high-intensity neural load
     const anaerobicTE = workout.stress?.anaerobic_te ? parseFloat(workout.stress.anaerobic_te) : 0;
@@ -287,9 +326,16 @@ export class MultiStreamLoadService {
     // Base neural load from intensity
     let neuralLoad = anaerobicTE * 10; // TE 0-5 → 0-50
 
-    // Add RPE-squared factor for heavy efforts (esp. strength)
-    if (sportType === 'strength' && rpe >= 7) {
-      neuralLoad += (rpe * rpe) / 10 * durationMinutes / 30;
+    // Add RPE-squared factor for heavy efforts
+    // Previously only for strength, now applies to all workout types when RPE >= 7
+    if (rpe >= 7) {
+      const rpeContribution = (rpe * rpe) / 10 * durationMinutes / 30;
+      // Strength gets full contribution, others get partial
+      if (sportType === 'strength') {
+        neuralLoad += rpeContribution;
+      } else {
+        neuralLoad += rpeContribution * 0.5; // 50% for non-strength workouts
+      }
     }
 
     // High intensity cardio also taxes CNS
@@ -387,7 +433,129 @@ export class MultiStreamLoadService {
     startDate.setHours(0, 0, 0, 0);
 
     const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    // First, find all completed workouts in the date range
+    const workouts = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId,
+        completedDateFrom: startDate,
+        completedDateTo: endDate,
+        completed: true,
+      },
+    });
+
+    // Calculate TSS for any workouts that don't have it yet
+    for (const workout of workouts) {
+      const existingTss = await this.trainingStressRepository.findByWorkoutExecutionId(workout.id);
+      if (!existingTss) {
+        await this.trainingStressService.calculateForWorkout(workout.id);
+      }
+    }
+
+    // Reset endDate for the day-by-day calculation
     endDate.setHours(0, 0, 0, 0);
+
+    // Check if user has any data before the start date (for seeding)
+    const dataBeforeStart = await this.multiStreamLoadRepository.findByUserAndDate(
+      userId,
+      new Date(startDate.getTime() - 24 * 60 * 60 * 1000),
+    );
+
+    if (!dataBeforeStart) {
+      // Estimate initial values from first 14 days of training (PMC seeding)
+      const params = await this.loadModelParametersRepository.getParametersWithDefaults(userId);
+      const seedingPeriodEnd = new Date(startDate);
+      seedingPeriodEnd.setDate(seedingPeriodEnd.getDate() + 14);
+
+      let totalAerobic = 0;
+      let totalMsk = 0;
+      let totalNeural = 0;
+      let daysWithData = 0;
+
+      const seedDate = new Date(startDate);
+      while (seedDate <= seedingPeriodEnd && seedDate <= endDate) {
+        const seedStartOfDay = new Date(seedDate);
+        const seedEndOfDay = new Date(seedDate);
+        seedEndOfDay.setHours(23, 59, 59, 999);
+
+        const dayWorkouts = await this.workoutExecutionRepository.findMany({
+          filter: {
+            userId,
+            completedDateFrom: seedStartOfDay,
+            completedDateTo: seedEndOfDay,
+            completed: true,
+          },
+        });
+
+        if (dayWorkouts.length > 0) {
+          const workoutsWithStress: WorkoutWithStress[] = await Promise.all(
+            dayWorkouts.map(async (execution) => {
+              const stress = await this.trainingStressRepository.findByWorkoutExecutionId(execution.id);
+              let workoutType: WorkoutType | null = null;
+              if (execution.workout_schedule_id) {
+                const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
+                if (schedule) {
+                  const workout = await this.workoutRepository.findById(schedule.workout_id);
+                  workoutType = workout?.type ?? null;
+                }
+              }
+              const avgRpe = await this.getAverageRpe(execution.id);
+              return {
+                execution,
+                stress: stress ?? null,
+                workoutType,
+                avgRpe,
+                sessionRpe: execution.session_rpe ?? null,
+                srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : null,
+              };
+            }),
+          );
+
+          const dayLoads = this.calculateStreamLoads(workoutsWithStress, params);
+          if (dayLoads.aerobic > 0 || dayLoads.msk > 0 || dayLoads.neural > 0) {
+            totalAerobic += dayLoads.aerobic;
+            totalMsk += dayLoads.msk;
+            totalNeural += dayLoads.neural;
+            daysWithData++;
+          }
+        }
+
+        seedDate.setDate(seedDate.getDate() + 1);
+      }
+
+      if (daysWithData > 0) {
+        // Calculate average daily loads and seed at 80% (assume prior training)
+        const avgAerobic = (totalAerobic / daysWithData) * 0.8;
+        const avgMsk = (totalMsk / daysWithData) * 0.8;
+        const avgNeural = (totalNeural / daysWithData) * 0.8;
+
+        // Store seeded values for day before start
+        const dayBeforeStart = new Date(startDate);
+        dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+
+        const seedData: NewMultiStreamLoadDaily = {
+          user_id: userId,
+          date: formatDateToYMD(dayBeforeStart),
+          aerobic_ctl: this.round(avgAerobic),
+          aerobic_atl: this.round(avgAerobic),
+          aerobic_tsb: 0,
+          aerobic_daily_load: 0,
+          msk_ctl: this.round(avgMsk),
+          msk_atl: this.round(avgMsk),
+          msk_tsb: 0,
+          msk_daily_load: 0,
+          neural_ctl: this.round(avgNeural),
+          neural_atl: this.round(avgNeural),
+          neural_tsb: 0,
+          neural_daily_load: 0,
+          limiting_stream: null,
+          metadata: { seeded: true },
+        };
+
+        await this.multiStreamLoadRepository.upsert(seedData);
+      }
+    }
 
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {

@@ -6,16 +6,20 @@ import {
   SetCompletion,
   WorkoutExecution,
   WorkoutRoute,
+  WorkoutType,
 } from 'src/database/interfaces';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 interface DetectedPR {
   recordType: PersonalRecordType;
   exerciseId: string | null;
+  workoutType: WorkoutType | null;
   value: number;
   unit: string;
 }
@@ -39,6 +43,8 @@ export class PersonalRecordsDetectionService {
     private readonly workoutRouteRepository: WorkoutRouteRepository,
     private readonly exerciseInstanceRepository: ExerciseInstanceRepository,
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
+    private readonly workoutRepository: WorkoutRepository,
+    private readonly workoutScheduleRepository: WorkoutScheduleRepository,
   ) {}
 
   async detectAndStorePRs(executionId: string, userId: string): Promise<void> {
@@ -50,10 +56,13 @@ export class PersonalRecordsDetectionService {
 
       const achievedAt = execution.completed_at;
 
+      // Get workout type from the execution
+      const workoutType = await this.getWorkoutType(execution);
+
       // Detect all potential PRs
       const [strengthPRs, cardioPRs] = await Promise.all([
         this.detectStrengthPRs(executionId),
-        this.detectCardioPRs(executionId, execution),
+        this.detectCardioPRs(executionId, execution, workoutType),
       ]);
 
       const allDetectedPRs = [...strengthPRs, ...cardioPRs];
@@ -69,6 +78,21 @@ export class PersonalRecordsDetectionService {
     } catch (error) {
       this.logger.error(`Error detecting PRs for execution ${executionId}:`, error);
     }
+  }
+
+  private async getWorkoutType(execution: WorkoutExecution): Promise<WorkoutType | null> {
+    // Get workout type from schedule
+    if (execution.workout_schedule_id) {
+      const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
+      if (schedule?.workout_id) {
+        const workout = await this.workoutRepository.findById(schedule.workout_id);
+        if (workout?.type) {
+          return workout.type;
+        }
+      }
+    }
+
+    return null;
   }
 
   private async detectStrengthPRs(executionId: string): Promise<DetectedPR[]> {
@@ -117,6 +141,7 @@ export class PersonalRecordsDetectionService {
         detectedPRs.push({
           recordType: PersonalRecordType.MAX_WEIGHT,
           exerciseId,
+          workoutType: null, // Strength PRs are exercise-specific, not sport-specific
           value: maxWeight,
           unit: 'kg',
         });
@@ -128,6 +153,7 @@ export class PersonalRecordsDetectionService {
         detectedPRs.push({
           recordType: PersonalRecordType.MAX_REPS,
           exerciseId,
+          workoutType: null,
           value: maxReps,
           unit: 'reps',
         });
@@ -139,6 +165,7 @@ export class PersonalRecordsDetectionService {
         detectedPRs.push({
           recordType: PersonalRecordType.MAX_VOLUME_SET,
           exerciseId,
+          workoutType: null,
           value: maxVolumeSet,
           unit: 'kg',
         });
@@ -186,7 +213,11 @@ export class PersonalRecordsDetectionService {
     return max;
   }
 
-  private async detectCardioPRs(executionId: string, execution: WorkoutExecution): Promise<DetectedPR[]> {
+  private async detectCardioPRs(
+    executionId: string,
+    execution: WorkoutExecution,
+    workoutType: WorkoutType | null,
+  ): Promise<DetectedPR[]> {
     const route = await this.workoutRouteRepository.findByExecutionId(executionId);
     if (!route) {
       return [];
@@ -196,21 +227,21 @@ export class PersonalRecordsDetectionService {
     const detectedPRs: DetectedPR[] = [];
 
     // Distance-based PRs (fastest times)
-    const distancePRs = this.detectDistancePRs(markers);
+    const distancePRs = this.detectDistancePRs(markers, workoutType);
     detectedPRs.push(...distancePRs);
 
     // Split PRs
-    const splitPRs = this.detectSplitPRs(markers);
+    const splitPRs = this.detectSplitPRs(markers, workoutType);
     detectedPRs.push(...splitPRs);
 
     // Other cardio PRs
-    const otherPRs = this.detectOtherCardioPRs(route, execution);
+    const otherPRs = this.detectOtherCardioPRs(route, execution, workoutType);
     detectedPRs.push(...otherPRs);
 
     return detectedPRs;
   }
 
-  private detectDistancePRs(markers: RouteMarker[]): DetectedPR[] {
+  private detectDistancePRs(markers: RouteMarker[], workoutType: WorkoutType | null): DetectedPR[] {
     const detectedPRs: DetectedPR[] = [];
 
     for (const [recordType, targetDistance] of Object.entries(DISTANCE_THRESHOLDS)) {
@@ -228,6 +259,7 @@ export class PersonalRecordsDetectionService {
           detectedPRs.push({
             recordType: recordType as PersonalRecordType,
             exerciseId: null,
+            workoutType,
             value: marker.cumulative_time_seconds,
             unit: 'seconds',
           });
@@ -239,7 +271,7 @@ export class PersonalRecordsDetectionService {
     return detectedPRs;
   }
 
-  private detectSplitPRs(markers: RouteMarker[]): DetectedPR[] {
+  private detectSplitPRs(markers: RouteMarker[], workoutType: WorkoutType | null): DetectedPR[] {
     const detectedPRs: DetectedPR[] = [];
 
     // Fastest km split
@@ -249,6 +281,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.FASTEST_KM_SPLIT,
         exerciseId: null,
+        workoutType,
         value: fastestKm,
         unit: 'seconds',
       });
@@ -261,6 +294,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.FASTEST_MILE_SPLIT,
         exerciseId: null,
+        workoutType,
         value: fastestMile,
         unit: 'seconds',
       });
@@ -269,7 +303,11 @@ export class PersonalRecordsDetectionService {
     return detectedPRs;
   }
 
-  private detectOtherCardioPRs(route: WorkoutRoute, execution: WorkoutExecution): DetectedPR[] {
+  private detectOtherCardioPRs(
+    route: WorkoutRoute,
+    execution: WorkoutExecution,
+    workoutType: WorkoutType | null,
+  ): DetectedPR[] {
     const detectedPRs: DetectedPR[] = [];
 
     // Longest distance
@@ -277,6 +315,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.LONGEST_DISTANCE,
         exerciseId: null,
+        workoutType,
         value: Number.parseFloat(route.total_distance_meters),
         unit: 'meters',
       });
@@ -287,6 +326,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.MAX_ELEVATION_GAIN,
         exerciseId: null,
+        workoutType,
         value: Number.parseFloat(route.elevation_gain_meters),
         unit: 'meters',
       });
@@ -297,6 +337,7 @@ export class PersonalRecordsDetectionService {
       detectedPRs.push({
         recordType: PersonalRecordType.LONGEST_DURATION,
         exerciseId: null,
+        workoutType,
         value: execution.duration_seconds,
         unit: 'seconds',
       });
@@ -311,10 +352,11 @@ export class PersonalRecordsDetectionService {
     executionId: string,
     achievedAt: Date,
   ): Promise<void> {
-    const existingPR = await this.personalRecordRepository.findByUserTypeAndExercise(
+    const existingPR = await this.personalRecordRepository.findByUserTypeExerciseAndWorkoutType(
       userId,
       detected.recordType,
       detected.exerciseId,
+      detected.workoutType,
     );
 
     // Determine if this is a new PR
@@ -325,6 +367,7 @@ export class PersonalRecordsDetectionService {
         user_id: userId,
         record_type: detected.recordType,
         exercise_id: detected.exerciseId,
+        workout_type: detected.workoutType,
         value: detected.value,
         unit: detected.unit,
         workout_execution_id: executionId,
@@ -339,6 +382,7 @@ export class PersonalRecordsDetectionService {
         user_id: userId,
         record_type: detected.recordType,
         exercise_id: detected.exerciseId,
+        workout_type: detected.workoutType,
         value: detected.value,
         unit: detected.unit,
         workout_execution_id: executionId,
@@ -347,7 +391,8 @@ export class PersonalRecordsDetectionService {
 
       this.logger.log(
         `New PR detected: ${detected.recordType} = ${detected.value} ${detected.unit}` +
-          (detected.exerciseId ? ` (exercise: ${detected.exerciseId})` : ''),
+          (detected.exerciseId ? ` (exercise: ${detected.exerciseId})` : '') +
+          (detected.workoutType ? ` (sport: ${detected.workoutType})` : ''),
       );
     }
   }

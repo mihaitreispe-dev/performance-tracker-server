@@ -22,6 +22,10 @@ export const NotificationType = {
   COACH_ALERT_LOW_COMPLIANCE: 'coach_alert_low_compliance',
   COACH_ALERT_INCOMPLETE_INTAKE: 'coach_alert_incomplete_intake',
   COACH_ALERT_HEALTH_CONCERN: 'coach_alert_health_concern',
+  // New injury/illness alert types
+  COACH_ALERT_NEW_INJURY: 'coach_alert_new_injury',
+  COACH_ALERT_NEW_ILLNESS: 'coach_alert_new_illness',
+  COACH_ALERT_ONGOING_CONCERN: 'coach_alert_ongoing_concern',
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -46,6 +50,15 @@ export interface NotificationData {
   missedDate?: string;
   metricType?: string;
   metricValue?: number;
+  // Injury/Illness alert data
+  injuryType?: string;
+  isInjury?: boolean;
+  illnessType?: string;
+  severity?: number;
+  startDate?: string;
+  daysSinceStart?: number;
+  expectedRecoveryDays?: number;
+  concernType?: 'injury' | 'illness';
 }
 
 export interface NotificationsTable {

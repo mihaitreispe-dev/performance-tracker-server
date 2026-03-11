@@ -55,6 +55,21 @@ export class WorkoutExecutionDTO {
   @IsOptional()
   notes?: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Session RPE (1-10)' })
+  @IsNumber()
+  @IsOptional()
+  sessionRpe?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'sRPE-TSS (RPE × duration in minutes)' })
+  @IsNumber()
+  @IsOptional()
+  srpeTss?: number | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'When session RPE was collected' })
+  @IsString()
+  @IsOptional()
+  rpeCollectedAt?: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;
@@ -301,4 +316,40 @@ export class WorkoutRouteResponse extends ItemResponse<WorkoutRouteDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: WorkoutRouteDTO;
+}
+
+// Session RPE
+
+export class SessionRPEDTO {
+  @ApiProperty({ description: 'Session RPE (1-10)' })
+  @IsNumber()
+  sessionRpe: number;
+
+  @ApiProperty({ description: 'sRPE-TSS (RPE × duration in minutes)' })
+  @IsNumber()
+  srpeTss: number;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Calculated TSS from power/pace/HR' })
+  @IsNumber()
+  @IsOptional()
+  calculatedTss?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Ratio of sRPE-TSS to calculated TSS' })
+  @IsNumber()
+  @IsOptional()
+  rpeTssRatio?: number | null;
+
+  @ApiProperty({ description: 'Whether accumulated fatigue was detected' })
+  accumulatedFatigueFlag: boolean;
+
+  @ApiProperty({ description: 'When the RPE was collected' })
+  @IsString()
+  rpeCollectedAt: string;
+}
+
+export class SessionRPEResponse extends ItemResponse<SessionRPEDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: SessionRPEDTO;
 }

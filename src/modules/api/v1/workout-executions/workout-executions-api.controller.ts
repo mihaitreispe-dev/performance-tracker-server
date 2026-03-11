@@ -24,6 +24,7 @@ import {
   ListSetCompletionsQuery,
   ListWorkoutExecutionsQuery,
   StartWorkoutExecutionBody,
+  UpdateSessionRPEBody,
   UpdateWorkoutExecutionBody,
   UploadRouteBody,
   WorkoutExecutionIdParam,
@@ -31,6 +32,7 @@ import {
 import {
   BatchUploadMetricsResponse,
   CardioMetricListResponse,
+  SessionRPEResponse,
   SetCompletionListResponse,
   SetCompletionResponse,
   WorkoutExecutionListResponse,
@@ -108,6 +110,36 @@ export class WorkoutExecutionsApiController {
   @Delete(':id')
   async delete(@Req() req: Request & { user: AuthUser }, @Param() params: WorkoutExecutionIdParam): Promise<void> {
     return this.service.delete(req, params.id);
+  }
+
+  // Session RPE
+
+  @Version('1')
+  @ApiOperation({ summary: 'Record or update session RPE for a completed workout' })
+  @ApiResponse({ status: HttpStatus.OK, type: SessionRPEResponse })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Execution not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Workout not completed' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Patch(':id/session-rpe')
+  async updateSessionRPE(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: WorkoutExecutionIdParam,
+    @Body() body: UpdateSessionRPEBody,
+  ): Promise<SessionRPEResponse> {
+    return this.service.updateSessionRPE(req, params.id, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get session RPE for a workout execution' })
+  @ApiResponse({ status: HttpStatus.OK, type: SessionRPEResponse })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Execution or session RPE not found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get(':id/session-rpe')
+  async getSessionRPE(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: WorkoutExecutionIdParam,
+  ): Promise<SessionRPEResponse> {
+    return this.service.getSessionRPE(req, params.id);
   }
 
   // Set Completions

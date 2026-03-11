@@ -10,6 +10,7 @@ import {
   ListPersonalRecordsQuery,
   PeriodComparisonQuery,
   PREvolutionQuery,
+  PRHistoryQuery,
   RecentPRsQuery,
 } from './request.dto';
 import {
@@ -17,6 +18,7 @@ import {
   PeriodComparisonResponse,
   PersonalRecordListResponse,
   PREvolutionResponse,
+  PRHistoryResponse,
   RecentPRsResponse,
 } from './response.dto';
 
@@ -85,5 +87,17 @@ export class PersonalRecordsApiController {
     @Query() query: RecentPRsQuery,
   ): Promise<RecentPRsResponse> {
     return this.service.getRecentPRs(req, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get PR history for a specific record type, sorted by value (best first)' })
+  @ApiResponse({ status: HttpStatus.OK, type: PRHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('history')
+  async getHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: PRHistoryQuery,
+  ): Promise<PRHistoryResponse> {
+    return this.service.getHistory(req, query);
   }
 }

@@ -73,3 +73,17 @@ export class FitnessFatiguePredictionBody {
   @IsNumber({}, { each: true })
   plannedDailyTSS: number[];
 }
+
+export class CorrelationQuery {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of days to analyze (default 90, max 365)',
+    example: 90,
+  })
+  @IsNumber()
+  @Min(7)
+  @Max(365)
+  @IsOptional()
+  @Transform(({ value }) => (value ? Number.parseInt(value, 10) : undefined))
+  days?: number;
+}

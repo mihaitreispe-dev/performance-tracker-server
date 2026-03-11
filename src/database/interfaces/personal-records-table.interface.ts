@@ -1,4 +1,5 @@
 import type { ColumnType, Insertable, Selectable, Updateable } from 'kysely';
+import { WorkoutType } from './workouts-table.interface';
 
 export enum PersonalRecordType {
   MAX_WEIGHT = 'max_weight',
@@ -21,6 +22,7 @@ export interface PersonalRecordsTable {
   user_id: string;
   record_type: PersonalRecordType;
   exercise_id: string | null;
+  workout_type: WorkoutType | null;
   value: ColumnType<string, string | number, string | number>;
   unit: string;
   workout_execution_id: string;

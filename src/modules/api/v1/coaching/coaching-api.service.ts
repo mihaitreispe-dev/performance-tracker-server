@@ -20,6 +20,9 @@ import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-
 import { CoachAthleteLabelRepository } from 'src/repositories/coach-athlete-label.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { CoachingMessageRepository } from 'src/repositories/coaching-message.repository';
+import { IllnessLogRepository } from 'src/repositories/illness-log.repository';
+import { PainLogRepository } from 'src/repositories/pain-log.repository';
+import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
@@ -65,8 +68,10 @@ import {
   UpdateAthleteIntakeBody,
   UpdateAthleteLabelBody,
   UpdatePrivacySettingsBody,
+  WellnessTrendsQuery,
 } from './request.dto';
 import {
+  ActiveConcernDTO,
   AssignedWorkoutDTO,
   AssignedWorkoutListResponse,
   AssignedWorkoutResponse,
@@ -83,6 +88,10 @@ import {
   AthleteScheduleDTO,
   AthleteScheduleListResponse,
   AthleteScheduleResponse,
+  AthleteWellnessTrendPointDTO,
+  AthleteWellnessTrendsDTO,
+  AthleteWellnessTrendsResponse,
+  AtRiskAthleteDTO,
   AttachedPlanDTO,
   AttachedWorkoutDTO,
   BecomeCoachResponse,
@@ -97,6 +106,9 @@ import {
   MessageResponse,
   MessagesListResponse,
   PrivacySettingsResponse,
+  TeamWellnessAveragesDTO,
+  TeamWellnessOverviewDTO,
+  TeamWellnessOverviewResponse,
   UnreadCountResponse,
   UserBasicDTO,
   WorkoutInfoDTO,
@@ -118,6 +130,9 @@ export class CoachingApiService {
     private readonly workoutPlanRepo: WorkoutPlanRepository,
     private readonly workoutPlanItemRepo: WorkoutPlanItemRepository,
     private readonly messageRepo: CoachingMessageRepository,
+    private readonly quickWellnessCheckinRepo: QuickWellnessCheckinRepository,
+    private readonly illnessLogRepo: IllnessLogRepository,
+    private readonly painLogRepo: PainLogRepository,
     private readonly notificationsService: NotificationsApiService,
     private readonly workoutsService: WorkoutsApiService,
     private readonly workoutPlansService: WorkoutPlansApiService,
@@ -401,6 +416,7 @@ export class CoachingApiService {
         sharePersonalRecords: settings.share_personal_records,
         shareSleepData: settings.share_sleep_data,
         shareTrainingLoad: settings.share_training_load,
+        shareWellnessCheckins: settings.share_wellness_checkins,
       },
     };
   }
@@ -421,6 +437,7 @@ export class CoachingApiService {
         sharePersonalRecords: settings.share_personal_records,
         shareSleepData: settings.share_sleep_data,
         shareTrainingLoad: settings.share_training_load,
+        shareWellnessCheckins: settings.share_wellness_checkins,
       },
     };
   }
@@ -524,6 +541,7 @@ export class CoachingApiService {
     if (body.sharePersonalRecords !== undefined) update.share_personal_records = body.sharePersonalRecords;
     if (body.shareSleepData !== undefined) update.share_sleep_data = body.shareSleepData;
     if (body.shareTrainingLoad !== undefined) update.share_training_load = body.shareTrainingLoad;
+    if (body.shareWellnessCheckins !== undefined) update.share_wellness_checkins = body.shareWellnessCheckins;
 
     const settings = await this.privacySettingsRepo.upsert(req.user.id, update);
 
@@ -536,6 +554,7 @@ export class CoachingApiService {
         sharePersonalRecords: settings.share_personal_records,
         shareSleepData: settings.share_sleep_data,
         shareTrainingLoad: settings.share_training_load,
+        shareWellnessCheckins: settings.share_wellness_checkins,
       },
     };
   }
@@ -550,9 +569,14 @@ export class CoachingApiService {
       throw new NotFoundException('You do not have an active coach');
     }
 
-    const intake = await this.intakeRepo.findByUserAndCoach(req.user.id, relationship.coach_id);
+    let intake = await this.intakeRepo.findByUserAndCoach(req.user.id, relationship.coach_id);
+
+    // Auto-create intake form if it doesn't exist (for relationships created before intake feature)
     if (!intake) {
-      throw new NotFoundException('Intake form not found');
+      intake = await this.intakeRepo.create({
+        user_id: req.user.id,
+        coach_id: relationship.coach_id,
+      });
     }
 
     return {
@@ -1858,6 +1882,268 @@ export class CoachingApiService {
 
     // Copy the plan and all its workouts to the user's library
     return this.workoutPlansService.copyPlanToUser(planId, userId);
+  }
+
+  // ==================== COACH WELLNESS DASHBOARD ====================
+
+  async getTeamWellnessOverview(req: Request & { user: AuthUser }): Promise<TeamWellnessOverviewResponse> {
+    const coachId = req.user.id;
+
+    // Get all active athletes for this coach
+    const relationships = await this.relationshipRepo.findMany({
+      coachId,
+      status: [CoachAthleteStatus.ACTIVE],
+    });
+
+    const today = new Date();
+    const todayStr = formatDateToYMD(today);
+
+    // Collect wellness data from athletes who have enabled sharing
+    const athleteWellnessData: Array<{
+      athleteId: string;
+      athleteName: string;
+      sleepQuality: number | null;
+      energyLevel: number | null;
+      soreness: number | null;
+      stress: number | null;
+      readiness: number | null;
+      hasCheckinToday: boolean;
+    }> = [];
+
+    const atRiskAthletes: AtRiskAthleteDTO[] = [];
+    const activeConcerns: ActiveConcernDTO[] = [];
+
+    for (const rel of relationships) {
+      const user = await this.userRepo.findById(rel.athlete_id);
+      if (!user) continue;
+
+      // Check privacy settings
+      const privacySettings = await this.privacySettingsRepo.findByUserId(rel.athlete_id);
+      if (!privacySettings?.share_wellness_checkins) {
+        continue; // Skip athletes who haven't enabled wellness sharing
+      }
+
+      const athleteName = user.display_name || user.email || 'Unknown';
+
+      // Get today's check-in if exists
+      const todayCheckin = await this.quickWellnessCheckinRepo.findByUserAndDate(rel.athlete_id, today);
+
+      // Get 7-day average for trends
+      const avgScores = await this.quickWellnessCheckinRepo.getAverageScores(rel.athlete_id, 7);
+
+      athleteWellnessData.push({
+        athleteId: rel.athlete_id,
+        athleteName,
+        sleepQuality: todayCheckin?.sleep_quality ?? avgScores.sleepQuality,
+        energyLevel: todayCheckin?.energy_level ?? avgScores.energyLevel,
+        soreness: todayCheckin?.muscle_soreness ?? avgScores.muscleSoreness,
+        stress: todayCheckin?.stress_level ?? avgScores.stressLevel,
+        readiness: todayCheckin?.training_readiness ?? avgScores.trainingReadiness,
+        hasCheckinToday: !!todayCheckin,
+      });
+
+      // Check for at-risk conditions
+      // Low recovery: avg readiness < 2.5 over 7 days
+      if (avgScores.trainingReadiness && avgScores.trainingReadiness < 2.5) {
+        atRiskAthletes.push({
+          athleteId: rel.athlete_id,
+          athleteName,
+          riskType: 'low_recovery',
+          riskScore: Math.round((2.5 - avgScores.trainingReadiness) * 40), // Scale to 0-100
+          details: `Average readiness ${avgScores.trainingReadiness.toFixed(1)}/5 over past 7 days`,
+        });
+      }
+
+      // High fatigue: avg energy < 2 over 7 days
+      if (avgScores.energyLevel && avgScores.energyLevel < 2) {
+        atRiskAthletes.push({
+          athleteId: rel.athlete_id,
+          athleteName,
+          riskType: 'high_fatigue',
+          riskScore: Math.round((2 - avgScores.energyLevel) * 50),
+          details: `Average energy ${avgScores.energyLevel.toFixed(1)}/5 over past 7 days`,
+        });
+      }
+
+      // Check for active injuries (pain logs marked as injury with high pain level)
+      const recentPainLogs = await this.painLogRepo.findMany({
+        filter: { userId: rel.athlete_id, minPainLevel: 5 },
+        limit: 5,
+      });
+
+      for (const painLog of recentPainLogs) {
+        if (painLog.is_injury) {
+          const daysSinceStart = Math.floor(
+            (today.getTime() - new Date(painLog.created_at as any).getTime()) / (1000 * 60 * 60 * 24),
+          );
+
+          if (daysSinceStart <= 14) {
+            // Only show injuries from last 2 weeks
+            atRiskAthletes.push({
+              athleteId: rel.athlete_id,
+              athleteName,
+              riskType: 'active_injury',
+              riskScore: painLog.pain_level * 10,
+              details: `${painLog.body_part} injury (pain level ${painLog.pain_level}/10)`,
+            });
+
+            activeConcerns.push({
+              athleteId: rel.athlete_id,
+              athleteName,
+              concernType: 'injury',
+              description: `${painLog.body_part} - ${painLog.injury_type || 'unspecified'} injury`,
+              daysSinceStart,
+            });
+          }
+        }
+      }
+
+      // Check for active illnesses
+      const activeIllnesses = await this.illnessLogRepo.getActiveForUser(rel.athlete_id);
+      for (const illness of activeIllnesses) {
+        const daysSinceStart = Math.floor(
+          (today.getTime() - new Date(illness.start_date as any).getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        atRiskAthletes.push({
+          athleteId: rel.athlete_id,
+          athleteName,
+          riskType: 'active_illness',
+          riskScore: illness.severity * 10,
+          details: `${illness.illness_type} (severity ${illness.severity}/10, day ${daysSinceStart + 1})`,
+        });
+
+        activeConcerns.push({
+          athleteId: rel.athlete_id,
+          athleteName,
+          concernType: 'illness',
+          description: `${illness.illness_type} - severity ${illness.severity}/10`,
+          daysSinceStart,
+        });
+      }
+    }
+
+    // Calculate team averages
+    const athletesWithData = athleteWellnessData.filter(
+      (a) => a.sleepQuality || a.energyLevel || a.soreness || a.stress || a.readiness,
+    );
+
+    const calculateAverage = (values: (number | null)[]): number => {
+      const valid = values.filter((v): v is number => v !== null);
+      if (valid.length === 0) return 0;
+      return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+    };
+
+    const teamAverages: TeamWellnessAveragesDTO = {
+      sleepQuality: Math.round(calculateAverage(athletesWithData.map((a) => a.sleepQuality)) * 10) / 10,
+      energyLevel: Math.round(calculateAverage(athletesWithData.map((a) => a.energyLevel)) * 10) / 10,
+      soreness: Math.round(calculateAverage(athletesWithData.map((a) => a.soreness)) * 10) / 10,
+      stress: Math.round(calculateAverage(athletesWithData.map((a) => a.stress)) * 10) / 10,
+      readiness: Math.round(calculateAverage(athletesWithData.map((a) => a.readiness)) * 10) / 10,
+      checkinCompliance:
+        athleteWellnessData.length > 0
+          ? Math.round((athleteWellnessData.filter((a) => a.hasCheckinToday).length / athleteWellnessData.length) * 100)
+          : 0,
+    };
+
+    // Sort at-risk athletes by risk score descending
+    atRiskAthletes.sort((a, b) => b.riskScore - a.riskScore);
+
+    // Remove duplicates (same athlete can appear multiple times for different risk types)
+    const uniqueAtRiskAthletes = atRiskAthletes.filter(
+      (athlete, index, self) =>
+        index === self.findIndex((a) => a.athleteId === athlete.athleteId && a.riskType === athlete.riskType),
+    );
+
+    const overviewData: TeamWellnessOverviewDTO = {
+      teamAverages,
+      atRiskAthletes: uniqueAtRiskAthletes,
+      activeConcerns,
+    };
+
+    return { data: overviewData };
+  }
+
+  async getAthleteWellnessTrends(
+    req: Request & { user: AuthUser },
+    athleteId: string,
+    query: WellnessTrendsQuery,
+  ): Promise<AthleteWellnessTrendsResponse> {
+    // Verify relationship exists
+    const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(req.user.id, athleteId);
+    if (!relationship) {
+      throw new NotFoundException('Athlete not found in your roster');
+    }
+
+    // Check privacy settings
+    const privacySettings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!privacySettings?.share_wellness_checkins) {
+      throw new ForbiddenException('Athlete has not shared wellness check-ins with you');
+    }
+
+    const user = await this.userRepo.findById(athleteId);
+    if (!user) {
+      throw new NotFoundException('Athlete not found');
+    }
+
+    const days = query.days ?? 30;
+    const checkins = await this.quickWellnessCheckinRepo.getDateRange(athleteId, days);
+
+    const athleteName = user.display_name || user.email || 'Unknown';
+
+    // Map check-ins to trend points
+    const trends: AthleteWellnessTrendPointDTO[] = checkins.map((checkin) => {
+      // Calculate composite wellness score (0-100)
+      const scores = [
+        checkin.sleep_quality,
+        checkin.energy_level,
+        checkin.muscle_soreness,
+        checkin.stress_level,
+        checkin.training_readiness,
+      ].filter((s): s is number => s !== null);
+
+      const avgScore = scores.length > 0 ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0;
+      const wellnessScore = Math.round(((avgScore - 1) / 4) * 100); // Scale 1-5 to 0-100
+
+      return {
+        date:
+          checkin.checkin_date instanceof Date
+            ? formatDateToYMD(checkin.checkin_date)
+            : String(checkin.checkin_date),
+        sleepQuality: checkin.sleep_quality ?? null,
+        energyLevel: checkin.energy_level ?? null,
+        muscleSoreness: checkin.muscle_soreness ?? null,
+        stressLevel: checkin.stress_level ?? null,
+        trainingReadiness: checkin.training_readiness ?? null,
+        wellnessScore,
+      };
+    });
+
+    // Calculate trend direction based on first and last week averages
+    let trendDirection: 'improving' | 'stable' | 'declining' = 'stable';
+    if (trends.length >= 7) {
+      const firstWeek = trends.slice(0, 7);
+      const lastWeek = trends.slice(-7);
+
+      const firstWeekAvg = firstWeek.reduce((sum, t) => sum + t.wellnessScore, 0) / firstWeek.length;
+      const lastWeekAvg = lastWeek.reduce((sum, t) => sum + t.wellnessScore, 0) / lastWeek.length;
+
+      const diff = lastWeekAvg - firstWeekAvg;
+      if (diff > 5) {
+        trendDirection = 'improving';
+      } else if (diff < -5) {
+        trendDirection = 'declining';
+      }
+    }
+
+    const trendsData: AthleteWellnessTrendsDTO = {
+      athleteId,
+      athleteName,
+      trends,
+      trendDirection,
+    };
+
+    return { data: trendsData };
   }
 
   /**

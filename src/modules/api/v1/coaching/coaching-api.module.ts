@@ -5,6 +5,9 @@ import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-
 import { CoachAthleteLabelRepository } from 'src/repositories/coach-athlete-label.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { CoachingMessageRepository } from 'src/repositories/coaching-message.repository';
+import { IllnessLogRepository } from 'src/repositories/illness-log.repository';
+import { PainLogRepository } from 'src/repositories/pain-log.repository';
+import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
@@ -45,6 +48,9 @@ export class CoachingApiModule {
           CoachAssignedWorkoutRepository,
           CoachAthleteLabelRepository,
           CoachingMessageRepository,
+          QuickWellnessCheckinRepository,
+          IllnessLogRepository,
+          PainLogRepository,
           UserRepository,
           WorkoutRepository,
           WorkoutScheduleRepository,

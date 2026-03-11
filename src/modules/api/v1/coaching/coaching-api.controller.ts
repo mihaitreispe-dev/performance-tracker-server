@@ -61,6 +61,7 @@ import {
   UpdateAthleteIntakeBody,
   UpdateAthleteLabelBody,
   UpdatePrivacySettingsBody,
+  WellnessTrendsQuery,
 } from './request.dto';
 import {
   AssignedWorkoutListResponse,
@@ -73,6 +74,7 @@ import {
   AthleteResponse,
   AthleteScheduleListResponse,
   AthleteScheduleResponse,
+  AthleteWellnessTrendsResponse,
   BecomeCoachResponse,
   CoachResponse,
   ComplianceOverviewResponse,
@@ -82,6 +84,7 @@ import {
   MessageResponse,
   MessagesListResponse,
   PrivacySettingsResponse,
+  TeamWellnessOverviewResponse,
   UnreadCountResponse,
 } from './response.dto';
 
@@ -612,6 +615,42 @@ export class CoachingApiController {
     @Query() query: ComplianceQuery,
   ): Promise<AthleteComplianceResponse> {
     return this.service.getAthleteCompliance(req, params.athleteId, query);
+  }
+
+  // ===== WELLNESS DASHBOARD =====
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get team wellness overview (COACH only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: TeamWellnessOverviewResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not a coach' })
+  @Roles(UserRole.COACH)
+  @Get('wellness/overview')
+  async getTeamWellnessOverview(
+    @Req() req: Request & { user: AuthUser },
+  ): Promise<TeamWellnessOverviewResponse> {
+    return this.service.getTeamWellnessOverview(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's wellness trends (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteWellnessTrendsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Athlete not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/wellness/trends')
+  async getAthleteWellnessTrends(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AthleteIdParam,
+    @Query() query: WellnessTrendsQuery,
+  ): Promise<AthleteWellnessTrendsResponse> {
+    return this.service.getAthleteWellnessTrends(req, params.athleteId, query);
   }
 
   // ===== ATHLETE LABELS =====

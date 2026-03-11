@@ -4,6 +4,7 @@ import {
   LimitingStream,
   LoadModelParameterValues,
   NewMultiStreamLoadDaily,
+  QuickWellnessCheckin,
   RecoveryJournalEntry,
   StreamType,
 } from 'src/database/interfaces';
@@ -11,6 +12,7 @@ import { formatDateToYMD } from 'src/lib/util';
 import { HrvBaselineRepository } from 'src/repositories/hrv-baseline.repository';
 import { LoadModelParametersRepository } from 'src/repositories/load-model-parameters.repository';
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
+import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { RecoveryJournalRepository } from 'src/repositories/recovery-journal.repository';
 
 export interface ReadinessResult {
@@ -26,6 +28,7 @@ export interface ReadinessResult {
     neuralContribution: number;
     hrvContribution: number;
     journalContribution: number;
+    quickWellnessContribution: number; // New: quick check-in contribution
   };
   recommendation: ReadinessRecommendation;
 }
@@ -52,6 +55,7 @@ export class ReadinessService {
     private readonly hrvBaselineRepository: HrvBaselineRepository,
     private readonly recoveryJournalRepository: RecoveryJournalRepository,
     private readonly loadModelParametersRepository: LoadModelParametersRepository,
+    private readonly quickWellnessCheckinRepository: QuickWellnessCheckinRepository,
   ) {}
 
   /**
@@ -73,6 +77,9 @@ export class ReadinessService {
     // Get recovery journal entry
     const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, targetDate);
 
+    // Get quick wellness check-in
+    const quickWellnessCheckin = await this.quickWellnessCheckinRepository.findByUserAndDate(userId, targetDate);
+
     // Calculate TSB contributions (normalized to 0-100)
     const aerobicTsb = loadData?.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : 0;
     const mskTsb = loadData?.msk_tsb ? parseFloat(loadData.msk_tsb) : 0;
@@ -91,13 +98,24 @@ export class ReadinessService {
     // Calculate journal contribution
     const journalContribution = this.calculateJournalContribution(journalEntry ?? null, params);
 
-    // Weight the components
-    const baseReadiness =
-      aerobicContribution * 0.25 +
-      mskContribution * 0.2 +
-      neuralContribution * 0.2 +
-      hrvContribution * 0.2 +
-      journalContribution * 0.15;
+    // Calculate quick wellness check-in contribution
+    const quickWellnessContribution = this.calculateQuickWellnessContribution(quickWellnessCheckin);
+
+    // Weight the components - adjusted weights to include quick wellness check-in (15%)
+    // If quick wellness check-in exists, use it; otherwise use journal contribution
+    const hasQuickWellness = quickWellnessCheckin !== null;
+    const baseReadiness = hasQuickWellness
+      ? aerobicContribution * 0.22 +
+        mskContribution * 0.18 +
+        neuralContribution * 0.18 +
+        hrvContribution * 0.17 +
+        journalContribution * 0.10 +
+        quickWellnessContribution * 0.15
+      : aerobicContribution * 0.25 +
+        mskContribution * 0.2 +
+        neuralContribution * 0.2 +
+        hrvContribution * 0.2 +
+        journalContribution * 0.15;
 
     // Apply confidence-weighted blending with population model
     const confidence = params.parameter_confidence || 0;
@@ -130,6 +148,7 @@ export class ReadinessService {
       hrvContribution,
       journalContribution,
       isHrvSuppressed,
+      quickWellnessContribution,
     );
 
     // Get recommendation
@@ -158,6 +177,7 @@ export class ReadinessService {
         neuralContribution: Math.round(neuralContribution * 100) / 100,
         hrvContribution: Math.round(hrvContribution * 100) / 100,
         journalContribution: Math.round(journalContribution * 100) / 100,
+        quickWellnessContribution: Math.round(quickWellnessContribution * 100) / 100,
       },
       recommendation,
     };
@@ -186,6 +206,10 @@ export class ReadinessService {
     const hrvContribution = this.normalizeHrvZscore(hrvZscore);
     const journalContribution = this.calculateJournalContribution(journalEntry || null, params);
 
+    // Get quick wellness check-in for this date
+    const quickWellnessCheckin = await this.quickWellnessCheckinRepository.findByUserAndDate(userId, latest.date);
+    const quickWellnessContribution = this.calculateQuickWellnessContribution(quickWellnessCheckin);
+
     const readinessScore = parseFloat(latest.readiness_score);
     const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
 
@@ -199,6 +223,7 @@ export class ReadinessService {
         hrvContribution,
         journalContribution,
         isHrvSuppressed,
+        quickWellnessContribution,
       ),
       limitingStream: latest.limiting_stream,
       isHrvSuppressed,
@@ -209,6 +234,7 @@ export class ReadinessService {
         neuralContribution,
         hrvContribution,
         journalContribution,
+        quickWellnessContribution,
       },
       recommendation: this.getRecommendation(readinessScore, isHrvSuppressed),
     };
@@ -318,6 +344,41 @@ export class ReadinessService {
   }
 
   /**
+   * Calculate quick wellness check-in contribution to readiness
+   * All values are on 1-5 scale, with some inverted (soreness, stress)
+   */
+  private calculateQuickWellnessContribution(checkin: QuickWellnessCheckin | null | undefined): number {
+    if (!checkin) {
+      return 50; // Neutral if no check-in
+    }
+
+    const values: number[] = [];
+
+    // Sleep quality (1-5: 1=poor, 5=excellent)
+    if (checkin.sleep_quality) values.push(checkin.sleep_quality);
+
+    // Energy level (1-5: 1=exhausted, 5=energized)
+    if (checkin.energy_level) values.push(checkin.energy_level);
+
+    // Muscle soreness (1-5 inverted: 1=very sore, 5=no soreness)
+    if (checkin.muscle_soreness) values.push(checkin.muscle_soreness);
+
+    // Stress level (1-5 inverted: 1=very stressed, 5=relaxed)
+    if (checkin.stress_level) values.push(checkin.stress_level);
+
+    // Training readiness (1-5: 1=not ready, 5=very ready)
+    if (checkin.training_readiness) values.push(checkin.training_readiness);
+
+    if (values.length === 0) {
+      return 50; // Neutral if all values are null
+    }
+
+    // Average of all values, scaled from 1-5 to 0-100
+    const average = values.reduce((a, b) => a + b, 0) / values.length;
+    return ((average - 1) / 4) * 100;
+  }
+
+  /**
    * Calculate population-based readiness (for cold start)
    */
   private calculatePopulationReadiness(
@@ -363,6 +424,7 @@ export class ReadinessService {
     hrvContribution: number,
     journalContribution: number,
     isHrvSuppressed: boolean,
+    quickWellnessContribution: number = 50,
   ): string {
     if (isHrvSuppressed) {
       return 'HRV Suppression';
@@ -374,6 +436,7 @@ export class ReadinessService {
       { name: 'Neural/CNS Fatigue', value: neuralContribution },
       { name: 'HRV Status', value: hrvContribution },
       { name: 'Subjective Recovery', value: journalContribution },
+      { name: 'Quick Wellness', value: quickWellnessContribution },
     ];
 
     const minFactor = factors.reduce((min, f) => (f.value < min.value ? f : min), factors[0]);

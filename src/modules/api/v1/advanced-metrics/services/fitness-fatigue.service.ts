@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { NewFitnessFatigueDaily, TrainingRecommendation } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
+import { TrainingStressService } from './training-stress.service';
 
 export interface FitnessFatigueResult {
   date: string;
@@ -36,6 +37,8 @@ export class FitnessFatigueService {
     private readonly fitnessFatigueRepository: FitnessFatigueRepository,
     private readonly trainingStressRepository: TrainingStressRepository,
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
+    @Inject(forwardRef(() => TrainingStressService))
+    private readonly trainingStressService: TrainingStressService,
   ) {}
 
   /**
@@ -115,10 +118,90 @@ export class FitnessFatigueService {
     startDate.setHours(0, 0, 0, 0);
 
     const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    // First, find all completed workouts in the date range
+    const workouts = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId,
+        completedDateFrom: startDate,
+        completedDateTo: endDate,
+        completed: true,
+      },
+    });
+
+    // Calculate TSS for any workouts that don't have it yet
+    for (const workout of workouts) {
+      const existingTss = await this.trainingStressRepository.findByWorkoutExecutionId(workout.id);
+      if (!existingTss) {
+        await this.trainingStressService.calculateForWorkout(workout.id);
+      }
+    }
+
+    // Reset endDate for the day-by-day calculation
     endDate.setHours(0, 0, 0, 0);
 
-    // Delete existing data for the range
+    // Delete existing fitness/fatigue data for the range
     await this.fitnessFatigueRepository.deleteByUserAndDateRange(userId, startDate, endDate);
+
+    // Estimate initial CTL/ATL for new users (PMC seeding)
+    // Check if user has any data before the start date
+    const dataBeforeStart = await this.fitnessFatigueRepository.findByUserAndDate(
+      userId,
+      new Date(startDate.getTime() - 24 * 60 * 60 * 1000), // day before start
+    );
+
+    let initialCTL = 0;
+    let initialATL = 0;
+
+    if (!dataBeforeStart) {
+      // No historical data - estimate baseline from first 14 days of training
+      const seedingPeriodEnd = new Date(startDate);
+      seedingPeriodEnd.setDate(seedingPeriodEnd.getDate() + 14);
+
+      let totalTSS = 0;
+      let daysWithData = 0;
+
+      const seedDate = new Date(startDate);
+      while (seedDate <= seedingPeriodEnd && seedDate <= endDate) {
+        const dailyTss = await this.trainingStressRepository.getTotalTSSForDate(userId, seedDate);
+        if (dailyTss > 0) {
+          totalTSS += dailyTss;
+          daysWithData++;
+        }
+        seedDate.setDate(seedDate.getDate() + 1);
+      }
+
+      if (daysWithData > 0) {
+        // Calculate average daily TSS and use it as the steady-state estimate
+        // At steady state: CTL ≈ ATL ≈ average daily TSS
+        const avgDailyTSS = totalTSS / daysWithData;
+
+        // Assume they were training at ~80% of this load before starting to track
+        // This prevents the "new user shock" where first workouts seem extremely fatiguing
+        initialCTL = avgDailyTSS * 0.8;
+        initialATL = avgDailyTSS * 0.8;
+      }
+    }
+
+    // Store the seeded initial values for the day before start
+    if (initialCTL > 0 || initialATL > 0) {
+      const dayBeforeStart = new Date(startDate);
+      dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+
+      const seedData: NewFitnessFatigueDaily = {
+        user_id: userId,
+        date: formatDateToYMD(dayBeforeStart),
+        ctl: Math.round(initialCTL * 100) / 100,
+        atl: Math.round(initialATL * 100) / 100,
+        tsb: 0, // At steady state, TSB ≈ 0
+        daily_tss: 0,
+        ramp_rate: null,
+        workout_count: 0,
+      };
+
+      await this.fitnessFatigueRepository.upsert(seedData);
+    }
 
     // Calculate day by day
     const currentDate = new Date(startDate);

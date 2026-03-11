@@ -5,7 +5,7 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
-import { DateQuery, FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
+import { CorrelationQuery, DateQuery, FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
 import {
   DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
@@ -15,11 +15,13 @@ import {
   MultiStreamLoadHistoryResponse,
   MultiStreamLoadResponse,
   ReadinessHistoryResponse,
+  RpeTssCorrelationResponse,
   ThresholdOverrideResponse,
   ThresholdsResponse,
   TrainingStressResponse,
   Vo2MaxHistoryResponse,
   Vo2MaxResponse,
+  WellnessPerformanceCorrelationResponse,
 } from './response.dto';
 
 @ApiTags('advanced-metrics')
@@ -120,6 +122,20 @@ export class AdvancedMetricsApiController {
     return this.service.predictFitnessFatigue(req, body);
   }
 
+  @Version('1')
+  @ApiOperation({ summary: 'Backfill fitness/fatigue history from existing workouts' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Backfill completed successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('fitness-fatigue/backfill')
+  async backfillFitnessFatigue(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<{ message: string }> {
+    const days = query.days ?? 90;
+    await this.service.backfillFitnessFatigue(req, days);
+    return { message: `Successfully backfilled fitness/fatigue data for the last ${days} days` };
+  }
+
   // ==========================================
   // Multi-Stream Load endpoints
   // ==========================================
@@ -146,6 +162,20 @@ export class AdvancedMetricsApiController {
     @Query() query: HistoryQuery,
   ): Promise<MultiStreamLoadHistoryResponse> {
     return this.service.getMultiStreamLoadHistory(req, query.days);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Backfill multi-stream load history from existing workouts' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Backfill completed successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('multi-stream-load/backfill')
+  async backfillMultiStreamLoad(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<{ message: string }> {
+    const days = query.days ?? 90;
+    await this.service.backfillMultiStreamLoad(req, days);
+    return { message: `Successfully backfilled multi-stream load data for the last ${days} days` };
   }
 
   // ==========================================
@@ -202,5 +232,33 @@ export class AdvancedMetricsApiController {
     @Query() query: HistoryQuery,
   ): Promise<ReadinessHistoryResponse> {
     return this.service.getReadinessHistory(req, query.days);
+  }
+
+  // ==========================================
+  // Subjective-Load Correlation endpoints
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get RPE vs calculated TSS correlation data' })
+  @ApiResponse({ status: HttpStatus.OK, type: RpeTssCorrelationResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('rpe-tss-correlation')
+  async getRpeTssCorrelation(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: CorrelationQuery,
+  ): Promise<RpeTssCorrelationResponse> {
+    return this.service.getRpeTssCorrelation(req, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get wellness-performance correlation and overtraining risk' })
+  @ApiResponse({ status: HttpStatus.OK, type: WellnessPerformanceCorrelationResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('wellness-performance')
+  async getWellnessPerformanceCorrelation(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: CorrelationQuery,
+  ): Promise<WellnessPerformanceCorrelationResponse> {
+    return this.service.getWellnessPerformanceCorrelation(req, query);
   }
 }

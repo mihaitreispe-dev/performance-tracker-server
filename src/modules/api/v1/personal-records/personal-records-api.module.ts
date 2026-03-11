@@ -5,6 +5,8 @@ import { PersonalRecordRepository } from 'src/repositories/personal-record.repos
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { PersonalRecordsApiController } from './personal-records-api.controller';
 import { PersonalRecordsApiService } from './personal-records-api.service';
@@ -27,6 +29,8 @@ export class PersonalRecordsApiModule {
           WorkoutRouteRepository,
           ExerciseInstanceRepository,
           WorkoutExecutionRepository,
+          WorkoutRepository,
+          WorkoutScheduleRepository,
         ],
         controllers: [PersonalRecordsApiController],
         exports: [PersonalRecordsDetectionService],

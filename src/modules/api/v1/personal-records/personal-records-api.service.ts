@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { PersonalRecord, PersonalRecordHistory, PersonalRecordType } from 'src/database/interfaces';
+import { PersonalRecord, PersonalRecordHistory, PersonalRecordType, WorkoutType } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 
-import { ListPersonalRecordsQuery, PeriodComparisonQuery, PREvolutionQuery, RecentPRsQuery } from './request.dto';
+import { ListPersonalRecordsQuery, PeriodComparisonQuery, PREvolutionQuery, PRHistoryQuery, RecentPRsQuery } from './request.dto';
 import {
   ExercisePRsDTO,
   ExercisePRsResponse,
@@ -17,6 +17,9 @@ import {
   PREvolutionDTO,
   PREvolutionPointDTO,
   PREvolutionResponse,
+  PRHistoryDTO,
+  PRHistoryRecordDTO,
+  PRHistoryResponse,
   RecentPRDTO,
   RecentPRsResponse,
 } from './response.dto';
@@ -79,11 +82,12 @@ export class PersonalRecordsApiService {
       dateFrom,
     });
 
-    // Get current best
-    const currentBest = await this.personalRecordRepository.findByUserTypeAndExercise(
+    // Get current best (pass null for workoutType to get any sport)
+    const currentBest = await this.personalRecordRepository.findByUserTypeExerciseAndWorkoutType(
       req.user.id,
       query.recordType,
       query.exerciseId ?? null,
+      null, // workoutType - null to find any
     );
 
     let exerciseName: string | null = null;
@@ -207,6 +211,7 @@ export class PersonalRecordsApiService {
         recordType: pr.record_type,
         exerciseId: pr.exercise_id,
         exerciseName: exerciseNames.get(pr.exercise_id ?? '') ?? null,
+        workoutType: pr.workout_type ?? null,
         value,
         unit: pr.unit,
         formattedValue: this.formatValue(value, pr.unit, pr.record_type),
@@ -222,6 +227,61 @@ export class PersonalRecordsApiService {
         totalCount: recentPRs.length,
       },
     };
+  }
+
+  async getHistory(req: Request & { user: AuthUser }, query: PRHistoryQuery): Promise<PRHistoryResponse> {
+    const workoutType = query.workoutType as WorkoutType | undefined;
+
+    // Get all historical records sorted by value
+    const history = await this.personalRecordRepository.findAllHistory({
+      userId: req.user.id,
+      recordType: query.recordType,
+      exerciseId: query.exerciseId,
+      workoutType,
+    });
+
+    // Get the current best record
+    const currentBest = await this.personalRecordRepository.findByUserTypeExerciseAndWorkoutType(
+      req.user.id,
+      query.recordType,
+      query.exerciseId ?? null,
+      workoutType ?? null,
+    );
+
+    let exerciseName: string | null = null;
+    if (query.exerciseId) {
+      const exercise = await this.exerciseRepository.findById(query.exerciseId);
+      exerciseName = exercise?.name ?? null;
+    }
+
+    const unit = history.length > 0 ? history[0].unit : this.getDefaultUnit(query.recordType);
+
+    // Map history records with rank and isCurrent flag
+    const records: PRHistoryRecordDTO[] = history.map((h, index) => ({
+      id: h.id,
+      recordType: h.record_type,
+      exerciseId: h.exercise_id,
+      exerciseName,
+      workoutType: h.workout_type ?? null,
+      value: Number.parseFloat(h.value),
+      unit: h.unit,
+      formattedValue: this.formatValue(Number.parseFloat(h.value), h.unit, h.record_type),
+      workoutExecutionId: h.workout_execution_id,
+      achievedAt: h.achieved_at instanceof Date ? h.achieved_at.toISOString() : String(h.achieved_at),
+      isCurrent: currentBest ? h.id === currentBest.id || h.workout_execution_id === currentBest.workout_execution_id : index === 0,
+      rank: index + 1,
+    }));
+
+    const data: PRHistoryDTO = {
+      recordType: query.recordType,
+      exerciseId: query.exerciseId ?? null,
+      exerciseName,
+      unit,
+      records,
+      totalCount: records.length,
+    };
+
+    return { data };
   }
 
   // Helper methods
@@ -246,6 +306,7 @@ export class PersonalRecordsApiService {
       recordType: record.record_type,
       exerciseId: record.exercise_id,
       exerciseName: exerciseName ?? null,
+      workoutType: record.workout_type ?? null,
       value,
       unit: record.unit,
       formattedValue: this.formatValue(value, record.unit, record.record_type),
@@ -263,6 +324,7 @@ export class PersonalRecordsApiService {
       recordType: record.record_type,
       exerciseId: record.exercise_id,
       exerciseName: exerciseName ?? null,
+      workoutType: record.workout_type ?? null,
       value,
       unit: record.unit,
       formattedValue: this.formatValue(value, record.unit, record.record_type),

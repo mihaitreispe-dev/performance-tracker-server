@@ -134,6 +134,10 @@ export class PrivacySettingsDTO {
   @ApiProperty()
   @IsBoolean()
   shareTrainingLoad: boolean;
+
+  @ApiProperty()
+  @IsBoolean()
+  shareWellnessCheckins: boolean;
 }
 
 export class AssignedWorkoutDTO {
@@ -837,4 +841,161 @@ export class AthleteIntakeResponse extends ItemResponse<AthleteIntakeDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: AthleteIntakeDTO;
+}
+
+// Coach Wellness Dashboard DTOs
+
+export class TeamWellnessAveragesDTO {
+  @ApiProperty({ description: 'Average sleep quality (1-5)' })
+  @IsNumber()
+  sleepQuality: number;
+
+  @ApiProperty({ description: 'Average energy level (1-5)' })
+  @IsNumber()
+  energyLevel: number;
+
+  @ApiProperty({ description: 'Average soreness level (1-5)' })
+  @IsNumber()
+  soreness: number;
+
+  @ApiProperty({ description: 'Average stress level (1-5)' })
+  @IsNumber()
+  stress: number;
+
+  @ApiProperty({ description: 'Average readiness (1-5)' })
+  @IsNumber()
+  readiness: number;
+
+  @ApiProperty({ description: 'Percentage of athletes with check-in today' })
+  @IsNumber()
+  checkinCompliance: number;
+}
+
+export class AtRiskAthleteDTO {
+  @ApiProperty()
+  @IsString()
+  athleteId: string;
+
+  @ApiProperty()
+  @IsString()
+  athleteName: string;
+
+  @ApiProperty({ enum: ['high_fatigue', 'low_recovery', 'declining_trend', 'active_injury', 'active_illness'] })
+  @IsString()
+  riskType: 'high_fatigue' | 'low_recovery' | 'declining_trend' | 'active_injury' | 'active_illness';
+
+  @ApiProperty({ description: 'Risk score (0-100)' })
+  @IsNumber()
+  riskScore: number;
+
+  @ApiProperty()
+  @IsString()
+  details: string;
+}
+
+export class ActiveConcernDTO {
+  @ApiProperty()
+  @IsString()
+  athleteId: string;
+
+  @ApiProperty()
+  @IsString()
+  athleteName: string;
+
+  @ApiProperty({ enum: ['injury', 'illness'] })
+  @IsString()
+  concernType: 'injury' | 'illness';
+
+  @ApiProperty()
+  @IsString()
+  description: string;
+
+  @ApiProperty()
+  @IsNumber()
+  daysSinceStart: number;
+}
+
+export class TeamWellnessOverviewDTO {
+  @ApiProperty()
+  @IsObject()
+  @ValidateNested()
+  teamAverages: TeamWellnessAveragesDTO;
+
+  @ApiProperty({ type: [AtRiskAthleteDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  atRiskAthletes: AtRiskAthleteDTO[];
+
+  @ApiProperty({ type: [ActiveConcernDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  activeConcerns: ActiveConcernDTO[];
+}
+
+export class TeamWellnessOverviewResponse extends ItemResponse<TeamWellnessOverviewDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: TeamWellnessOverviewDTO;
+}
+
+export class AthleteWellnessTrendPointDTO {
+  @ApiProperty()
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  sleepQuality?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  energyLevel?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  muscleSoreness?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  stressLevel?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  trainingReadiness?: number | null;
+
+  @ApiProperty({ description: 'Composite wellness score (0-100)' })
+  @IsNumber()
+  wellnessScore: number;
+}
+
+export class AthleteWellnessTrendsDTO {
+  @ApiProperty()
+  @IsString()
+  athleteId: string;
+
+  @ApiProperty()
+  @IsString()
+  athleteName: string;
+
+  @ApiProperty({ type: [AthleteWellnessTrendPointDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  trends: AthleteWellnessTrendPointDTO[];
+
+  @ApiProperty({ description: 'Overall trend direction' })
+  @IsString()
+  trendDirection: 'improving' | 'stable' | 'declining';
+}
+
+export class AthleteWellnessTrendsResponse extends ItemResponse<AthleteWellnessTrendsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: AthleteWellnessTrendsDTO;
 }

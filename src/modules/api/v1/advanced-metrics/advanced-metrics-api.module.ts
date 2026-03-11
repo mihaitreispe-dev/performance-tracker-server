@@ -8,7 +8,9 @@ import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repos
 import { HrvBaselineRepository } from 'src/repositories/hrv-baseline.repository';
 import { LoadModelParametersRepository } from 'src/repositories/load-model-parameters.repository';
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
+import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { RecoveryJournalRepository } from 'src/repositories/recovery-journal.repository';
+import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
@@ -78,6 +80,8 @@ export class AdvancedMetricsApiModule {
           WorkoutScheduleRepository,
           CoachAthleteRelationshipRepository,
           AthletePrivacySettingsRepository,
+          QuickWellnessCheckinRepository,
+          RpeTssTrackingRepository,
         ],
         controllers: [
           AdvancedMetricsApiController,

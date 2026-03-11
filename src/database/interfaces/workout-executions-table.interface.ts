@@ -21,6 +21,9 @@ export interface WorkoutExecutionsTable {
   source: WorkoutExecutionSource;
   external_id: string | null;
   notes: string | null;
+  session_rpe: number | null;
+  srpe_tss: string | null; // NUMERIC stored as string
+  rpe_collected_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

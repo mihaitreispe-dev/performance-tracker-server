@@ -26,6 +26,7 @@ import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
 import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
+import { WellnessModule } from './wellness/wellness.module';
 import { VoiceApiModule } from './voice/voice.module';
 import { WearablesApiModule } from './wearables/wearables-api.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
@@ -62,6 +63,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     CoachingApiModule.register(),
     NotificationsApiModule.register(),
     RecoveryJournalModule.register(),
+    WellnessModule.register(),
   ],
   providers: [
     {

@@ -500,3 +500,102 @@ export class ReadinessHistoryResponse extends ItemResponse<ReadinessHistoryDTO> 
   @ValidateNested()
   declare data: ReadinessHistoryDTO;
 }
+
+// RPE-TSS Correlation
+
+export class RpeTssDataPointDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  workoutName?: string | null;
+
+  @ApiProperty({ description: 'Session RPE (1-10)' })
+  @IsNumber()
+  sessionRpe: number;
+
+  @ApiProperty({ description: 'sRPE-TSS (session RPE × duration)' })
+  @IsNumber()
+  srpeTss: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Calculated TSS from power/pace/HR' })
+  @IsNumber()
+  @IsOptional()
+  calculatedTss?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Ratio of sRPE-TSS to calculated TSS' })
+  @IsNumber()
+  @IsOptional()
+  rpeTssRatio?: number | null;
+}
+
+export class RpeTssCorrelationDTO {
+  @ApiProperty({ type: [RpeTssDataPointDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RpeTssDataPointDTO)
+  dataPoints: RpeTssDataPointDTO[];
+
+  @ApiPropertyOptional({ type: Number, description: 'Average RPE:TSS ratio (target ~1.0)' })
+  @IsNumber()
+  @IsOptional()
+  averageRatio?: number | null;
+
+  @ApiProperty({ enum: ['increasing', 'stable', 'decreasing'], description: 'Trend direction of ratio' })
+  @IsString()
+  ratioTrend: 'increasing' | 'stable' | 'decreasing';
+
+  @ApiProperty({ description: 'True if avg ratio > 1.3 over 7+ days' })
+  accumulatedFatigueWarning: boolean;
+}
+
+export class RpeTssCorrelationResponse extends ItemResponse<RpeTssCorrelationDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: RpeTssCorrelationDTO;
+}
+
+// Wellness-Performance Correlation
+
+export class WellnessCorrelationDTO {
+  @ApiProperty({ enum: ['sleep', 'stress', 'soreness', 'energy'] })
+  @IsString()
+  factor: 'sleep' | 'stress' | 'soreness' | 'energy';
+
+  @ApiProperty({ description: 'Pearson correlation coefficient with performance (-1 to 1)' })
+  @IsNumber()
+  correlationWithPerformance: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Statistical p-value' })
+  @IsNumber()
+  @IsOptional()
+  pValue?: number | null;
+}
+
+export class WellnessPerformanceCorrelationDTO {
+  @ApiProperty({ type: [WellnessCorrelationDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WellnessCorrelationDTO)
+  correlations: WellnessCorrelationDTO[];
+
+  @ApiProperty({ description: 'Overtraining risk score (0-100)' })
+  @IsNumber()
+  overtrainingRiskScore: number;
+
+  @ApiProperty({ type: [String], description: 'Contributing risk factors' })
+  @IsArray()
+  @IsString({ each: true })
+  riskFactors: string[];
+}
+
+export class WellnessPerformanceCorrelationResponse extends ItemResponse<WellnessPerformanceCorrelationDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: WellnessPerformanceCorrelationDTO;
+}

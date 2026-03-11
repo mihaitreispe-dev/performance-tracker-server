@@ -1,6 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from 'class-validator';
 import { CardioMetricType, WorkoutType } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -687,6 +696,14 @@ export class StreakResponse extends ItemResponse<StreakDTO> {
 
 // Race Predictions
 
+export const RacePredictionSport = {
+  RUNNING: 'running',
+  CYCLING: 'cycling',
+  SWIMMING: 'swimming',
+  TRIATHLON: 'triathlon',
+} as const;
+export type RacePredictionSport = (typeof RacePredictionSport)[keyof typeof RacePredictionSport];
+
 export class RacePredictionDTO {
   @ApiProperty({ description: 'Race distance identifier' })
   @IsString()
@@ -773,6 +790,285 @@ export class RacePredictionsResponse extends ItemResponse<RacePredictionsDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: RacePredictionsDTO;
+}
+
+// Multi-Sport Race Predictions
+
+export class CyclingDataSourceDTO {
+  @ApiProperty({ description: 'FTP (Functional Threshold Power) in watts' })
+  @IsNumber()
+  ftp: number;
+
+  @ApiPropertyOptional({ type: String, description: 'Date when FTP was recorded' })
+  @IsString()
+  @IsOptional()
+  recordedAt?: string | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Source of FTP (test, estimate, etc.)' })
+  @IsString()
+  @IsOptional()
+  source?: string | null;
+}
+
+export class SwimmingDataSourceDTO {
+  @ApiProperty({ description: 'CSS (Critical Swim Speed) in m/s' })
+  @IsNumber()
+  cssMetersPerSecond: number;
+
+  @ApiProperty({ description: 'CSS pace formatted (e.g., "1:45 /100m")' })
+  @IsString()
+  cssPaceFormatted: string;
+
+  @ApiPropertyOptional({ type: String, description: 'Date when CSS was recorded' })
+  @IsString()
+  @IsOptional()
+  recordedAt?: string | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Source of CSS' })
+  @IsString()
+  @IsOptional()
+  source?: string | null;
+}
+
+export class CyclingPredictionDTO {
+  @ApiProperty({ description: 'Event identifier' })
+  @IsString()
+  eventId: string;
+
+  @ApiProperty({ description: 'Event name (e.g., "10km Time Trial")' })
+  @IsString()
+  eventName: string;
+
+  @ApiProperty({ description: 'Distance in meters' })
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiProperty({ description: 'Predicted time in seconds' })
+  @IsNumber()
+  predictedTimeSeconds: number;
+
+  @ApiProperty({ description: 'Predicted time formatted (HH:MM:SS or MM:SS)' })
+  @IsString()
+  predictedTimeFormatted: string;
+
+  @ApiProperty({ description: 'Average speed in km/h' })
+  @IsNumber()
+  avgSpeedKmh: number;
+
+  @ApiProperty({ description: 'Average power in watts' })
+  @IsNumber()
+  avgPowerWatts: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Confidence level 0-100' })
+  @IsNumber()
+  @IsOptional()
+  confidence?: number | null;
+}
+
+export class CyclingPredictionsDTO {
+  @ApiProperty({ type: [CyclingPredictionDTO], description: 'Cycling time trial predictions' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CyclingPredictionDTO)
+  predictions: CyclingPredictionDTO[];
+
+  @ApiPropertyOptional({ type: CyclingDataSourceDTO, description: 'FTP data used for predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CyclingDataSourceDTO)
+  @IsOptional()
+  dataSource?: CyclingDataSourceDTO | null;
+
+  @ApiProperty({ description: 'Whether sufficient data exists for predictions' })
+  @IsBoolean()
+  hasData: boolean;
+
+  @ApiPropertyOptional({ type: String, description: 'Message when no data available' })
+  @IsString()
+  @IsOptional()
+  message?: string | null;
+}
+
+export class SwimmingPredictionDTO {
+  @ApiProperty({ description: 'Event identifier' })
+  @IsString()
+  eventId: string;
+
+  @ApiProperty({ description: 'Event name (e.g., "400m Freestyle")' })
+  @IsString()
+  eventName: string;
+
+  @ApiProperty({ description: 'Distance in meters' })
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiProperty({ description: 'Predicted time in seconds' })
+  @IsNumber()
+  predictedTimeSeconds: number;
+
+  @ApiProperty({ description: 'Predicted time formatted (HH:MM:SS or MM:SS)' })
+  @IsString()
+  predictedTimeFormatted: string;
+
+  @ApiProperty({ description: 'Pace per 100m in seconds' })
+  @IsNumber()
+  pacePer100mSeconds: number;
+
+  @ApiProperty({ description: 'Pace per 100m formatted (MM:SS /100m)' })
+  @IsString()
+  paceFormatted: string;
+
+  @ApiPropertyOptional({ type: Number, description: 'Confidence level 0-100' })
+  @IsNumber()
+  @IsOptional()
+  confidence?: number | null;
+}
+
+export class SwimmingPredictionsDTO {
+  @ApiProperty({ type: [SwimmingPredictionDTO], description: 'Swimming race predictions' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SwimmingPredictionDTO)
+  predictions: SwimmingPredictionDTO[];
+
+  @ApiPropertyOptional({ type: SwimmingDataSourceDTO, description: 'CSS data used for predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SwimmingDataSourceDTO)
+  @IsOptional()
+  dataSource?: SwimmingDataSourceDTO | null;
+
+  @ApiProperty({ description: 'Whether sufficient data exists for predictions' })
+  @IsBoolean()
+  hasData: boolean;
+
+  @ApiPropertyOptional({ type: String, description: 'Message when no data available' })
+  @IsString()
+  @IsOptional()
+  message?: string | null;
+}
+
+export class TriathlonLegDTO {
+  @ApiProperty({ description: 'Leg identifier (swim, bike, run, t1, t2)' })
+  @IsString()
+  legId: string;
+
+  @ApiProperty({ description: 'Leg name' })
+  @IsString()
+  legName: string;
+
+  @ApiProperty({ description: 'Distance in meters (0 for transitions)' })
+  @IsNumber()
+  distanceMeters: number;
+
+  @ApiProperty({ description: 'Predicted time in seconds' })
+  @IsNumber()
+  predictedTimeSeconds: number;
+
+  @ApiProperty({ description: 'Predicted time formatted' })
+  @IsString()
+  predictedTimeFormatted: string;
+}
+
+export class TriathlonPredictionDTO {
+  @ApiProperty({ description: 'Event identifier' })
+  @IsString()
+  eventId: string;
+
+  @ApiProperty({ description: 'Event name (e.g., "Sprint Triathlon", "Ironman 70.3")' })
+  @IsString()
+  eventName: string;
+
+  @ApiProperty({ type: [TriathlonLegDTO], description: 'Breakdown by leg' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TriathlonLegDTO)
+  legs: TriathlonLegDTO[];
+
+  @ApiProperty({ description: 'Total time in seconds' })
+  @IsNumber()
+  totalTimeSeconds: number;
+
+  @ApiProperty({ description: 'Total time formatted (HH:MM:SS)' })
+  @IsString()
+  totalTimeFormatted: string;
+
+  @ApiPropertyOptional({ type: Number, description: 'Overall confidence level 0-100' })
+  @IsNumber()
+  @IsOptional()
+  confidence?: number | null;
+
+  @ApiPropertyOptional({ type: [String], description: 'Sports missing data for full prediction' })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  missingSports?: string[] | null;
+}
+
+export class TriathlonPredictionsDTO {
+  @ApiProperty({ type: [TriathlonPredictionDTO], description: 'Triathlon event predictions' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TriathlonPredictionDTO)
+  predictions: TriathlonPredictionDTO[];
+
+  @ApiProperty({ description: 'Whether sufficient data exists for predictions' })
+  @IsBoolean()
+  hasData: boolean;
+
+  @ApiPropertyOptional({ type: [String], description: 'Sports with available data' })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  availableSports?: string[] | null;
+
+  @ApiPropertyOptional({ type: [String], description: 'Sports missing data' })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  missingSports?: string[] | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Message when data is incomplete' })
+  @IsString()
+  @IsOptional()
+  message?: string | null;
+}
+
+export class MultiSportRacePredictionsDTO {
+  @ApiPropertyOptional({ type: RacePredictionsDTO, description: 'Running predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RacePredictionsDTO)
+  @IsOptional()
+  running?: RacePredictionsDTO | null;
+
+  @ApiPropertyOptional({ type: CyclingPredictionsDTO, description: 'Cycling predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CyclingPredictionsDTO)
+  @IsOptional()
+  cycling?: CyclingPredictionsDTO | null;
+
+  @ApiPropertyOptional({ type: SwimmingPredictionsDTO, description: 'Swimming predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SwimmingPredictionsDTO)
+  @IsOptional()
+  swimming?: SwimmingPredictionsDTO | null;
+
+  @ApiPropertyOptional({ type: TriathlonPredictionsDTO, description: 'Triathlon predictions' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => TriathlonPredictionsDTO)
+  @IsOptional()
+  triathlon?: TriathlonPredictionsDTO | null;
+}
+
+export class MultiSportRacePredictionsResponse extends ItemResponse<MultiSportRacePredictionsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: MultiSportRacePredictionsDTO;
 }
 
 // Strength Progression

@@ -18,7 +18,9 @@ import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-priva
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
+import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
+import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import {
   WorkoutExecutionFilter,
@@ -37,6 +39,7 @@ import {
   ListSetCompletionsQuery,
   ListWorkoutExecutionsQuery,
   StartWorkoutExecutionBody,
+  UpdateSessionRPEBody,
   UpdateWorkoutExecutionBody,
   UploadRouteBody,
 } from './request.dto';
@@ -45,6 +48,8 @@ import {
   CardioMetricDTO,
   CardioMetricListResponse,
   RouteMarkerDTO,
+  SessionRPEDTO,
+  SessionRPEResponse,
   SetCompletionDTO,
   SetCompletionListResponse,
   SetCompletionResponse,
@@ -71,6 +76,8 @@ export class WorkoutExecutionsApiService {
     private readonly executionWeatherRepository: ExecutionWeatherRepository,
     private readonly relationshipRepository: CoachAthleteRelationshipRepository,
     private readonly privacySettingsRepository: AthletePrivacySettingsRepository,
+    private readonly rpeTssTrackingRepository: RpeTssTrackingRepository,
+    private readonly trainingStressRepository: TrainingStressRepository,
   ) {}
 
   // Workout Executions
@@ -269,6 +276,130 @@ export class WorkoutExecutionsApiService {
     }
 
     await this.workoutExecutionRepository.deleteById(id);
+  }
+
+  // Session RPE
+
+  async updateSessionRPE(
+    req: Request & { user: AuthUser },
+    id: string,
+    body: UpdateSessionRPEBody,
+  ): Promise<SessionRPEResponse> {
+    const execution = await this.workoutExecutionRepository.findById(id);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Workout must be completed to record session RPE
+    if (!execution.completed_at || !execution.duration_seconds) {
+      throw new BadRequestException('Workout must be completed with duration to record session RPE');
+    }
+
+    const now = new Date();
+    const durationMinutes = execution.duration_seconds / 60;
+
+    // Calculate sRPE-TSS using Foster method: RPE × duration in minutes
+    const srpeTss = body.sessionRpe * durationMinutes;
+
+    // Get calculated TSS from training stress scores (if available)
+    const trainingStress = await this.trainingStressRepository.findByWorkoutExecutionId(id);
+    const calculatedTss = trainingStress?.tss ? parseFloat(trainingStress.tss) : null;
+
+    // Calculate RPE:TSS ratio
+    let rpeTssRatio: number | null = null;
+    if (calculatedTss && calculatedTss > 0) {
+      rpeTssRatio = srpeTss / calculatedTss;
+    }
+
+    // Check for accumulated fatigue (average ratio > 1.3 over last 7 days)
+    const avgRatio = await this.rpeTssTrackingRepository.getAverageRatio(req.user.id, 7);
+    const accumulatedFatigueFlag = avgRatio !== null && avgRatio > 1.3;
+
+    // Update workout execution with session RPE
+    await this.workoutExecutionRepository.updateById(id, {
+      session_rpe: body.sessionRpe,
+      srpe_tss: srpeTss.toFixed(2),
+      rpe_collected_at: now,
+    });
+
+    // Create or update tracking record
+    const existingTracking = await this.rpeTssTrackingRepository.findByWorkoutExecutionId(id);
+    if (existingTracking) {
+      await this.rpeTssTrackingRepository.updateById(existingTracking.id, {
+        session_rpe: body.sessionRpe,
+        srpe_tss: srpeTss.toFixed(2),
+        calculated_tss: calculatedTss?.toFixed(2) ?? null,
+        rpe_tss_ratio: rpeTssRatio?.toFixed(2) ?? null,
+        accumulated_fatigue_flag: accumulatedFatigueFlag,
+      });
+    } else {
+      await this.rpeTssTrackingRepository.create({
+        user_id: req.user.id,
+        workout_execution_id: id,
+        session_rpe: body.sessionRpe,
+        srpe_tss: srpeTss.toFixed(2),
+        calculated_tss: calculatedTss?.toFixed(2) ?? null,
+        rpe_tss_ratio: rpeTssRatio?.toFixed(2) ?? null,
+        accumulated_fatigue_flag: accumulatedFatigueFlag,
+      });
+    }
+
+    const responseData: SessionRPEDTO = {
+      sessionRpe: body.sessionRpe,
+      srpeTss,
+      calculatedTss,
+      rpeTssRatio,
+      accumulatedFatigueFlag,
+      rpeCollectedAt: now.toISOString(),
+    };
+
+    return { data: responseData };
+  }
+
+  async getSessionRPE(req: Request & { user: AuthUser }, id: string): Promise<SessionRPEResponse> {
+    const execution = await this.workoutExecutionRepository.findById(id);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+
+    // Check if user owns the execution or is a coach with access
+    if (execution.user_id !== req.user.id) {
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
+    }
+
+    if (!execution.session_rpe) {
+      throw new NotFoundException('Session RPE not recorded for this workout');
+    }
+
+    const tracking = await this.rpeTssTrackingRepository.findByWorkoutExecutionId(id);
+
+    const responseData: SessionRPEDTO = {
+      sessionRpe: execution.session_rpe,
+      srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : 0,
+      calculatedTss: tracking?.calculated_tss ? parseFloat(tracking.calculated_tss) : null,
+      rpeTssRatio: tracking?.rpe_tss_ratio ? parseFloat(tracking.rpe_tss_ratio) : null,
+      accumulatedFatigueFlag: tracking?.accumulated_fatigue_flag ?? false,
+      rpeCollectedAt: execution.rpe_collected_at
+        ? new Date(execution.rpe_collected_at).toISOString()
+        : new Date().toISOString(),
+    };
+
+    return { data: responseData };
   }
 
   // Set Completions
@@ -585,6 +716,12 @@ export class WorkoutExecutionsApiService {
       };
     }
 
+    const rpeCollectedAt = execution.rpe_collected_at
+      ? execution.rpe_collected_at instanceof Date
+        ? execution.rpe_collected_at.toISOString()
+        : String(execution.rpe_collected_at)
+      : null;
+
     return {
       id: execution.id,
       userId: execution.user_id,
@@ -596,6 +733,9 @@ export class WorkoutExecutionsApiService {
       source: execution.source,
       externalId: execution.external_id,
       notes: execution.notes,
+      sessionRpe: execution.session_rpe,
+      srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : null,
+      rpeCollectedAt,
       createdAt,
       updatedAt,
     };

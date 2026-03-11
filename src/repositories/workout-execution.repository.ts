@@ -41,6 +41,11 @@ export class WorkoutExecutionRepository {
     return this.db.selectFrom('workout_executions').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
+  async findByIds(ids: string[]): Promise<WorkoutExecution[]> {
+    if (ids.length === 0) return [];
+    return this.db.selectFrom('workout_executions').where('id', 'in', ids).selectAll().execute();
+  }
+
   async findByExternalId(externalId: string, source: WorkoutExecutionSource): Promise<WorkoutExecution | undefined> {
     return this.db
       .selectFrom('workout_executions')

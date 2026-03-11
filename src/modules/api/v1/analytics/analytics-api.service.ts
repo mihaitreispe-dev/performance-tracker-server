@@ -35,12 +35,17 @@ import {
 import {
   CurrentTrainingLoadDTO,
   CurrentTrainingLoadResponse,
+  CyclingDataSourceDTO,
+  CyclingPredictionDTO,
+  CyclingPredictionsDTO,
   DailyActivityDTO,
   DailyWorkoutDTO,
   ExecutionWeatherDTO,
   HRZonesSummaryDTO,
   HRZoneStatDTO,
   MetricSummaryDTO,
+  MultiSportRacePredictionsDTO,
+  MultiSportRacePredictionsResponse,
   MuscleGroupBreakdownDTO,
   MuscleGroupVolumeDTO,
   PeriodSummaryDTO,
@@ -59,12 +64,18 @@ import {
   StrengthDataPointDTO,
   StrengthProgressionDTO,
   StrengthProgressionResponse,
+  SwimmingDataSourceDTO,
+  SwimmingPredictionDTO,
+  SwimmingPredictionsDTO,
   TrackedExerciseDTO,
   TrackedExercisesDTO,
   TrackedExercisesResponse,
   TrainingLoadDTO,
   TrainingLoadHistoryDTO,
   TrainingLoadHistoryResponse,
+  TriathlonLegDTO,
+  TriathlonPredictionDTO,
+  TriathlonPredictionsDTO,
   WeeklySummaryDTO,
   WeeklySummaryResponse,
   WorkoutAnalyticsDTO,
@@ -1918,5 +1929,542 @@ export class AnalyticsApiService {
 
     const data: TrackedExercisesDTO = { exercises };
     return { data };
+  }
+
+  // ==================== Multi-Sport Race Predictions ====================
+
+  // Cycling Time Trial distances in meters
+  private readonly CYCLING_TT_DISTANCES = [
+    { id: '10km_tt', name: '10km Time Trial', meters: 10000 },
+    { id: '20km_tt', name: '20km Time Trial', meters: 20000 },
+    { id: '40km_tt', name: '40km Time Trial', meters: 40000 },
+    { id: '100km', name: '100km Ride', meters: 100000 },
+  ];
+
+  // Swimming race distances in meters
+  private readonly SWIM_DISTANCES = [
+    { id: '400m', name: '400m Freestyle', meters: 400 },
+    { id: '800m', name: '800m Freestyle', meters: 800 },
+    { id: '1500m', name: '1500m Freestyle', meters: 1500 },
+    { id: '1.9km', name: '1.9km (Half IM Swim)', meters: 1900 },
+    { id: '3.8km', name: '3.8km (Full IM Swim)', meters: 3800 },
+  ];
+
+  // Triathlon event distances
+  private readonly TRIATHLON_EVENTS = [
+    {
+      id: 'sprint',
+      name: 'Sprint Triathlon',
+      swimMeters: 750,
+      bikeMeters: 20000,
+      runMeters: 5000,
+      t1Seconds: 120,
+      t2Seconds: 90,
+    },
+    {
+      id: 'olympic',
+      name: 'Olympic Triathlon',
+      swimMeters: 1500,
+      bikeMeters: 40000,
+      runMeters: 10000,
+      t1Seconds: 180,
+      t2Seconds: 120,
+    },
+    {
+      id: '70.3',
+      name: 'Ironman 70.3',
+      swimMeters: 1900,
+      bikeMeters: 90000,
+      runMeters: 21097.5,
+      t1Seconds: 300,
+      t2Seconds: 180,
+    },
+    {
+      id: 'ironman',
+      name: 'Ironman',
+      swimMeters: 3800,
+      bikeMeters: 180000,
+      runMeters: 42195,
+      t1Seconds: 420,
+      t2Seconds: 300,
+    },
+  ];
+
+  async getMultiSportRacePredictions(req: Request & { user: AuthUser }): Promise<MultiSportRacePredictionsResponse> {
+    return this.getMultiSportRacePredictionsForUser(req.user.id);
+  }
+
+  async getMultiSportRacePredictionsForUser(userId: string): Promise<MultiSportRacePredictionsResponse> {
+    const [running, cycling, swimming] = await Promise.all([
+      this.getRacePredictionsForUser(userId).then((r) => r.data),
+      this.getCyclingPredictionsForUser(userId),
+      this.getSwimmingPredictionsForUser(userId),
+    ]);
+
+    const triathlon = await this.getTriathlonPredictionsForUser(userId, running, cycling, swimming);
+
+    const data: MultiSportRacePredictionsDTO = {
+      running,
+      cycling,
+      swimming,
+      triathlon,
+    };
+
+    return { data };
+  }
+
+  private async getCyclingPredictionsForUser(userId: string): Promise<CyclingPredictionsDTO> {
+    // Get FTP from user settings
+    const settings = await this.userSettingsRepository.findByUserId(userId);
+    const ftp = settings?.power_zones?.ftp;
+
+    if (!ftp || ftp <= 0) {
+      return {
+        predictions: [],
+        dataSource: null,
+        hasData: false,
+        message: 'No FTP data available. Complete an FTP test or set your FTP in settings to see cycling predictions.',
+      };
+    }
+
+    // Calculate predictions using Critical Power model
+    // For TT, average power = FTP * factor (depends on duration)
+    // TT performance: time = distance / speed, speed = f(power, CdA, rolling resistance, etc.)
+    // Simplified model: assume flat road, standard CdA
+    const predictions: CyclingPredictionDTO[] = this.CYCLING_TT_DISTANCES.map((event) => {
+      const result = this.predictCyclingTT(ftp, event.meters);
+      return {
+        eventId: event.id,
+        eventName: event.name,
+        distanceMeters: event.meters,
+        predictedTimeSeconds: result.timeSeconds,
+        predictedTimeFormatted: this.formatRaceTime(result.timeSeconds),
+        avgSpeedKmh: Math.round(result.avgSpeedKmh * 10) / 10,
+        avgPowerWatts: Math.round(result.avgPowerWatts),
+        confidence: result.confidence,
+      };
+    });
+
+    const dataSource: CyclingDataSourceDTO = {
+      ftp,
+      recordedAt: settings?.updated_at ? new Date(settings.updated_at as unknown as string).toISOString() : null,
+      source: 'user_settings',
+    };
+
+    return {
+      predictions,
+      dataSource,
+      hasData: true,
+      message: null,
+    };
+  }
+
+  private predictCyclingTT(
+    ftp: number,
+    distanceMeters: number,
+  ): { timeSeconds: number; avgSpeedKmh: number; avgPowerWatts: number; confidence: number } {
+    // Time trial power sustainability factors (% of FTP based on duration)
+    // Short TT: can sustain higher % of FTP
+    // Longer events: need to ride below FTP
+    const estimatedDuration = this.estimateCyclingDuration(ftp, distanceMeters);
+
+    // Power sustainability: starts at 105% for <20 min, decreases for longer durations
+    let powerFactor: number;
+    let confidence: number;
+
+    if (estimatedDuration < 20 * 60) {
+      powerFactor = 1.05;
+      confidence = 85;
+    } else if (estimatedDuration < 40 * 60) {
+      powerFactor = 1.0;
+      confidence = 80;
+    } else if (estimatedDuration < 60 * 60) {
+      powerFactor = 0.95;
+      confidence = 75;
+    } else if (estimatedDuration < 90 * 60) {
+      powerFactor = 0.88;
+      confidence = 70;
+    } else {
+      powerFactor = 0.82;
+      confidence = 65;
+    }
+
+    const avgPowerWatts = ftp * powerFactor;
+
+    // Speed calculation using simplified model
+    // Power = 0.5 * CdA * rho * v^3 + Crr * m * g * v
+    // Simplified: assume 75kg rider, CdA = 0.3 (TT position), Crr = 0.004 (good tires)
+    // Solving for v given P
+    const speed = this.calculateCyclingSpeedFromPower(avgPowerWatts);
+    const timeSeconds = distanceMeters / speed;
+    const avgSpeedKmh = speed * 3.6;
+
+    return { timeSeconds: Math.round(timeSeconds), avgSpeedKmh, avgPowerWatts, confidence };
+  }
+
+  private estimateCyclingDuration(ftp: number, distanceMeters: number): number {
+    // Initial rough estimate using FTP
+    const roughSpeed = this.calculateCyclingSpeedFromPower(ftp);
+    return distanceMeters / roughSpeed;
+  }
+
+  private calculateCyclingSpeedFromPower(powerWatts: number): number {
+    // Simplified cycling model for flat terrain
+    // Power = air resistance + rolling resistance
+    // P = 0.5 * rho * CdA * v^3 + Crr * m * g * v
+    // Solving iteratively for v
+
+    const rho = 1.225; // Air density (kg/m^3)
+    const CdA = 0.3; // TT position drag area (m^2)
+    const Crr = 0.004; // Rolling resistance coefficient
+    const m = 75; // Rider + bike mass (kg)
+    const g = 9.81; // Gravity (m/s^2)
+
+    // Newton-Raphson iteration to solve for v
+    let v = 10; // Initial guess (m/s)
+    for (let i = 0; i < 20; i++) {
+      const f = 0.5 * rho * CdA * v * v * v + Crr * m * g * v - powerWatts;
+      const fPrime = 1.5 * rho * CdA * v * v + Crr * m * g;
+      const vNew = v - f / fPrime;
+      if (Math.abs(vNew - v) < 0.001) break;
+      v = vNew;
+    }
+
+    return Math.max(v, 1); // Minimum 1 m/s
+  }
+
+  private async getSwimmingPredictionsForUser(userId: string): Promise<SwimmingPredictionsDTO> {
+    // Try to find CSS from recent swim workouts
+    const css = await this.estimateCSSForUser(userId);
+
+    if (!css) {
+      return {
+        predictions: [],
+        dataSource: null,
+        hasData: false,
+        message: 'No swimming data available. Complete swim workouts with pace tracking to see predictions.',
+      };
+    }
+
+    // Swimming prediction using Riegel's formula with swimming-specific exponent (1.035)
+    const predictions: SwimmingPredictionDTO[] = this.SWIM_DISTANCES.map((event) => {
+      const result = this.predictSwimTime(css.cssSecondsPerMeter, event.meters, css.referenceDistance);
+      return {
+        eventId: event.id,
+        eventName: event.name,
+        distanceMeters: event.meters,
+        predictedTimeSeconds: result.timeSeconds,
+        predictedTimeFormatted: this.formatRaceTime(result.timeSeconds),
+        pacePer100mSeconds: result.pacePer100m,
+        paceFormatted: this.formatSwimPace(result.pacePer100m),
+        confidence: result.confidence,
+      };
+    });
+
+    const dataSource: SwimmingDataSourceDTO = {
+      cssMetersPerSecond: 1 / css.cssSecondsPerMeter,
+      cssPaceFormatted: this.formatSwimPace(css.cssSecondsPerMeter * 100),
+      recordedAt: css.recordedAt,
+      source: css.source,
+    };
+
+    return {
+      predictions,
+      dataSource,
+      hasData: true,
+      message: null,
+    };
+  }
+
+  private async estimateCSSForUser(
+    userId: string,
+  ): Promise<{ cssSecondsPerMeter: number; referenceDistance: number; recordedAt: string; source: string } | null> {
+    // Look for swimming workouts in last 90 days
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const executions = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId,
+        completedDateFrom: ninetyDaysAgo,
+        completedDateTo: new Date(),
+        completed: true,
+      },
+      sort: [{ field: 'completed_at', direction: 'desc' }],
+    });
+
+    // Filter to swimming workouts with route data
+    const swimWorkouts: { distance: number; duration: number; date: Date }[] = [];
+
+    for (const exec of executions) {
+      const workoutType = await this.getWorkoutTypeForExecution(exec);
+      if (workoutType !== WorkoutType.SWIMMING) continue;
+
+      const route = await this.workoutRouteRepository.findByExecutionId(exec.id);
+      if (!route || !exec.duration_seconds) continue;
+
+      const distance = Number.parseFloat(route.total_distance_meters);
+      if (distance < 200) continue; // Minimum 200m swim
+
+      const completedAt =
+        exec.completed_at instanceof Date ? exec.completed_at : new Date(String(exec.completed_at));
+
+      swimWorkouts.push({
+        distance,
+        duration: exec.duration_seconds,
+        date: completedAt,
+      });
+    }
+
+    if (swimWorkouts.length === 0) return null;
+
+    // Calculate CSS from best sustained efforts
+    // Use the fastest pace from swims of at least 400m
+    const sustainedSwims = swimWorkouts.filter((s) => s.distance >= 400);
+    if (sustainedSwims.length === 0) {
+      // Fall back to any swim
+      const best = swimWorkouts.reduce((a, b) =>
+        a.duration / a.distance < b.duration / b.distance ? a : b,
+      );
+      return {
+        cssSecondsPerMeter: best.duration / best.distance,
+        referenceDistance: best.distance,
+        recordedAt: best.date.toISOString(),
+        source: 'recent_swim',
+      };
+    }
+
+    // Find best pace
+    const best = sustainedSwims.reduce((a, b) =>
+      a.duration / a.distance < b.duration / b.distance ? a : b,
+    );
+
+    return {
+      cssSecondsPerMeter: best.duration / best.distance,
+      referenceDistance: best.distance,
+      recordedAt: best.date.toISOString(),
+      source: 'recent_swim',
+    };
+  }
+
+  private predictSwimTime(
+    cssSecondsPerMeter: number,
+    targetDistance: number,
+    referenceDistance: number,
+  ): { timeSeconds: number; pacePer100m: number; confidence: number } {
+    // Swimming uses a lower exponent than running (1.035 vs 1.06)
+    // due to different fatigue characteristics in water
+    const exponent = 1.035;
+
+    // Reference time at CSS pace
+    const referenceTime = cssSecondsPerMeter * referenceDistance;
+
+    // Predict time for target distance
+    const predictedTime = referenceTime * Math.pow(targetDistance / referenceDistance, exponent);
+    const pacePer100m = (predictedTime / targetDistance) * 100;
+
+    // Confidence based on distance ratio
+    const distanceRatio = Math.min(referenceDistance, targetDistance) / Math.max(referenceDistance, targetDistance);
+    const confidence = Math.round(distanceRatio * 90); // Max 90% for swimming predictions
+
+    return {
+      timeSeconds: Math.round(predictedTime),
+      pacePer100m: Math.round(pacePer100m * 10) / 10,
+      confidence,
+    };
+  }
+
+  private formatSwimPace(secondsPer100m: number): string {
+    const minutes = Math.floor(secondsPer100m / 60);
+    const secs = Math.round(secondsPer100m % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')} /100m`;
+  }
+
+  private async getTriathlonPredictionsForUser(
+    userId: string,
+    running: RacePredictionsDTO,
+    cycling: CyclingPredictionsDTO,
+    swimming: SwimmingPredictionsDTO,
+  ): Promise<TriathlonPredictionsDTO> {
+    const hasRunning = running.hasData;
+    const hasCycling = cycling.hasData;
+    const hasSwimming = swimming.hasData;
+
+    const availableSports: string[] = [];
+    const missingSports: string[] = [];
+
+    if (hasRunning) availableSports.push('running');
+    else missingSports.push('running');
+
+    if (hasCycling) availableSports.push('cycling');
+    else missingSports.push('cycling');
+
+    if (hasSwimming) availableSports.push('swimming');
+    else missingSports.push('swimming');
+
+    if (availableSports.length === 0) {
+      return {
+        predictions: [],
+        hasData: false,
+        availableSports,
+        missingSports,
+        message: 'No swim, bike, or run data available for triathlon predictions.',
+      };
+    }
+
+    // Generate predictions for each triathlon event
+    const predictions: TriathlonPredictionDTO[] = this.TRIATHLON_EVENTS.map((event) => {
+      const legs: TriathlonLegDTO[] = [];
+      let totalTime = 0;
+      let legConfidences: number[] = [];
+
+      // Swim leg
+      if (hasSwimming && swimming.dataSource) {
+        const swimTime = this.predictSwimTime(
+          1 / swimming.dataSource.cssMetersPerSecond,
+          event.swimMeters,
+          1000, // Reference distance
+        );
+        legs.push({
+          legId: 'swim',
+          legName: 'Swim',
+          distanceMeters: event.swimMeters,
+          predictedTimeSeconds: swimTime.timeSeconds,
+          predictedTimeFormatted: this.formatRaceTime(swimTime.timeSeconds),
+        });
+        totalTime += swimTime.timeSeconds;
+        legConfidences.push(swimTime.confidence);
+      } else {
+        // Estimate swim time based on typical finish time ratios
+        const estimatedSwimTime = this.estimateSwimTime(event.swimMeters);
+        legs.push({
+          legId: 'swim',
+          legName: 'Swim (estimated)',
+          distanceMeters: event.swimMeters,
+          predictedTimeSeconds: estimatedSwimTime,
+          predictedTimeFormatted: this.formatRaceTime(estimatedSwimTime),
+        });
+        totalTime += estimatedSwimTime;
+        legConfidences.push(30); // Low confidence
+      }
+
+      // T1 transition
+      legs.push({
+        legId: 't1',
+        legName: 'T1',
+        distanceMeters: 0,
+        predictedTimeSeconds: event.t1Seconds,
+        predictedTimeFormatted: this.formatRaceTime(event.t1Seconds),
+      });
+      totalTime += event.t1Seconds;
+
+      // Bike leg
+      if (hasCycling && cycling.dataSource) {
+        const bikeResult = this.predictCyclingTT(cycling.dataSource.ftp, event.bikeMeters);
+        legs.push({
+          legId: 'bike',
+          legName: 'Bike',
+          distanceMeters: event.bikeMeters,
+          predictedTimeSeconds: bikeResult.timeSeconds,
+          predictedTimeFormatted: this.formatRaceTime(bikeResult.timeSeconds),
+        });
+        totalTime += bikeResult.timeSeconds;
+        legConfidences.push(bikeResult.confidence);
+      } else {
+        const estimatedBikeTime = this.estimateBikeTime(event.bikeMeters);
+        legs.push({
+          legId: 'bike',
+          legName: 'Bike (estimated)',
+          distanceMeters: event.bikeMeters,
+          predictedTimeSeconds: estimatedBikeTime,
+          predictedTimeFormatted: this.formatRaceTime(estimatedBikeTime),
+        });
+        totalTime += estimatedBikeTime;
+        legConfidences.push(30);
+      }
+
+      // T2 transition
+      legs.push({
+        legId: 't2',
+        legName: 'T2',
+        distanceMeters: 0,
+        predictedTimeSeconds: event.t2Seconds,
+        predictedTimeFormatted: this.formatRaceTime(event.t2Seconds),
+      });
+      totalTime += event.t2Seconds;
+
+      // Run leg
+      if (hasRunning && running.dataSource) {
+        const runTime = this.predictRaceTime(
+          running.dataSource.distanceMeters,
+          running.dataSource.timeSeconds,
+          event.runMeters,
+        );
+        legs.push({
+          legId: 'run',
+          legName: 'Run',
+          distanceMeters: event.runMeters,
+          predictedTimeSeconds: Math.round(runTime),
+          predictedTimeFormatted: this.formatRaceTime(runTime),
+        });
+        totalTime += Math.round(runTime);
+        // Calculate run confidence
+        const distRatio = Math.min(running.dataSource.distanceMeters, event.runMeters) /
+          Math.max(running.dataSource.distanceMeters, event.runMeters);
+        legConfidences.push(Math.round(distRatio * 100));
+      } else {
+        const estimatedRunTime = this.estimateRunTime(event.runMeters);
+        legs.push({
+          legId: 'run',
+          legName: 'Run (estimated)',
+          distanceMeters: event.runMeters,
+          predictedTimeSeconds: estimatedRunTime,
+          predictedTimeFormatted: this.formatRaceTime(estimatedRunTime),
+        });
+        totalTime += estimatedRunTime;
+        legConfidences.push(30);
+      }
+
+      // Calculate overall confidence
+      const avgConfidence = legConfidences.length > 0
+        ? Math.round(legConfidences.reduce((a, b) => a + b, 0) / legConfidences.length)
+        : 30;
+
+      return {
+        eventId: event.id,
+        eventName: event.name,
+        legs,
+        totalTimeSeconds: Math.round(totalTime),
+        totalTimeFormatted: this.formatRaceTime(totalTime),
+        confidence: avgConfidence,
+        missingSports: missingSports.length > 0 ? missingSports : null,
+      };
+    });
+
+    return {
+      predictions,
+      hasData: true,
+      availableSports,
+      missingSports: missingSports.length > 0 ? missingSports : null,
+      message: missingSports.length > 0
+        ? `Some predictions are estimated. Add ${missingSports.join(', ')} data for more accurate results.`
+        : null,
+    };
+  }
+
+  // Estimation helpers for sports without data
+  private estimateSwimTime(distanceMeters: number): number {
+    // Assume 2:00/100m average recreational triathlon pace
+    return (distanceMeters / 100) * 120;
+  }
+
+  private estimateBikeTime(distanceMeters: number): number {
+    // Assume 30 km/h average recreational triathlon pace
+    return (distanceMeters / 1000) * 120; // 30 km/h = 2 min/km
+  }
+
+  private estimateRunTime(distanceMeters: number): number {
+    // Assume 6:00/km average recreational triathlon pace
+    return (distanceMeters / 1000) * 360;
   }
 }

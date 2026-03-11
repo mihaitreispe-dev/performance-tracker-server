@@ -10,6 +10,7 @@ export interface AthletePrivacySettingsTable {
   share_personal_records: Generated<boolean>;
   share_sleep_data: Generated<boolean>;
   share_training_load: Generated<boolean>;
+  share_wellness_checkins: Generated<boolean>;
 }
 
 export type AthletePrivacySettings = Selectable<AthletePrivacySettingsTable>;

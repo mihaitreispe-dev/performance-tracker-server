@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
-import { PersonalRecordType } from 'src/database/interfaces';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
+import { PersonalRecordType, WorkoutType } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -24,6 +24,11 @@ export class PersonalRecordDTO {
   @IsString()
   @IsOptional()
   exerciseName?: string | null;
+
+  @ApiPropertyOptional({ enum: WorkoutType, description: 'Sport type for cardio PRs (run, cycling, swimming)' })
+  @IsEnumString(WorkoutType)
+  @IsOptional()
+  workoutType?: WorkoutType | null;
 
   @ApiProperty()
   @IsNumber()
@@ -228,6 +233,11 @@ export class RecentPRDTO {
   @IsOptional()
   exerciseName?: string | null;
 
+  @ApiPropertyOptional({ enum: WorkoutType, description: 'Sport type for cardio PRs' })
+  @IsEnumString(WorkoutType)
+  @IsOptional()
+  workoutType?: WorkoutType | null;
+
   @ApiProperty()
   @IsNumber()
   value: number;
@@ -272,4 +282,95 @@ export class RecentPRsResponse extends ItemResponse<RecentPRsDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: RecentPRsDTO;
+}
+
+// PR History (all records for a specific type, sorted by value)
+export class PRHistoryRecordDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty({ enum: PersonalRecordType })
+  @IsEnumString(PersonalRecordType)
+  recordType: PersonalRecordType;
+
+  @ApiPropertyOptional({ type: String })
+  @IsUUID()
+  @IsOptional()
+  exerciseId?: string | null;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  exerciseName?: string | null;
+
+  @ApiPropertyOptional({ enum: WorkoutType })
+  @IsEnumString(WorkoutType)
+  @IsOptional()
+  workoutType?: WorkoutType | null;
+
+  @ApiProperty()
+  @IsNumber()
+  value: number;
+
+  @ApiProperty()
+  @IsString()
+  unit: string;
+
+  @ApiProperty()
+  @IsString()
+  formattedValue: string;
+
+  @ApiProperty()
+  @IsUUID()
+  workoutExecutionId: string;
+
+  @ApiProperty()
+  @IsString()
+  achievedAt: string;
+
+  @ApiProperty({ description: 'Whether this is the current best' })
+  @IsBoolean()
+  isCurrent: boolean;
+
+  @ApiProperty({ description: 'Rank in history (1 = best)' })
+  @IsNumber()
+  rank: number;
+}
+
+export class PRHistoryDTO {
+  @ApiProperty({ enum: PersonalRecordType })
+  @IsEnumString(PersonalRecordType)
+  recordType: PersonalRecordType;
+
+  @ApiPropertyOptional({ type: String })
+  @IsUUID()
+  @IsOptional()
+  exerciseId?: string | null;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  exerciseName?: string | null;
+
+  @ApiProperty()
+  @IsString()
+  unit: string;
+
+  @ApiProperty({ type: [PRHistoryRecordDTO], description: 'All historical records sorted by value (best first)' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PRHistoryRecordDTO)
+  records: PRHistoryRecordDTO[];
+
+  @ApiProperty()
+  @IsNumber()
+  totalCount: number;
+}
+
+export class PRHistoryResponse extends ItemResponse<PRHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: PRHistoryDTO;
 }

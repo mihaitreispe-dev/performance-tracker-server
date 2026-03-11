@@ -149,6 +149,11 @@ export class UpdatePrivacySettingsBody {
   @IsBoolean()
   @IsOptional()
   shareTrainingLoad?: boolean;
+
+  @ApiPropertyOptional({ description: 'Share wellness check-ins with coach' })
+  @IsBoolean()
+  @IsOptional()
+  shareWellnessCheckins?: boolean;
 }
 
 export class CreateAthleteLabelBody {
@@ -355,6 +360,17 @@ export class FitnessFatiguePredictionBody {
 }
 
 // Athlete Intake DTOs
+// Wellness Dashboard Query DTOs
+export class WellnessTrendsQuery {
+  @ApiPropertyOptional({ description: 'Number of days to fetch (default: 30)' })
+  @Transform(({ value }) => Number.parseInt(value, 10))
+  @IsInt()
+  @Min(7)
+  @Max(90)
+  @IsOptional()
+  days?: number;
+}
+
 export class UpdateAthleteIntakeBody {
   @ApiPropertyOptional({
     description: 'Primary fitness goals (from WorkoutPlanGoal enum values)',

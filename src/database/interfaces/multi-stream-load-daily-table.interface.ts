@@ -6,6 +6,7 @@ export interface MultiStreamLoadDailyMetadata {
   mskBreakdown?: { workoutId: string; load: number; sport: string }[];
   neuralBreakdown?: { workoutId: string; load: number; sport: string }[];
   notes?: string;
+  seeded?: boolean; // True if this entry was created as an initial estimate for new users
 }
 
 export type LimitingStream = 'aerobic' | 'msk' | 'neural' | null;

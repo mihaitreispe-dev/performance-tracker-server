@@ -28,6 +28,9 @@ import { FitnessFatigueDailyTable } from './fitness-fatigue-daily-table.interfac
 import { FitnessMetricsTable } from './fitness-metrics-table.interface';
 import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
+import { IllnessLogsTable } from './illness-logs-table.interface';
+import { QuickWellnessCheckinsTable } from './quick-wellness-checkins-table.interface';
+import { RpeTssTrackingTable } from './rpe-tss-tracking-table.interface';
 import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
@@ -115,4 +118,7 @@ export interface Database {
   recovery_journal_entries: RecoveryJournalEntriesTable;
   hrv_baseline_daily: HrvBaselineDailyTable;
   load_model_parameters: LoadModelParametersTable;
+  rpe_tss_tracking: RpeTssTrackingTable;
+  quick_wellness_checkins: QuickWellnessCheckinsTable;
+  illness_logs: IllnessLogsTable;
 }

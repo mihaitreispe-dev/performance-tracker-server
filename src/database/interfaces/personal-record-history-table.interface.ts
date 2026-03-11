@@ -1,12 +1,14 @@
 import type { ColumnType, Insertable, Selectable } from 'kysely';
 
 import { PersonalRecordType } from './personal-records-table.interface';
+import { WorkoutType } from './workouts-table.interface';
 
 export interface PersonalRecordHistoryTable {
   id: ColumnType<string, string | undefined, never>;
   user_id: string;
   record_type: PersonalRecordType;
   exercise_id: string | null;
+  workout_type: WorkoutType | null;
   value: ColumnType<string, string | number, string | number>;
   unit: string;
   workout_execution_id: string;

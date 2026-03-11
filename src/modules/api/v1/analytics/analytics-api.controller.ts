@@ -15,6 +15,7 @@ import {
 } from './request.dto';
 import {
   CurrentTrainingLoadResponse,
+  MultiSportRacePredictionsResponse,
   PeriodSummaryResponse,
   RacePredictionsResponse,
   StreakResponse,
@@ -105,6 +106,17 @@ export class AnalyticsApiController {
   @Get('race-predictions')
   async getRacePredictions(@Req() req: Request & { user: AuthUser }): Promise<RacePredictionsResponse> {
     return this.service.getRacePredictions(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get multi-sport race predictions (running, cycling, swimming, triathlon)' })
+  @ApiResponse({ status: HttpStatus.OK, type: MultiSportRacePredictionsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('race-predictions/multi-sport')
+  async getMultiSportRacePredictions(
+    @Req() req: Request & { user: AuthUser },
+  ): Promise<MultiSportRacePredictionsResponse> {
+    return this.service.getMultiSportRacePredictions(req);
   }
 
   @Version('1')

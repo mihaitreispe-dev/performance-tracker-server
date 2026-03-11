@@ -55,3 +55,6 @@ export * from './multi-stream-load-daily-table.interface';
 export * from './recovery-journal-entries-table.interface';
 export * from './hrv-baseline-daily-table.interface';
 export * from './load-model-parameters-table.interface';
+export * from './rpe-tss-tracking-table.interface';
+export * from './quick-wellness-checkins-table.interface';
+export * from './illness-logs-table.interface';

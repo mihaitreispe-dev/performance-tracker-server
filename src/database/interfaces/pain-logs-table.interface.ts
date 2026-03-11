@@ -60,6 +60,12 @@ export enum PainTrend {
   INCREASING = 'increasing',
 }
 
+export enum InjuryType {
+  ACUTE = 'acute',
+  CHRONIC = 'chronic',
+  OVERUSE = 'overuse',
+}
+
 export interface PainLogsTable {
   id: Generated<string>;
   user_id: string;
@@ -71,6 +77,10 @@ export interface PainLogsTable {
   pain_duration_end: number; // 0-100 (percentage of workout)
   pain_trend: PainTrend;
   notes: string | null;
+  is_injury: Generated<boolean>;
+  injury_type: InjuryType | null;
+  expected_recovery_days: number | null;
+  coach_notified_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
