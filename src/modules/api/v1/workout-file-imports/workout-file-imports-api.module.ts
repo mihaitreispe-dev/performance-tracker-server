@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { WeatherModule } from 'src/modules/weather/weather.module';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
@@ -20,7 +21,7 @@ export class WorkoutFileImportsApiModule {
     if (!this.instance) {
       this.instance = {
         module: WorkoutFileImportsApiModule,
-        imports: [S3Module.register()],
+        imports: [S3Module.register(), WeatherModule.register()],
         providers: [
           WorkoutFileImportsApiService,
           WorkoutFileParserService,

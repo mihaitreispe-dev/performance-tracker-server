@@ -15,6 +15,7 @@ import {
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { WeatherService } from 'src/modules/weather/weather.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
@@ -54,6 +55,7 @@ export class WorkoutFileImportsApiService {
     private readonly workoutScheduleRepository: WorkoutScheduleRepository,
     private readonly workoutRepository: WorkoutRepository,
     private readonly cardioStepRepository: CardioStepRepository,
+    private readonly weatherService: WeatherService,
   ) {}
 
   async requestUpload(
@@ -206,6 +208,15 @@ export class WorkoutFileImportsApiService {
         });
 
         this.logger.log(`Created workout route: ${route.id}`);
+
+        // Fetch weather data asynchronously (fire and forget)
+        const firstPoint = parsedData.routePoints[0];
+        this.weatherService.fetchAndStoreWeather({
+          workoutExecutionId: execution.id,
+          latitude: firstPoint.latitude,
+          longitude: firstPoint.longitude,
+          startedAt: parsedData.startTime,
+        }).catch((err) => this.logger.error(`Failed to fetch weather for imported workout: ${err.message}`));
 
         // Create route markers from laps
         if (parsedData.laps.length > 0) {
@@ -496,6 +507,15 @@ export class WorkoutFileImportsApiService {
         });
 
         this.logger.log(`Created workout route: ${route.id}`);
+
+        // Fetch weather data asynchronously (fire and forget)
+        const firstPointConfirm = parsedData.routePoints[0];
+        this.weatherService.fetchAndStoreWeather({
+          workoutExecutionId: execution.id,
+          latitude: firstPointConfirm.latitude,
+          longitude: firstPointConfirm.longitude,
+          startedAt: parsedData.startTime,
+        }).catch((err) => this.logger.error(`Failed to fetch weather for confirmed import: ${err.message}`));
 
         // Create route markers from laps
         if (parsedData.laps.length > 0) {

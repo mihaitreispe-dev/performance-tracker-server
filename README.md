@@ -1,98 +1,170 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Performance Tracker Server
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend API for the Performance Tracker fitness application, built with NestJS and PostgreSQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+### Workout Management
+- **Workouts**: CRUD operations for workout templates (strength, cardio, hybrid)
+- **Exercises**: Exercise library with muscle group mapping
+- **Workout Executions**: Track completed workouts with sets, reps, metrics
+- **Workout Plans**: Multi-week training programs
+- **Workout Schedules**: Calendar-based workout scheduling
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### Cardio & Metrics
+- **File Imports**: Parse FIT, GPX, and TCX files from fitness devices
+- **Cardio Metrics**: Heart rate, pace, power, cadence, elevation tracking
+- **Advanced Metrics**: Running dynamics, power zones, training load
+- **Route Data**: GPS coordinates, splits, elevation profiles
+- **Weather Integration**: Open-Meteo API for workout weather conditions
 
-## Project setup
+### Analytics
+- **Workout Analytics**: Performance summaries, personal records
+- **Training Load**: TRIMP, TSS, and load modeling
+- **Race Predictions**: Estimated race times based on training data
+
+### Health & Recovery
+- **Sleep Logging**: Track sleep duration and quality
+- **Recovery Journal**: Daily readiness and recovery notes
+- **Pain Logs**: Track injuries and pain points
+
+### Coaching
+- **Coach-Athlete Relationships**: Multi-athlete management
+- **Athlete Profiles**: Intake forms, goals, preferences
+- **Notifications**: Push notifications via Firebase
+- **Messaging**: In-app communication
+
+### Integrations
+- **Wearables**: Garmin, Polar, Wahoo data sync
+- **OpenWearables**: Open wearable data standard support
+- **Data Export**: CSV, JSON export functionality
+- **Firebase Auth**: Authentication and push notifications
+- **AWS S3**: Media storage with CloudFront CDN
+- **AWS MediaConvert**: Video processing
+
+### Additional
+- **Voice Commands**: OpenAI-powered voice control
+- **Personal Records**: Automatic PR detection and tracking
+
+## Tech Stack
+
+- **Framework**: NestJS 11
+- **Language**: TypeScript
+- **Database**: PostgreSQL with Kysely ORM
+- **Auth**: Firebase Admin SDK + JWT
+- **Storage**: AWS S3 + CloudFront
+- **API Docs**: Swagger/OpenAPI
+- **Testing**: Jest + Supertest
+- **Scheduling**: @nestjs/schedule for cron jobs
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- Yarn
+
+### Installation
 
 ```bash
-$ yarn install
+# Install dependencies
+yarn install
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Run database migrations
+yarn migrate:latest
+
+# (Optional) Seed database
+yarn seed
+
+# Start development server
+yarn dev
 ```
 
-## Compile and run the project
+### Available Scripts
 
 ```bash
-# development
-$ yarn run start
+yarn dev              # Start with hot reload + debugging
+yarn build            # Build for production
+yarn start:build      # Run production build
 
-# watch mode
-$ yarn run start:dev
+yarn lint             # Run ESLint
+yarn format           # Fix lint issues
+yarn typecheck        # TypeScript type checking
 
-# production mode
-$ yarn run start:prod
+yarn test             # Run unit tests
+yarn test:watch       # Watch mode
+yarn test:cov         # Coverage report
+yarn test:e2e         # End-to-end tests
+
+yarn migrate:latest   # Run all pending migrations
+yarn migrate:up       # Run next migration
+yarn migrate:down     # Rollback last migration
+yarn migrate:make     # Create new migration
+yarn migrate:list     # List migration status
+
+yarn seed             # Run database seeds
+yarn cli              # Run CLI commands
 ```
 
-## Run tests
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Secret for JWT signing |
+| `FIREBASE_*` | Firebase Admin SDK credentials |
+| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials |
+| `AWS_S3_BUCKET` | S3 bucket name |
+| `AWS_CLOUDFRONT_DOMAIN` | CloudFront distribution |
+| `OPENAI_API_KEY` | OpenAI API for voice features |
+| `OPEN_METEO_API_URL` | Weather API endpoint |
+
+## Project Structure
+
+```
+src/
+├── modules/
+│   ├── api/v1/           # REST API endpoints
+│   │   ├── workouts/     # Workout CRUD
+│   │   ├── exercises/    # Exercise library
+│   │   ├── analytics/    # Performance analytics
+│   │   ├── coaching/     # Coach features
+│   │   └── ...
+│   ├── auth/             # Authentication
+│   ├── database/         # Database module
+│   ├── firebase/         # Firebase integration
+│   ├── s3/               # AWS S3 service
+│   ├── weather/          # Weather API
+│   └── cron/             # Scheduled jobs
+├── database/
+│   ├── migrations/       # Kysely migrations
+│   ├── seeds/            # Database seeds
+│   └── interfaces/       # Table type definitions
+├── repositories/         # Data access layer
+├── lib/                  # Shared utilities
+└── main.ts               # Application entry
+```
+
+## API Documentation
+
+Swagger UI available at `/api/docs` when running the server.
+
+## Docker
 
 ```bash
-# unit tests
-$ yarn run test
+# Build image
+docker build -t performance-tracker-server .
 
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+# Run with docker-compose
+docker-compose up
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Private project.
