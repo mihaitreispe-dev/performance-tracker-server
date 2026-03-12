@@ -999,3 +999,142 @@ export class AthleteWellnessTrendsResponse extends ItemResponse<AthleteWellnessT
   @ValidateNested()
   declare data: AthleteWellnessTrendsDTO;
 }
+
+// ==========================================
+// Coach Correlation Dashboard DTOs
+// ==========================================
+
+export const AlertLevel = {
+  OK: 'ok',
+  WATCH: 'watch',
+  ACTION_NEEDED: 'action_needed',
+} as const;
+
+export const ReadinessTrend = {
+  IMPROVING: 'improving',
+  STABLE: 'stable',
+  DECLINING: 'declining',
+} as const;
+
+export const RpeTssTrend = {
+  INCREASING: 'increasing',
+  STABLE: 'stable',
+  DECREASING: 'decreasing',
+} as const;
+
+export const DominantWellnessFactor = {
+  SLEEP: 'sleep',
+  STRESS: 'stress',
+  SORENESS: 'soreness',
+  ENERGY: 'energy',
+} as const;
+
+export class AthleteCorrelationSummaryDTO {
+  @ApiProperty()
+  @IsString()
+  athleteId: string;
+
+  @ApiProperty()
+  @IsString()
+  athleteName: string;
+
+  @ApiProperty({ enum: ['ok', 'watch', 'action_needed'] })
+  @IsString()
+  alertLevel: 'ok' | 'watch' | 'action_needed';
+
+  // RPE-TSS
+  @ApiPropertyOptional({ type: Number, description: 'RPE:TSS ratio (target ~1.0, >1.3 = warning)' })
+  @IsNumber()
+  @IsOptional()
+  rpeTssRatio?: number | null;
+
+  @ApiProperty({ enum: ['increasing', 'stable', 'decreasing'] })
+  @IsString()
+  rpeTssRatioTrend: 'increasing' | 'stable' | 'decreasing';
+
+  @ApiProperty({ description: 'True if avg ratio > 1.3 over 7+ days' })
+  @IsBoolean()
+  accumulatedFatigueWarning: boolean;
+
+  // Wellness-Performance
+  @ApiProperty({ description: 'Overtraining risk score (0-100)' })
+  @IsNumber()
+  overtrainingRiskScore: number;
+
+  @ApiProperty({ type: [String], description: 'Contributing risk factors' })
+  @IsArray()
+  @IsString({ each: true })
+  primaryRiskFactors: string[];
+
+  @ApiPropertyOptional({ enum: ['sleep', 'stress', 'soreness', 'energy'], description: 'Most impactful wellness factor' })
+  @IsString()
+  @IsOptional()
+  dominantWellnessFactor?: 'sleep' | 'stress' | 'soreness' | 'energy' | null;
+
+  // Current state
+  @ApiPropertyOptional({ type: Number, description: 'Current readiness score (0-100)' })
+  @IsNumber()
+  @IsOptional()
+  currentReadinessScore?: number | null;
+
+  @ApiProperty({ enum: ['improving', 'stable', 'declining'] })
+  @IsString()
+  readinessTrend: 'improving' | 'stable' | 'declining';
+
+  @ApiProperty({ description: 'Whether this athlete has privacy restrictions' })
+  @IsBoolean()
+  privacyRestricted: boolean;
+
+  @ApiProperty({ description: 'Whether there is insufficient data for correlation analysis' })
+  @IsBoolean()
+  insufficientData: boolean;
+}
+
+export class AthleteCorrelationSummaryResponse extends ItemResponse<AthleteCorrelationSummaryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: AthleteCorrelationSummaryDTO;
+}
+
+export class AlertLevelCountsDTO {
+  @ApiProperty()
+  @IsNumber()
+  ok: number;
+
+  @ApiProperty()
+  @IsNumber()
+  watch: number;
+
+  @ApiProperty()
+  @IsNumber()
+  action_needed: number;
+}
+
+export class TeamCorrelationOverviewDTO {
+  @ApiProperty({ type: AlertLevelCountsDTO })
+  @IsObject()
+  @ValidateNested()
+  athletesByAlertLevel: AlertLevelCountsDTO;
+
+  @ApiProperty({ type: [AthleteCorrelationSummaryDTO], description: 'Athletes sorted by urgency' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  athletesNeedingAttention: AthleteCorrelationSummaryDTO[];
+
+  @ApiPropertyOptional({ type: Number, description: 'Team average RPE:TSS ratio' })
+  @IsNumber()
+  @IsOptional()
+  teamAverageRpeTssRatio?: number | null;
+
+  @ApiProperty({ description: 'Team average overtraining risk (0-100)' })
+  @IsNumber()
+  teamAverageOvertrainingRisk: number;
+}
+
+export class TeamCorrelationOverviewResponse extends ItemResponse<TeamCorrelationOverviewDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: TeamCorrelationOverviewDTO;
+}

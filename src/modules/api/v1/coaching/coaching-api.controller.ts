@@ -21,11 +21,17 @@ import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import {
+  DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
+  MultiStreamLoadHistoryResponse,
+  ReadinessHistoryResponse,
+  RpeTssCorrelationResponse,
   Vo2MaxHistoryResponse,
   Vo2MaxResponse,
+  WellnessPerformanceCorrelationResponse,
 } from '../advanced-metrics/response.dto';
+import { DateQuery } from '../advanced-metrics/request.dto';
 import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
 import {
   CurrentTrainingLoadResponse,
@@ -43,6 +49,7 @@ import {
   AssignWorkoutBody,
   AthleteIdParam,
   ComplianceQuery,
+  CorrelationQuery,
   CreateAthleteLabelBody,
   CreateAthleteScheduleBody,
   DeployPlanBody,
@@ -67,6 +74,7 @@ import {
   AssignedWorkoutListResponse,
   AssignedWorkoutResponse,
   AthleteComplianceResponse,
+  AthleteCorrelationSummaryResponse,
   AthleteIntakeResponse,
   AthleteLabelResponse,
   AthleteLabelsResponse,
@@ -84,6 +92,7 @@ import {
   MessageResponse,
   MessagesListResponse,
   PrivacySettingsResponse,
+  TeamCorrelationOverviewResponse,
   TeamWellnessOverviewResponse,
   UnreadCountResponse,
 } from './response.dto';
@@ -519,6 +528,67 @@ export class CoachingApiController {
     return this.service.getAthleteVo2MaxHistory(params.athleteId, query);
   }
 
+  // ==================== ATHLETE MULTI-STREAM LOAD (Coach viewing) ====================
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's multi-stream load history (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: MultiStreamLoadHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/multi-stream-load/history')
+  async getAthleteMultiStreamLoadHistory(
+    @Param() params: AthleteIdParam,
+    @Query() query: FitnessFatigueQuery,
+  ): Promise<MultiStreamLoadHistoryResponse> {
+    return this.service.getAthleteMultiStreamLoadHistory(params.athleteId, query);
+  }
+
+  // ==================== ATHLETE READINESS (Coach viewing) ====================
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's daily readiness (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: DailyReadinessResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/readiness')
+  async getAthleteReadiness(
+    @Param() params: AthleteIdParam,
+    @Query() query: DateQuery,
+  ): Promise<DailyReadinessResponse> {
+    return this.service.getAthleteReadiness(params.athleteId, query.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's readiness history (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: ReadinessHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/readiness/history')
+  async getAthleteReadinessHistory(
+    @Param() params: AthleteIdParam,
+    @Query() query: FitnessFatigueQuery,
+  ): Promise<ReadinessHistoryResponse> {
+    return this.service.getAthleteReadinessHistory(params.athleteId, query);
+  }
+
   @Version('1')
   @ApiOperation({ summary: 'Update privacy settings' })
   @ApiResponse({ status: HttpStatus.OK, type: PrivacySettingsResponse })
@@ -651,6 +721,76 @@ export class CoachingApiController {
     @Query() query: WellnessTrendsQuery,
   ): Promise<AthleteWellnessTrendsResponse> {
     return this.service.getAthleteWellnessTrends(req, params.athleteId, query);
+  }
+
+  // ===== CORRELATION DASHBOARD =====
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get team correlation overview with alert levels and athletes needing attention (COACH only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: TeamCorrelationOverviewResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not a coach' })
+  @Roles(UserRole.COACH)
+  @Get('correlation/overview')
+  async getTeamCorrelationOverview(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: CorrelationQuery,
+  ): Promise<TeamCorrelationOverviewResponse> {
+    return this.service.getTeamCorrelationOverview(req, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's RPE-TSS correlation (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: RpeTssCorrelationResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or athlete has not shared required data',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/correlation/rpe-tss')
+  async getAthleteRpeTssCorrelation(
+    @Param() params: AthleteIdParam,
+    @Query() query: CorrelationQuery,
+  ): Promise<RpeTssCorrelationResponse> {
+    return this.service.getAthleteRpeTssCorrelation(params.athleteId, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's wellness-performance correlation (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: WellnessPerformanceCorrelationResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or athlete has not shared required data',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/correlation/wellness-performance')
+  async getAthleteWellnessPerformanceCorrelation(
+    @Param() params: AthleteIdParam,
+    @Query() query: CorrelationQuery,
+  ): Promise<WellnessPerformanceCorrelationResponse> {
+    return this.service.getAthleteWellnessPerformanceCorrelation(params.athleteId, query);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's correlation summary (compact version for cards) (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: AthleteCorrelationSummaryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not authorized' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Athlete not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/correlation/summary')
+  async getAthleteCorrelationSummary(
+    @Param() params: AthleteIdParam,
+    @Query() query: CorrelationQuery,
+  ): Promise<AthleteCorrelationSummaryResponse> {
+    return this.service.getAthleteCorrelationSummary(params.athleteId, query);
   }
 
   // ===== ATHLETE LABELS =====

@@ -35,8 +35,10 @@ import { AdvancedMetricsApiService } from '../advanced-metrics/advanced-metrics-
 import {
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
+  RpeTssCorrelationResponse,
   Vo2MaxHistoryResponse,
   Vo2MaxResponse,
+  WellnessPerformanceCorrelationResponse,
 } from '../advanced-metrics/response.dto';
 import { AnalyticsApiService } from '../analytics/analytics-api.service';
 import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
@@ -55,6 +57,7 @@ import { WorkoutsApiService } from '../workouts/workouts-api.service';
 import {
   AssignWorkoutBody,
   ComplianceQuery,
+  CorrelationQuery,
   CreateAthleteLabelBody,
   CreateAthleteScheduleBody,
   DeployPlanBody,
@@ -77,6 +80,8 @@ import {
   AssignedWorkoutResponse,
   AthleteComplianceDTO,
   AthleteComplianceResponse,
+  AthleteCorrelationSummaryDTO,
+  AthleteCorrelationSummaryResponse,
   AthleteDTO,
   AthleteIntakeDTO,
   AthleteIntakeResponse,
@@ -106,6 +111,8 @@ import {
   MessageResponse,
   MessagesListResponse,
   PrivacySettingsResponse,
+  TeamCorrelationOverviewDTO,
+  TeamCorrelationOverviewResponse,
   TeamWellnessAveragesDTO,
   TeamWellnessOverviewDTO,
   TeamWellnessOverviewResponse,
@@ -526,6 +533,43 @@ export class CoachingApiService {
       throw new ForbiddenException('Athlete has not shared training load with you');
     }
     return this.advancedMetricsService.getVo2MaxHistoryForUser(athleteId, query.days ?? 90);
+  }
+
+  // ==================== ATHLETE MULTI-STREAM LOAD (Coach viewing) ====================
+
+  async getAthleteMultiStreamLoadHistory(
+    athleteId: string,
+    query: FitnessFatigueQuery,
+  ): Promise<import('../advanced-metrics/response.dto').MultiStreamLoadHistoryResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getMultiStreamLoadHistoryForUser(athleteId, query.days ?? 30);
+  }
+
+  // ==================== ATHLETE READINESS (Coach viewing) ====================
+
+  async getAthleteReadiness(
+    athleteId: string,
+    date?: string,
+  ): Promise<import('../advanced-metrics/response.dto').DailyReadinessResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getDailyReadinessForUser(athleteId, date);
+  }
+
+  async getAthleteReadinessHistory(
+    athleteId: string,
+    query: FitnessFatigueQuery,
+  ): Promise<import('../advanced-metrics/response.dto').ReadinessHistoryResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_training_load) {
+      throw new ForbiddenException('Athlete has not shared training load with you');
+    }
+    return this.advancedMetricsService.getReadinessHistoryForUser(athleteId, query.days ?? 30);
   }
 
   async updatePrivacySettings(
@@ -2239,6 +2283,244 @@ export class CoachingApiService {
       attachedPlan: attachedPlan || null,
       readAt: message.read_at instanceof Date ? message.read_at.toISOString() : message.read_at,
       createdAt: message.created_at instanceof Date ? message.created_at.toISOString() : String(message.created_at),
+    };
+  }
+
+  // ==================== CORRELATION DASHBOARD (Coach viewing) ====================
+
+  /**
+   * Get team correlation overview with athletes by alert level and those needing attention
+   */
+  async getTeamCorrelationOverview(req: Request & { user: AuthUser }, query: CorrelationQuery): Promise<TeamCorrelationOverviewResponse> {
+    const days = query.days ?? 30;
+
+    // Get all active athletes for this coach
+    const relationships = await this.relationshipRepo.findMany({
+      coachId: req.user.id,
+      status: CoachAthleteStatus.ACTIVE,
+    });
+
+    const alertLevelCounts = { ok: 0, watch: 0, action_needed: 0 };
+    const athletesNeedingAttention: AthleteCorrelationSummaryDTO[] = [];
+    const allRpeTssRatios: number[] = [];
+    const allOvertrainingRisks: number[] = [];
+
+    for (const relationship of relationships) {
+      const athleteId = relationship.athlete_id;
+
+      // Get athlete info
+      const user = await this.userRepo.findById(athleteId);
+      if (!user) continue;
+
+      // Build correlation summary for this athlete
+      const summary = await this.buildAthleteCorrelationSummary(athleteId, user, days);
+
+      // Count by alert level
+      alertLevelCounts[summary.alertLevel]++;
+
+      // Collect ratios and risks for averages (only if data available)
+      if (summary.rpeTssRatio != null) {
+        allRpeTssRatios.push(summary.rpeTssRatio);
+      }
+      allOvertrainingRisks.push(summary.overtrainingRiskScore);
+
+      // Add to attention list if watch or action_needed
+      if (summary.alertLevel !== 'ok') {
+        athletesNeedingAttention.push(summary);
+      }
+    }
+
+    // Sort athletes needing attention by severity (action_needed first, then watch)
+    athletesNeedingAttention.sort((a, b) => {
+      const levelOrder = { action_needed: 0, watch: 1, ok: 2 };
+      const levelDiff = levelOrder[a.alertLevel] - levelOrder[b.alertLevel];
+      if (levelDiff !== 0) return levelDiff;
+      // Within same level, sort by overtraining risk descending
+      return b.overtrainingRiskScore - a.overtrainingRiskScore;
+    });
+
+    // Calculate team averages
+    const teamAverageRpeTssRatio = allRpeTssRatios.length > 0
+      ? Math.round((allRpeTssRatios.reduce((s, r) => s + r, 0) / allRpeTssRatios.length) * 100) / 100
+      : null;
+
+    const teamAverageOvertrainingRisk = allOvertrainingRisks.length > 0
+      ? Math.round(allOvertrainingRisks.reduce((s, r) => s + r, 0) / allOvertrainingRisks.length)
+      : 0;
+
+    return {
+      data: {
+        athletesByAlertLevel: alertLevelCounts,
+        athletesNeedingAttention,
+        teamAverageRpeTssRatio,
+        teamAverageOvertrainingRisk,
+      },
+    };
+  }
+
+  /**
+   * Get athlete's RPE-TSS correlation (coach access)
+   */
+  async getAthleteRpeTssCorrelation(athleteId: string, query: CorrelationQuery): Promise<RpeTssCorrelationResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+
+    // Requires both training load and wellness check-ins
+    if (!settings?.share_training_load || !settings?.share_wellness_checkins) {
+      throw new ForbiddenException('Athlete has not shared the required data (training load and wellness check-ins)');
+    }
+
+    return this.advancedMetricsService.getRpeTssCorrelationForUser(athleteId, query.days ?? 30);
+  }
+
+  /**
+   * Get athlete's wellness-performance correlation (coach access)
+   */
+  async getAthleteWellnessPerformanceCorrelation(athleteId: string, query: CorrelationQuery): Promise<WellnessPerformanceCorrelationResponse> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+
+    // Requires analytics and wellness check-ins
+    if (!settings?.share_analytics || !settings?.share_wellness_checkins) {
+      throw new ForbiddenException('Athlete has not shared the required data (analytics and wellness check-ins)');
+    }
+
+    return this.advancedMetricsService.getWellnessPerformanceCorrelationForUser(athleteId, query.days ?? 30);
+  }
+
+  /**
+   * Get athlete's correlation summary (compact version for cards)
+   */
+  async getAthleteCorrelationSummary(athleteId: string, query: CorrelationQuery): Promise<AthleteCorrelationSummaryResponse> {
+    const days = query.days ?? 30;
+
+    const user = await this.userRepo.findById(athleteId);
+    if (!user) {
+      throw new NotFoundException('Athlete not found');
+    }
+
+    const summary = await this.buildAthleteCorrelationSummary(athleteId, user, days);
+
+    return { data: summary };
+  }
+
+  /**
+   * Build correlation summary for an athlete (internal helper)
+   */
+  private async buildAthleteCorrelationSummary(
+    athleteId: string,
+    user: User,
+    days: number,
+  ): Promise<AthleteCorrelationSummaryDTO> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+
+    // Check privacy - need both training load and wellness for correlations
+    const hasRequiredPrivacy = settings?.share_training_load && settings?.share_wellness_checkins && settings?.share_analytics;
+
+    // Default values for when data is unavailable
+    let rpeTssRatio: number | null = null;
+    let rpeTssRatioTrend: 'increasing' | 'stable' | 'decreasing' = 'stable';
+    let accumulatedFatigueWarning = false;
+    let overtrainingRiskScore = 0;
+    let primaryRiskFactors: string[] = [];
+    let dominantWellnessFactor: 'sleep' | 'stress' | 'soreness' | 'energy' | null = null;
+    let currentReadinessScore: number | null = null;
+    let readinessTrend: 'improving' | 'stable' | 'declining' = 'stable';
+    let insufficientData = true;
+
+    if (hasRequiredPrivacy) {
+      try {
+        // Get RPE-TSS correlation
+        const rpeTssCorrelation = await this.advancedMetricsService.getRpeTssCorrelationForUser(athleteId, days);
+        rpeTssRatio = rpeTssCorrelation.data.averageRatio ?? null;
+        rpeTssRatioTrend = rpeTssCorrelation.data.ratioTrend;
+        accumulatedFatigueWarning = rpeTssCorrelation.data.accumulatedFatigueWarning;
+
+        if (rpeTssCorrelation.data.dataPoints.length >= 3) {
+          insufficientData = false;
+        }
+      } catch {
+        // Continue with defaults if RPE-TSS data unavailable
+      }
+
+      try {
+        // Get wellness-performance correlation
+        const wellnessCorrelation = await this.advancedMetricsService.getWellnessPerformanceCorrelationForUser(athleteId, days);
+        overtrainingRiskScore = wellnessCorrelation.data.overtrainingRiskScore;
+        primaryRiskFactors = wellnessCorrelation.data.riskFactors;
+
+        // Find dominant wellness factor (highest correlation magnitude)
+        if (wellnessCorrelation.data.correlations.length > 0) {
+          const sorted = [...wellnessCorrelation.data.correlations].sort(
+            (a, b) => Math.abs(b.correlationWithPerformance) - Math.abs(a.correlationWithPerformance),
+          );
+          dominantWellnessFactor = sorted[0].factor;
+          insufficientData = false;
+        }
+      } catch {
+        // Continue with defaults if wellness data unavailable
+      }
+
+      try {
+        // Get readiness history for trend
+        const readinessHistory = await this.advancedMetricsService.getReadinessHistoryForUser(athleteId, days);
+        if (readinessHistory.data.data.length > 0) {
+          currentReadinessScore = readinessHistory.data.data[0].readinessScore;
+
+          // Calculate trend by comparing first and last week
+          if (readinessHistory.data.data.length >= 7) {
+            const lastWeek = readinessHistory.data.data.slice(0, 7);
+            const firstWeek = readinessHistory.data.data.slice(-7);
+
+            const lastWeekAvg = lastWeek.reduce((s, d) => s + d.readinessScore, 0) / lastWeek.length;
+            const firstWeekAvg = firstWeek.reduce((s, d) => s + d.readinessScore, 0) / firstWeek.length;
+
+            const diff = lastWeekAvg - firstWeekAvg;
+            if (diff > 5) {
+              readinessTrend = 'improving';
+            } else if (diff < -5) {
+              readinessTrend = 'declining';
+            }
+          }
+          insufficientData = false;
+        }
+      } catch {
+        // Continue with defaults if readiness data unavailable
+      }
+    }
+
+    // Determine alert level based on the rules:
+    // action_needed: overtrainingRisk >= 60 OR rpeTssRatio > 1.4 OR 3+ days declining readiness
+    // watch: overtrainingRisk >= 35 OR rpeTssRatio > 1.2 OR declining trend
+    // ok: everything else
+    let alertLevel: 'ok' | 'watch' | 'action_needed' = 'ok';
+
+    if (
+      overtrainingRiskScore >= 60 ||
+      (rpeTssRatio !== null && rpeTssRatio > 1.4) ||
+      (readinessTrend === 'declining' && overtrainingRiskScore >= 35)
+    ) {
+      alertLevel = 'action_needed';
+    } else if (
+      overtrainingRiskScore >= 35 ||
+      (rpeTssRatio !== null && rpeTssRatio > 1.2) ||
+      readinessTrend === 'declining'
+    ) {
+      alertLevel = 'watch';
+    }
+
+    return {
+      athleteId,
+      athleteName: user.display_name || user.email,
+      alertLevel,
+      rpeTssRatio,
+      rpeTssRatioTrend,
+      accumulatedFatigueWarning,
+      overtrainingRiskScore,
+      primaryRiskFactors,
+      dominantWellnessFactor,
+      currentReadinessScore,
+      readinessTrend,
+      privacyRestricted: !hasRequiredPrivacy,
+      insufficientData,
     };
   }
 }

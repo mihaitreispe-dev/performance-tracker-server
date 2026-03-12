@@ -371,6 +371,17 @@ export class WellnessTrendsQuery {
   days?: number;
 }
 
+// Correlation Query DTOs
+export class CorrelationQuery {
+  @ApiPropertyOptional({ description: 'Number of days to analyze (default: 30)' })
+  @Transform(({ value }) => Number.parseInt(value, 10))
+  @IsInt()
+  @Min(7)
+  @Max(90)
+  @IsOptional()
+  days?: number;
+}
+
 export class UpdateAthleteIntakeBody {
   @ApiPropertyOptional({
     description: 'Primary fitness goals (from WorkoutPlanGoal enum values)',
