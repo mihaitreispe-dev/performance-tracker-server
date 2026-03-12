@@ -2,8 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { Command, Console } from 'nestjs-console';
 import { InjectKysely } from 'nestjs-kysely';
-import { Database } from 'src/database/interfaces';
+import { Database, PersonalRecordType } from 'src/database/interfaces';
 import { PersonalRecordsDetectionService } from 'src/modules/api/v1/personal-records/personal-records-detection.service';
+
+// Deprecated PR types that should be cleaned up
+const DEPRECATED_PR_TYPES: PersonalRecordType[] = [
+  PersonalRecordType.FASTEST_KM_SPLIT,
+  PersonalRecordType.FASTEST_MILE_SPLIT,
+  PersonalRecordType.MAX_ELEVATION_GAIN,
+];
 
 interface CompletedExecution {
   id: string;
@@ -64,6 +71,15 @@ export class BackfillPRsService {
     this.logger.log(
       `Options: dryRun=${!!dryRun}, limit=${limit || 'unlimited'}, userId=${userId || 'all'}, clearExisting=${!!clearExisting}, delay=${delay}ms`,
     );
+
+    // Always clean up deprecated PRs and cardio PRs without sport type
+    if (!dryRun) {
+      this.logger.log('Cleaning up deprecated PRs and cardio PRs without sport type...');
+      const cleanedUp = await this.cleanupDeprecatedPRs(userId);
+      this.logger.log(`Cleaned up ${cleanedUp.records} records and ${cleanedUp.history} history entries.`);
+    } else {
+      this.logger.log('[DRY RUN] Would clean up deprecated PRs and cardio PRs without sport type');
+    }
 
     // Optionally clear existing PRs
     if (clearExisting && !dryRun) {
@@ -166,6 +182,66 @@ export class BackfillPRsService {
       await this.db.deleteFrom('personal_records').execute();
       await this.db.deleteFrom('personal_record_history').execute();
     }
+  }
+
+  private async cleanupDeprecatedPRs(userId?: string): Promise<{ records: number; history: number }> {
+    // Cardio record types (non-strength) that should have a workout_type
+    const cardioTypes: PersonalRecordType[] = [
+      PersonalRecordType.FASTEST_1K,
+      PersonalRecordType.FASTEST_5K,
+      PersonalRecordType.FASTEST_10K,
+      PersonalRecordType.FASTEST_HALF_MARATHON,
+      PersonalRecordType.FASTEST_MARATHON,
+      PersonalRecordType.FASTEST_400M,
+      PersonalRecordType.FASTEST_800M,
+      PersonalRecordType.FASTEST_1500M,
+      PersonalRecordType.FASTEST_1900M,
+      PersonalRecordType.FASTEST_20K,
+      PersonalRecordType.FASTEST_40K,
+      PersonalRecordType.FASTEST_90K,
+      PersonalRecordType.FASTEST_100K,
+      PersonalRecordType.FASTEST_180K,
+      PersonalRecordType.LONGEST_DISTANCE,
+      PersonalRecordType.LONGEST_DURATION,
+    ];
+
+    // Build query for deprecated types
+    let recordsQuery = this.db
+      .deleteFrom('personal_records')
+      .where((eb) =>
+        eb.or([
+          // Deprecated PR types
+          eb('record_type', 'in', DEPRECATED_PR_TYPES),
+          // Cardio PRs without sport type
+          eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
+        ]),
+      );
+
+    let historyQuery = this.db
+      .deleteFrom('personal_record_history')
+      .where((eb) =>
+        eb.or([
+          // Deprecated PR types
+          eb('record_type', 'in', DEPRECATED_PR_TYPES),
+          // Cardio PRs without sport type
+          eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
+        ]),
+      );
+
+    if (userId) {
+      recordsQuery = recordsQuery.where('user_id', '=', userId);
+      historyQuery = historyQuery.where('user_id', '=', userId);
+    }
+
+    const [recordsResult, historyResult] = await Promise.all([
+      recordsQuery.executeTakeFirst(),
+      historyQuery.executeTakeFirst(),
+    ]);
+
+    return {
+      records: Number(recordsResult.numDeletedRows),
+      history: Number(historyResult.numDeletedRows),
+    };
   }
 
   private sleep(ms: number): Promise<void> {

@@ -2,10 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   NewPersonalRecord,
   PersonalRecordType,
-  RouteMarker,
   SetCompletion,
   WorkoutExecution,
-  WorkoutRoute,
   WorkoutType,
 } from 'src/database/interfaces';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
@@ -24,14 +22,50 @@ interface DetectedPR {
   unit: string;
 }
 
-// Distance thresholds in meters
-const DISTANCE_THRESHOLDS = {
+// Sport-specific distance thresholds in meters
+const RUNNING_DISTANCES: Record<PersonalRecordType, number> = {
   [PersonalRecordType.FASTEST_1K]: 1000,
   [PersonalRecordType.FASTEST_5K]: 5000,
   [PersonalRecordType.FASTEST_10K]: 10000,
   [PersonalRecordType.FASTEST_HALF_MARATHON]: 21097.5,
   [PersonalRecordType.FASTEST_MARATHON]: 42195,
-};
+} as Record<PersonalRecordType, number>;
+
+const SWIMMING_DISTANCES: Record<PersonalRecordType, number> = {
+  [PersonalRecordType.FASTEST_400M]: 400,
+  [PersonalRecordType.FASTEST_800M]: 800,
+  [PersonalRecordType.FASTEST_1500M]: 1500,
+  [PersonalRecordType.FASTEST_1900M]: 1900, // Half Ironman swim
+} as Record<PersonalRecordType, number>;
+
+const CYCLING_DISTANCES: Record<PersonalRecordType, number> = {
+  [PersonalRecordType.FASTEST_20K]: 20000,
+  [PersonalRecordType.FASTEST_40K]: 40000,
+  [PersonalRecordType.FASTEST_90K]: 90000, // Half Ironman bike
+  [PersonalRecordType.FASTEST_100K]: 100000,
+  [PersonalRecordType.FASTEST_180K]: 180000, // Ironman bike
+} as Record<PersonalRecordType, number>;
+
+// Minimum realistic times in seconds (based on world records with margin)
+const MIN_TIMES: Record<PersonalRecordType, number> = {
+  // Running
+  [PersonalRecordType.FASTEST_1K]: 120, // 2 min
+  [PersonalRecordType.FASTEST_5K]: 600, // 10 min
+  [PersonalRecordType.FASTEST_10K]: 1200, // 20 min
+  [PersonalRecordType.FASTEST_HALF_MARATHON]: 3000, // 50 min
+  [PersonalRecordType.FASTEST_MARATHON]: 6000, // 100 min
+  // Swimming
+  [PersonalRecordType.FASTEST_400M]: 180, // 3 min
+  [PersonalRecordType.FASTEST_800M]: 400, // ~6:40
+  [PersonalRecordType.FASTEST_1500M]: 780, // 13 min
+  [PersonalRecordType.FASTEST_1900M]: 1000, // ~16:40
+  // Cycling
+  [PersonalRecordType.FASTEST_20K]: 1200, // 20 min
+  [PersonalRecordType.FASTEST_40K]: 2400, // 40 min
+  [PersonalRecordType.FASTEST_90K]: 6000, // 100 min
+  [PersonalRecordType.FASTEST_100K]: 6600, // 110 min
+  [PersonalRecordType.FASTEST_180K]: 12000, // 200 min
+} as Record<PersonalRecordType, number>;
 
 @Injectable()
 export class PersonalRecordsDetectionService {
@@ -55,8 +89,6 @@ export class PersonalRecordsDetectionService {
       }
 
       const achievedAt = execution.completed_at;
-
-      // Get workout type from the execution
       const workoutType = await this.getWorkoutType(execution);
 
       // Detect all potential PRs
@@ -81,7 +113,6 @@ export class PersonalRecordsDetectionService {
   }
 
   private async getWorkoutType(execution: WorkoutExecution): Promise<WorkoutType | null> {
-    // Get workout type from schedule
     if (execution.workout_schedule_id) {
       const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
       if (schedule?.workout_id) {
@@ -91,7 +122,6 @@ export class PersonalRecordsDetectionService {
         }
       }
     }
-
     return null;
   }
 
@@ -104,13 +134,11 @@ export class PersonalRecordsDetectionService {
       return [];
     }
 
-    // Get exercise IDs from exercise instances
     const exerciseInstanceIds = [...new Set(setCompletions.map((sc) => sc.exercise_instance_id))];
     const exerciseInstances = await Promise.all(
       exerciseInstanceIds.map((id) => this.exerciseInstanceRepository.findById(id)),
     );
 
-    // Map exercise instance ID to exercise ID
     const instanceToExercise = new Map<string, string>();
     for (const instance of exerciseInstances) {
       if (instance) {
@@ -118,7 +146,6 @@ export class PersonalRecordsDetectionService {
       }
     }
 
-    // Group set completions by exercise
     const byExercise = new Map<string, SetCompletion[]>();
     for (const sc of setCompletions) {
       const exerciseId = instanceToExercise.get(sc.exercise_instance_id);
@@ -132,22 +159,19 @@ export class PersonalRecordsDetectionService {
     const detectedPRs: DetectedPR[] = [];
 
     for (const [exerciseId, sets] of byExercise) {
-      // Filter out skipped sets
       const completedSets = sets.filter((s) => !s.skipped);
 
-      // Max weight
       const maxWeight = this.findMaxWeight(completedSets);
       if (maxWeight !== null) {
         detectedPRs.push({
           recordType: PersonalRecordType.MAX_WEIGHT,
           exerciseId,
-          workoutType: null, // Strength PRs are exercise-specific, not sport-specific
+          workoutType: null,
           value: maxWeight,
           unit: 'kg',
         });
       }
 
-      // Max reps (any weight)
       const maxReps = this.findMaxReps(completedSets);
       if (maxReps !== null) {
         detectedPRs.push({
@@ -159,7 +183,6 @@ export class PersonalRecordsDetectionService {
         });
       }
 
-      // Max volume set (load * reps)
       const maxVolumeSet = this.findMaxVolumeSet(completedSets);
       if (maxVolumeSet !== null) {
         detectedPRs.push({
@@ -218,127 +241,107 @@ export class PersonalRecordsDetectionService {
     execution: WorkoutExecution,
     workoutType: WorkoutType | null,
   ): Promise<DetectedPR[]> {
+    // Skip cardio PRs if we can't determine the sport
+    if (!workoutType) {
+      this.logger.debug(`Skipping cardio PRs for execution ${executionId}: no workout type`);
+      return [];
+    }
+
     const route = await this.workoutRouteRepository.findByExecutionId(executionId);
     if (!route) {
       return [];
     }
 
-    const markers = await this.workoutRouteRepository.findMarkersByRouteId(route.id);
+    const totalDistanceMeters = route.total_distance_meters
+      ? Number.parseFloat(route.total_distance_meters)
+      : null;
+    const totalDurationSeconds = execution.duration_seconds ?? null;
+
+    if (!totalDistanceMeters || !totalDurationSeconds) {
+      return [];
+    }
+
     const detectedPRs: DetectedPR[] = [];
 
-    // Distance-based PRs (fastest times)
-    const distancePRs = this.detectDistancePRs(markers, workoutType);
+    // Detect fastest distance PRs based on sport type
+    const distancePRs = this.detectDistancePRs(
+      workoutType,
+      totalDistanceMeters,
+      totalDurationSeconds,
+    );
     detectedPRs.push(...distancePRs);
 
-    // Split PRs
-    const splitPRs = this.detectSplitPRs(markers, workoutType);
-    detectedPRs.push(...splitPRs);
+    // Longest distance (per sport)
+    detectedPRs.push({
+      recordType: PersonalRecordType.LONGEST_DISTANCE,
+      exerciseId: null,
+      workoutType,
+      value: totalDistanceMeters,
+      unit: 'meters',
+    });
 
-    // Other cardio PRs
-    const otherPRs = this.detectOtherCardioPRs(route, execution, workoutType);
-    detectedPRs.push(...otherPRs);
-
-    return detectedPRs;
-  }
-
-  private detectDistancePRs(markers: RouteMarker[], workoutType: WorkoutType | null): DetectedPR[] {
-    const detectedPRs: DetectedPR[] = [];
-
-    for (const [recordType, targetDistance] of Object.entries(DISTANCE_THRESHOLDS)) {
-      // Find the first marker where cumulative distance >= target
-      // We use marker_number * 1000 for km markers as an approximation
-      // Or check cumulative time at the appropriate marker
-      const sortedMarkers = [...markers].sort((a, b) => a.marker_number - b.marker_number);
-
-      for (const marker of sortedMarkers) {
-        // Assuming km markers, marker_number * 1000 gives meters
-        const distanceAtMarker =
-          marker.marker_type === 'km' ? marker.marker_number * 1000 : marker.marker_number * 1609.34; // miles to meters
-
-        if (distanceAtMarker >= targetDistance && marker.cumulative_time_seconds) {
-          detectedPRs.push({
-            recordType: recordType as PersonalRecordType,
-            exerciseId: null,
-            workoutType,
-            value: marker.cumulative_time_seconds,
-            unit: 'seconds',
-          });
-          break;
-        }
-      }
-    }
+    // Longest duration (per sport)
+    detectedPRs.push({
+      recordType: PersonalRecordType.LONGEST_DURATION,
+      exerciseId: null,
+      workoutType,
+      value: totalDurationSeconds,
+      unit: 'seconds',
+    });
 
     return detectedPRs;
   }
 
-  private detectSplitPRs(markers: RouteMarker[], workoutType: WorkoutType | null): DetectedPR[] {
-    const detectedPRs: DetectedPR[] = [];
-
-    // Fastest km split
-    const kmMarkers = markers.filter((m) => m.marker_type === 'km');
-    if (kmMarkers.length > 0) {
-      const fastestKm = Math.min(...kmMarkers.map((m) => m.split_time_seconds));
-      detectedPRs.push({
-        recordType: PersonalRecordType.FASTEST_KM_SPLIT,
-        exerciseId: null,
-        workoutType,
-        value: fastestKm,
-        unit: 'seconds',
-      });
-    }
-
-    // Fastest mile split
-    const mileMarkers = markers.filter((m) => m.marker_type === 'mile');
-    if (mileMarkers.length > 0) {
-      const fastestMile = Math.min(...mileMarkers.map((m) => m.split_time_seconds));
-      detectedPRs.push({
-        recordType: PersonalRecordType.FASTEST_MILE_SPLIT,
-        exerciseId: null,
-        workoutType,
-        value: fastestMile,
-        unit: 'seconds',
-      });
-    }
-
-    return detectedPRs;
-  }
-
-  private detectOtherCardioPRs(
-    route: WorkoutRoute,
-    execution: WorkoutExecution,
-    workoutType: WorkoutType | null,
+  private detectDistancePRs(
+    workoutType: WorkoutType,
+    totalDistanceMeters: number,
+    totalDurationSeconds: number,
   ): DetectedPR[] {
     const detectedPRs: DetectedPR[] = [];
 
-    // Longest distance
-    if (route.total_distance_meters) {
-      detectedPRs.push({
-        recordType: PersonalRecordType.LONGEST_DISTANCE,
-        exerciseId: null,
-        workoutType,
-        value: Number.parseFloat(route.total_distance_meters),
-        unit: 'meters',
-      });
+    // Get distance thresholds based on sport type
+    let distances: Record<PersonalRecordType, number>;
+    switch (workoutType) {
+      case WorkoutType.RUN:
+        distances = RUNNING_DISTANCES;
+        break;
+      case WorkoutType.SWIMMING:
+        distances = SWIMMING_DISTANCES;
+        break;
+      case WorkoutType.CYCLING:
+        distances = CYCLING_DISTANCES;
+        break;
+      default:
+        return [];
     }
 
-    // Max elevation gain
-    if (route.elevation_gain_meters) {
-      detectedPRs.push({
-        recordType: PersonalRecordType.MAX_ELEVATION_GAIN,
-        exerciseId: null,
-        workoutType,
-        value: Number.parseFloat(route.elevation_gain_meters),
-        unit: 'meters',
-      });
-    }
+    // Calculate average pace (time per meter)
+    const avgTimePerMeter = totalDurationSeconds / totalDistanceMeters;
 
-    // Longest duration
-    if (execution.duration_seconds) {
+    for (const [recordType, targetDistance] of Object.entries(distances)) {
+      // Skip if workout didn't cover this distance (with 5% GPS tolerance)
+      if (totalDistanceMeters < targetDistance * 0.95) {
+        continue;
+      }
+
+      // Calculate estimated time for this distance based on average pace
+      // This is the simplest and most reliable method
+      const estimatedTime = Math.round(avgTimePerMeter * targetDistance);
+
+      // Validate against minimum realistic times
+      const minTime = MIN_TIMES[recordType as PersonalRecordType];
+      if (minTime && estimatedTime < minTime) {
+        this.logger.warn(
+          `Skipping ${recordType}: estimated ${estimatedTime}s is below minimum ${minTime}s`,
+        );
+        continue;
+      }
+
       detectedPRs.push({
-        recordType: PersonalRecordType.LONGEST_DURATION,
+        recordType: recordType as PersonalRecordType,
         exerciseId: null,
         workoutType,
-        value: execution.duration_seconds,
+        value: estimatedTime,
         unit: 'seconds',
       });
     }
@@ -359,9 +362,21 @@ export class PersonalRecordsDetectionService {
       detected.workoutType,
     );
 
-    // Determine if this is a new PR
     const isNewPR = this.isNewPR(detected, existingPR);
 
+    // Always create a history entry for every completion (so users can see all attempts)
+    await this.personalRecordRepository.createHistory({
+      user_id: userId,
+      record_type: detected.recordType,
+      exercise_id: detected.exerciseId,
+      workout_type: detected.workoutType,
+      value: detected.value,
+      unit: detected.unit,
+      workout_execution_id: executionId,
+      achieved_at: achievedAt,
+    });
+
+    // Only update the current best PR when it's actually a new record
     if (isNewPR) {
       const prData: NewPersonalRecord = {
         user_id: userId,
@@ -374,20 +389,7 @@ export class PersonalRecordsDetectionService {
         achieved_at: achievedAt,
       };
 
-      // Upsert the current PR
       await this.personalRecordRepository.upsert(prData);
-
-      // Add to history
-      await this.personalRecordRepository.createHistory({
-        user_id: userId,
-        record_type: detected.recordType,
-        exercise_id: detected.exerciseId,
-        workout_type: detected.workoutType,
-        value: detected.value,
-        unit: detected.unit,
-        workout_execution_id: executionId,
-        achieved_at: achievedAt,
-      });
 
       this.logger.log(
         `New PR detected: ${detected.recordType} = ${detected.value} ${detected.unit}` +
@@ -404,22 +406,32 @@ export class PersonalRecordsDetectionService {
 
     const existingValue = Number.parseFloat(existing.value);
 
-    // For time-based PRs (lower is better)
+    // Time-based PRs (lower is better)
     const timePRTypes: PersonalRecordType[] = [
+      // Running
       PersonalRecordType.FASTEST_1K,
       PersonalRecordType.FASTEST_5K,
       PersonalRecordType.FASTEST_10K,
       PersonalRecordType.FASTEST_HALF_MARATHON,
       PersonalRecordType.FASTEST_MARATHON,
-      PersonalRecordType.FASTEST_KM_SPLIT,
-      PersonalRecordType.FASTEST_MILE_SPLIT,
+      // Swimming
+      PersonalRecordType.FASTEST_400M,
+      PersonalRecordType.FASTEST_800M,
+      PersonalRecordType.FASTEST_1500M,
+      PersonalRecordType.FASTEST_1900M,
+      // Cycling
+      PersonalRecordType.FASTEST_20K,
+      PersonalRecordType.FASTEST_40K,
+      PersonalRecordType.FASTEST_90K,
+      PersonalRecordType.FASTEST_100K,
+      PersonalRecordType.FASTEST_180K,
     ];
 
     if (timePRTypes.includes(detected.recordType)) {
       return detected.value < existingValue;
     }
 
-    // For other PRs (higher is better)
+    // Other PRs (higher is better)
     return detected.value > existingValue;
   }
 }

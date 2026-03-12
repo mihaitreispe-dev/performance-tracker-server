@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsDateString, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { PersonalRecordType } from 'src/database/interfaces';
+import { PersonalRecordType, WorkoutType } from 'src/database/interfaces';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
 export const PRCategory = {
@@ -26,6 +26,14 @@ export class ListPersonalRecordsQuery {
   @IsUUID()
   @IsOptional()
   exerciseId?: string;
+
+  @ApiPropertyOptional({
+    enum: WorkoutType,
+    description: 'Filter by workout/sport type (e.g., run, cycling, swimming)',
+  })
+  @IsEnumString(WorkoutType)
+  @IsOptional()
+  workoutType?: WorkoutType;
 
   @ApiPropertyOptional({
     description: 'Return only current best PRs (default: true)',

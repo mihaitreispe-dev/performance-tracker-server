@@ -2206,8 +2206,7 @@ export class AnalyticsApiService {
       const distance = Number.parseFloat(route.total_distance_meters);
       if (distance < 200) continue; // Minimum 200m swim
 
-      const completedAt =
-        exec.completed_at instanceof Date ? exec.completed_at : new Date(String(exec.completed_at));
+      const completedAt = exec.completed_at instanceof Date ? exec.completed_at : new Date(String(exec.completed_at));
 
       swimWorkouts.push({
         distance,
@@ -2223,9 +2222,7 @@ export class AnalyticsApiService {
     const sustainedSwims = swimWorkouts.filter((s) => s.distance >= 400);
     if (sustainedSwims.length === 0) {
       // Fall back to any swim
-      const best = swimWorkouts.reduce((a, b) =>
-        a.duration / a.distance < b.duration / b.distance ? a : b,
-      );
+      const best = swimWorkouts.reduce((a, b) => (a.duration / a.distance < b.duration / b.distance ? a : b));
       return {
         cssSecondsPerMeter: best.duration / best.distance,
         referenceDistance: best.distance,
@@ -2235,9 +2232,7 @@ export class AnalyticsApiService {
     }
 
     // Find best pace
-    const best = sustainedSwims.reduce((a, b) =>
-      a.duration / a.distance < b.duration / b.distance ? a : b,
-    );
+    const best = sustainedSwims.reduce((a, b) => (a.duration / a.distance < b.duration / b.distance ? a : b));
 
     return {
       cssSecondsPerMeter: best.duration / best.distance,
@@ -2281,7 +2276,7 @@ export class AnalyticsApiService {
   }
 
   private async getTriathlonPredictionsForUser(
-    userId: string,
+    _userId: string,
     running: RacePredictionsDTO,
     cycling: CyclingPredictionsDTO,
     swimming: SwimmingPredictionsDTO,
@@ -2316,7 +2311,7 @@ export class AnalyticsApiService {
     const predictions: TriathlonPredictionDTO[] = this.TRIATHLON_EVENTS.map((event) => {
       const legs: TriathlonLegDTO[] = [];
       let totalTime = 0;
-      let legConfidences: number[] = [];
+      const legConfidences: number[] = [];
 
       // Swim leg
       if (hasSwimming && swimming.dataSource) {
@@ -2409,7 +2404,8 @@ export class AnalyticsApiService {
         });
         totalTime += Math.round(runTime);
         // Calculate run confidence
-        const distRatio = Math.min(running.dataSource.distanceMeters, event.runMeters) /
+        const distRatio =
+          Math.min(running.dataSource.distanceMeters, event.runMeters) /
           Math.max(running.dataSource.distanceMeters, event.runMeters);
         legConfidences.push(Math.round(distRatio * 100));
       } else {
@@ -2426,9 +2422,8 @@ export class AnalyticsApiService {
       }
 
       // Calculate overall confidence
-      const avgConfidence = legConfidences.length > 0
-        ? Math.round(legConfidences.reduce((a, b) => a + b, 0) / legConfidences.length)
-        : 30;
+      const avgConfidence =
+        legConfidences.length > 0 ? Math.round(legConfidences.reduce((a, b) => a + b, 0) / legConfidences.length) : 30;
 
       return {
         eventId: event.id,
@@ -2446,9 +2441,10 @@ export class AnalyticsApiService {
       hasData: true,
       availableSports,
       missingSports: missingSports.length > 0 ? missingSports : null,
-      message: missingSports.length > 0
-        ? `Some predictions are estimated. Add ${missingSports.join(', ')} data for more accurate results.`
-        : null,
+      message:
+        missingSports.length > 0
+          ? `Some predictions are estimated. Add ${missingSports.join(', ')} data for more accurate results.`
+          : null,
     };
   }
 

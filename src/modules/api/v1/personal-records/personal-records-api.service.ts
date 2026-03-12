@@ -36,6 +36,7 @@ export class PersonalRecordsApiService {
       userId: req.user.id,
       category: query.category as 'strength' | 'cardio_distance' | 'cardio_other' | undefined,
       exerciseId: query.exerciseId,
+      workoutType: query.workoutType,
     });
 
     // Get exercise names for strength PRs
@@ -232,21 +233,13 @@ export class PersonalRecordsApiService {
   async getHistory(req: Request & { user: AuthUser }, query: PRHistoryQuery): Promise<PRHistoryResponse> {
     const workoutType = query.workoutType as WorkoutType | undefined;
 
-    // Get all historical records sorted by value
+    // Get all historical records sorted by value (best first)
     const history = await this.personalRecordRepository.findAllHistory({
       userId: req.user.id,
       recordType: query.recordType,
       exerciseId: query.exerciseId,
       workoutType,
     });
-
-    // Get the current best record
-    const currentBest = await this.personalRecordRepository.findByUserTypeExerciseAndWorkoutType(
-      req.user.id,
-      query.recordType,
-      query.exerciseId ?? null,
-      workoutType ?? null,
-    );
 
     let exerciseName: string | null = null;
     if (query.exerciseId) {
@@ -257,6 +250,7 @@ export class PersonalRecordsApiService {
     const unit = history.length > 0 ? history[0].unit : this.getDefaultUnit(query.recordType);
 
     // Map history records with rank and isCurrent flag
+    // The first record in the sorted list is the best value, so it's the current best
     const records: PRHistoryRecordDTO[] = history.map((h, index) => ({
       id: h.id,
       recordType: h.record_type,
@@ -268,7 +262,7 @@ export class PersonalRecordsApiService {
       formattedValue: this.formatValue(Number.parseFloat(h.value), h.unit, h.record_type),
       workoutExecutionId: h.workout_execution_id,
       achievedAt: h.achieved_at instanceof Date ? h.achieved_at.toISOString() : String(h.achieved_at),
-      isCurrent: currentBest ? h.id === currentBest.id || h.workout_execution_id === currentBest.workout_execution_id : index === 0,
+      isCurrent: index === 0, // First record in sorted list is always the best
       rank: index + 1,
     }));
 

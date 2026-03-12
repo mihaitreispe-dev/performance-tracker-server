@@ -2,19 +2,39 @@ import type { ColumnType, Insertable, Selectable, Updateable } from 'kysely';
 import { WorkoutType } from './workouts-table.interface';
 
 export enum PersonalRecordType {
+  // Strength PRs
   MAX_WEIGHT = 'max_weight',
   MAX_REPS = 'max_reps',
   MAX_VOLUME_SET = 'max_volume_set',
+
+  // Running distances
   FASTEST_1K = 'fastest_1k',
   FASTEST_5K = 'fastest_5k',
   FASTEST_10K = 'fastest_10k',
   FASTEST_HALF_MARATHON = 'fastest_half_marathon',
   FASTEST_MARATHON = 'fastest_marathon',
+
+  // Swimming distances
+  FASTEST_400M = 'fastest_400m',
+  FASTEST_800M = 'fastest_800m',
+  FASTEST_1500M = 'fastest_1500m',
+  FASTEST_1900M = 'fastest_1900m', // Half Ironman swim
+
+  // Cycling distances
+  FASTEST_20K = 'fastest_20k',
+  FASTEST_40K = 'fastest_40k',
+  FASTEST_90K = 'fastest_90k', // Half Ironman bike
+  FASTEST_100K = 'fastest_100k',
+  FASTEST_180K = 'fastest_180k', // Ironman bike
+
+  // General cardio PRs
+  LONGEST_DISTANCE = 'longest_distance',
+  LONGEST_DURATION = 'longest_duration',
+
+  // Deprecated - kept for backward compatibility but no longer detected
   FASTEST_KM_SPLIT = 'fastest_km_split',
   FASTEST_MILE_SPLIT = 'fastest_mile_split',
-  LONGEST_DISTANCE = 'longest_distance',
   MAX_ELEVATION_GAIN = 'max_elevation_gain',
-  LONGEST_DURATION = 'longest_duration',
 }
 
 export interface PersonalRecordsTable {

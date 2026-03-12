@@ -218,28 +218,18 @@ export class WorkoutFileImportsApiService {
           startedAt: parsedData.startTime,
         }).catch((err) => this.logger.error(`Failed to fetch weather for imported workout: ${err.message}`));
 
-        // Create route markers from laps
+        // Create route markers from laps (only for valid km or mile laps)
         if (parsedData.laps.length > 0) {
-          let cumulativeTime = 0;
-          const markersToCreate = parsedData.laps.map((lap) => {
-            cumulativeTime += lap.totalTimeSeconds;
-            return {
-              workout_route_id: route.id,
-              marker_type: 'km',
-              marker_number: lap.lapNumber,
-              latitude: (lap.startLatitude || parsedData.routePoints[0]?.latitude || 0).toString(),
-              longitude: (lap.startLongitude || parsedData.routePoints[0]?.longitude || 0).toString(),
-              elevation_meters: lap.startElevation?.toString() || null,
-              recorded_at: lap.startTime,
-              split_time_seconds: Math.round(lap.totalTimeSeconds),
-              cumulative_time_seconds: Math.round(cumulativeTime),
-              avg_heart_rate: lap.avgHeartRate ? Math.round(lap.avgHeartRate) : null,
-              avg_pace_seconds_per_km: lap.avgPaceSecondsPerKm ? Math.round(lap.avgPaceSecondsPerKm) : null,
-            };
-          });
+          const markersToCreate = this.createMarkersFromLaps(
+            route.id,
+            parsedData.laps,
+            parsedData.routePoints[0],
+          );
 
-          await this.workoutRouteRepository.createMarkers(markersToCreate);
-          this.logger.log(`Created ${markersToCreate.length} route markers`);
+          if (markersToCreate.length > 0) {
+            await this.workoutRouteRepository.createMarkers(markersToCreate);
+            this.logger.log(`Created ${markersToCreate.length} route markers`);
+          }
         }
       }
 
@@ -517,28 +507,18 @@ export class WorkoutFileImportsApiService {
           startedAt: parsedData.startTime,
         }).catch((err) => this.logger.error(`Failed to fetch weather for confirmed import: ${err.message}`));
 
-        // Create route markers from laps
+        // Create route markers from laps (only for valid km or mile laps)
         if (parsedData.laps.length > 0) {
-          let cumulativeTime = 0;
-          const markersToCreate = parsedData.laps.map((lap) => {
-            cumulativeTime += lap.totalTimeSeconds;
-            return {
-              workout_route_id: route.id,
-              marker_type: 'km',
-              marker_number: lap.lapNumber,
-              latitude: (lap.startLatitude || parsedData.routePoints[0]?.latitude || 0).toString(),
-              longitude: (lap.startLongitude || parsedData.routePoints[0]?.longitude || 0).toString(),
-              elevation_meters: lap.startElevation?.toString() || null,
-              recorded_at: lap.startTime,
-              split_time_seconds: Math.round(lap.totalTimeSeconds),
-              cumulative_time_seconds: Math.round(cumulativeTime),
-              avg_heart_rate: lap.avgHeartRate ? Math.round(lap.avgHeartRate) : null,
-              avg_pace_seconds_per_km: lap.avgPaceSecondsPerKm ? Math.round(lap.avgPaceSecondsPerKm) : null,
-            };
-          });
+          const markersToCreate = this.createMarkersFromLaps(
+            route.id,
+            parsedData.laps,
+            parsedData.routePoints[0],
+          );
 
-          await this.workoutRouteRepository.createMarkers(markersToCreate);
-          this.logger.log(`Created ${markersToCreate.length} route markers`);
+          if (markersToCreate.length > 0) {
+            await this.workoutRouteRepository.createMarkers(markersToCreate);
+            this.logger.log(`Created ${markersToCreate.length} route markers`);
+          }
         }
       }
 
@@ -1258,5 +1238,83 @@ export class WorkoutFileImportsApiService {
       ...lap,
       name: mergedCount > 1 ? `${name} (${mergedCount} segments)` : name,
     };
+  }
+
+  /**
+   * Create route markers from laps, but only if laps represent valid km or mile splits.
+   * Garmin watches can have various auto-lap settings (200m, 400m, 1km, 1 mile, etc.)
+   * We only want to create markers for ~1km or ~1 mile splits.
+   */
+  private createMarkersFromLaps(
+    routeId: string,
+    laps: ParsedLap[],
+    firstRoutePoint?: { latitude: number; longitude: number },
+  ): {
+    workout_route_id: string;
+    marker_type: string;
+    marker_number: number;
+    latitude: string;
+    longitude: string;
+    elevation_meters: string | null;
+    recorded_at: Date;
+    split_time_seconds: number;
+    cumulative_time_seconds: number;
+    avg_heart_rate: number | null;
+    avg_pace_seconds_per_km: number | null;
+  }[] {
+    if (laps.length === 0) return [];
+
+    // Calculate average lap distance to determine lap type
+    const lapsWithDistance = laps.filter((l) => l.distanceMeters > 0);
+    if (lapsWithDistance.length === 0) return [];
+
+    const totalDistance = lapsWithDistance.reduce((sum, l) => sum + l.distanceMeters, 0);
+    const avgLapDistance = totalDistance / lapsWithDistance.length;
+
+    // Determine marker type based on average lap distance
+    // Allow 20% tolerance for GPS inaccuracy
+    const isKmLap = avgLapDistance >= 800 && avgLapDistance <= 1200;
+    const isMileLap = avgLapDistance >= 1400 && avgLapDistance <= 1900; // ~1609m +/- 15%
+
+    if (!isKmLap && !isMileLap) {
+      // Laps are not standard km or mile - skip creating markers
+      // This handles 200m, 400m, or other custom auto-lap settings
+      this.logger.log(
+        `Skipping marker creation: average lap distance ${Math.round(avgLapDistance)}m is not a standard split`,
+      );
+      return [];
+    }
+
+    const markerType = isKmLap ? 'km' : 'mile';
+    this.logger.log(`Creating ${markerType} markers from ${laps.length} laps (avg distance: ${Math.round(avgLapDistance)}m)`);
+
+    let cumulativeTime = 0;
+    let markerNumber = 0;
+
+    return laps
+      .filter((lap) => {
+        // Only include laps that are close to the expected distance
+        const expectedDistance = isKmLap ? 1000 : 1609;
+        const tolerance = expectedDistance * 0.25; // 25% tolerance
+        return lap.distanceMeters >= expectedDistance - tolerance && lap.distanceMeters <= expectedDistance + tolerance;
+      })
+      .map((lap) => {
+        cumulativeTime += lap.totalTimeSeconds;
+        markerNumber++;
+
+        return {
+          workout_route_id: routeId,
+          marker_type: markerType,
+          marker_number: markerNumber,
+          latitude: (lap.startLatitude || firstRoutePoint?.latitude || 0).toString(),
+          longitude: (lap.startLongitude || firstRoutePoint?.longitude || 0).toString(),
+          elevation_meters: lap.startElevation?.toString() || null,
+          recorded_at: lap.startTime,
+          split_time_seconds: Math.round(lap.totalTimeSeconds),
+          cumulative_time_seconds: Math.round(cumulativeTime),
+          avg_heart_rate: lap.avgHeartRate ? Math.round(lap.avgHeartRate) : null,
+          avg_pace_seconds_per_km: lap.avgPaceSecondsPerKm ? Math.round(lap.avgPaceSecondsPerKm) : null,
+        };
+      });
   }
 }

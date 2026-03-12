@@ -48,18 +48,28 @@ const STRENGTH_TYPES: PersonalRecordType[] = [
 
 const CARDIO_DISTANCE_TYPES: PersonalRecordType[] = [
   PersonalRecordType.LONGEST_DISTANCE,
-  PersonalRecordType.FASTEST_HALF_MARATHON,
-  PersonalRecordType.FASTEST_MARATHON,
+  PersonalRecordType.LONGEST_DURATION,
 ];
 
+// "Best Efforts" - fastest times for various distances (per sport)
 const CARDIO_OTHER_TYPES: PersonalRecordType[] = [
+  // Running
   PersonalRecordType.FASTEST_1K,
   PersonalRecordType.FASTEST_5K,
   PersonalRecordType.FASTEST_10K,
-  PersonalRecordType.FASTEST_KM_SPLIT,
-  PersonalRecordType.FASTEST_MILE_SPLIT,
-  PersonalRecordType.MAX_ELEVATION_GAIN,
-  PersonalRecordType.LONGEST_DURATION,
+  PersonalRecordType.FASTEST_HALF_MARATHON,
+  PersonalRecordType.FASTEST_MARATHON,
+  // Swimming
+  PersonalRecordType.FASTEST_400M,
+  PersonalRecordType.FASTEST_800M,
+  PersonalRecordType.FASTEST_1500M,
+  PersonalRecordType.FASTEST_1900M,
+  // Cycling
+  PersonalRecordType.FASTEST_20K,
+  PersonalRecordType.FASTEST_40K,
+  PersonalRecordType.FASTEST_90K,
+  PersonalRecordType.FASTEST_100K,
+  PersonalRecordType.FASTEST_180K,
 ];
 
 @Injectable()
@@ -273,13 +283,23 @@ export class PersonalRecordRepository {
 
     // Determine sort order based on record type
     const isTimeBased = [
+      // Running
       PersonalRecordType.FASTEST_1K,
       PersonalRecordType.FASTEST_5K,
       PersonalRecordType.FASTEST_10K,
       PersonalRecordType.FASTEST_HALF_MARATHON,
       PersonalRecordType.FASTEST_MARATHON,
-      PersonalRecordType.FASTEST_KM_SPLIT,
-      PersonalRecordType.FASTEST_MILE_SPLIT,
+      // Swimming
+      PersonalRecordType.FASTEST_400M,
+      PersonalRecordType.FASTEST_800M,
+      PersonalRecordType.FASTEST_1500M,
+      PersonalRecordType.FASTEST_1900M,
+      // Cycling
+      PersonalRecordType.FASTEST_20K,
+      PersonalRecordType.FASTEST_40K,
+      PersonalRecordType.FASTEST_90K,
+      PersonalRecordType.FASTEST_100K,
+      PersonalRecordType.FASTEST_180K,
     ].includes(filter.recordType);
 
     // For time-based records, lower is better (ascending)
