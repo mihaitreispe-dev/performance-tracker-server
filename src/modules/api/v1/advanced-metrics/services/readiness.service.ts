@@ -33,6 +33,38 @@ export interface ReadinessResult {
   recommendation: ReadinessRecommendation;
 }
 
+export type SimpleRecommendation = 'push' | 'maintain' | 'recover';
+
+export type DivergenceType = 'load_up_hrv_down' | 'load_up_recovery_down' | 'none';
+
+export interface DivergenceAnalysis {
+  hasDivergence: boolean;
+  divergenceType: DivergenceType;
+  severity: 'warning' | 'alert' | null;
+  loadTrend: 'rising' | 'stable' | 'falling';
+  hrvTrend: 'rising' | 'stable' | 'falling' | 'insufficient_data';
+  daysSinceDivergence: number | null;
+  message: string | null;
+}
+
+export interface ReadinessTrendPoint {
+  date: string;
+  compositeLoad: number; // Combined ATL normalized 0-100
+  hrvZscore: number | null;
+  readinessScore: number;
+  simpleRecommendation: SimpleRecommendation;
+}
+
+export interface ReadinessTrendsResult {
+  data: ReadinessTrendPoint[];
+  divergence: DivergenceAnalysis;
+  period: {
+    startDate: string;
+    endDate: string;
+    daysWithData: number;
+  };
+}
+
 export type ReadinessRecommendation =
   | 'peak_ready'
   | 'ready_for_hard'
@@ -109,7 +141,7 @@ export class ReadinessService {
         mskContribution * 0.18 +
         neuralContribution * 0.18 +
         hrvContribution * 0.17 +
-        journalContribution * 0.10 +
+        journalContribution * 0.1 +
         quickWellnessContribution * 0.15
       : aerobicContribution * 0.25 +
         mskContribution * 0.2 +
@@ -299,10 +331,7 @@ export class ReadinessService {
   /**
    * Calculate journal contribution to readiness
    */
-  private calculateJournalContribution(
-    entry: RecoveryJournalEntry | null,
-    params: LoadModelParameterValues,
-  ): number {
+  private calculateJournalContribution(entry: RecoveryJournalEntry | null, params: LoadModelParameterValues): number {
     if (!entry) {
       return 50; // Neutral if no journal
     }
@@ -495,9 +524,7 @@ export class ReadinessService {
 
     let readinessScore = loadData?.readiness_score ? parseFloat(loadData.readiness_score) : 50;
     const hrvOverride = !!loadData?.readiness_override_reason;
-    const journalContribution = journalEntry
-      ? this.calculateJournalContribution(journalEntry, params)
-      : null;
+    const journalContribution = journalEntry ? this.calculateJournalContribution(journalEntry, params) : null;
 
     // Identify limiting factor
     let limitingFactor: string | null = null;
@@ -578,12 +605,267 @@ export class ReadinessService {
         neuralTsb,
         limitingFactor,
         hrvOverride: !!load.readiness_override_reason,
-        journalContribution: journalEntry
-          ? this.calculateJournalContribution(journalEntry, params)
-          : null,
+        journalContribution: journalEntry ? this.calculateJournalContribution(journalEntry, params) : null,
       });
     }
 
     return results;
+  }
+
+  /**
+   * Get simple recommendation (push/maintain/recover) based on readiness score and HRV status
+   */
+  getSimpleRecommendation(
+    readinessScore: number,
+    isHrvSuppressed: boolean,
+    suppressionSeverity: string | null,
+    hasDivergenceAlert: boolean,
+  ): SimpleRecommendation {
+    // Recover: readiness < 50 OR HRV suppressed (moderate/severe) OR divergence alert
+    if (readinessScore < 50) {
+      return 'recover';
+    }
+
+    if (isHrvSuppressed && (suppressionSeverity === 'moderate' || suppressionSeverity === 'severe')) {
+      return 'recover';
+    }
+
+    if (hasDivergenceAlert) {
+      return 'recover';
+    }
+
+    // Push: readiness ≥ 70 AND no HRV suppression (moderate/severe)
+    if (readinessScore >= 70) {
+      if (!isHrvSuppressed || suppressionSeverity === 'mild') {
+        return 'push';
+      }
+    }
+
+    // Maintain: everything else
+    return 'maintain';
+  }
+
+  /**
+   * Get divergence analysis - detects when load trend and HRV trend diverge
+   */
+  async getDivergenceAnalysis(userId: string, days: number = 14): Promise<DivergenceAnalysis> {
+    const loads = await this.multiStreamLoadRepository.getDateRange(userId, days);
+
+    // Insufficient data check
+    if (loads.length < 7) {
+      return {
+        hasDivergence: false,
+        divergenceType: 'none',
+        severity: null,
+        loadTrend: 'stable',
+        hrvTrend: 'insufficient_data',
+        daysSinceDivergence: null,
+        message: loads.length === 0 ? 'No data available' : `Need ${7 - loads.length} more days of data`,
+      };
+    }
+
+    // Get HRV data for the same period
+    const hrvData: Array<{ date: string; hrvZscore: number | null }> = [];
+    for (const load of loads) {
+      const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, load.date);
+      hrvData.push({
+        date: formatDateToYMD(load.date),
+        hrvZscore: hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null,
+      });
+    }
+
+    // Calculate composite load (combined ATL from all streams, normalized to 0-100)
+    const loadDataWithComposite = loads.map((load) => {
+      const aerobicAtl = load.aerobic_atl ? parseFloat(load.aerobic_atl) : 0;
+      const mskAtl = load.msk_atl ? parseFloat(load.msk_atl) : 0;
+      const neuralAtl = load.neural_atl ? parseFloat(load.neural_atl) : 0;
+      // Average ATL across streams, normalized (ATL typically 0-100+)
+      const compositeLoad = Math.min(100, (aerobicAtl + mskAtl + neuralAtl) / 3);
+      return {
+        date: formatDateToYMD(load.date),
+        compositeLoad,
+      };
+    });
+
+    // Calculate 7-day rolling averages for load
+    const calculateRollingAvg = (data: number[], windowSize: number = 7): number[] => {
+      const result: number[] = [];
+      for (let i = 0; i < data.length; i++) {
+        const start = Math.max(0, i - windowSize + 1);
+        const window = data.slice(start, i + 1);
+        result.push(window.reduce((a, b) => a + b, 0) / window.length);
+      }
+      return result;
+    };
+
+    const compositeLoads = loadDataWithComposite.map((d) => d.compositeLoad);
+    const loadRollingAvg = calculateRollingAvg(compositeLoads);
+
+    // Calculate load trend: compare recent 7-day avg to earlier 7-day avg
+    const recentLoadAvg = loadRollingAvg[loadRollingAvg.length - 1] || 0;
+    const earlierLoadAvg = loadRollingAvg[Math.max(0, loadRollingAvg.length - 8)] || recentLoadAvg;
+    const loadChangePercent = earlierLoadAvg > 0 ? ((recentLoadAvg - earlierLoadAvg) / earlierLoadAvg) * 100 : 0;
+
+    let loadTrend: DivergenceAnalysis['loadTrend'] = 'stable';
+    if (loadChangePercent > 10) {
+      loadTrend = 'rising';
+    } else if (loadChangePercent < -10) {
+      loadTrend = 'falling';
+    }
+
+    // Calculate HRV trend
+    const validHrvData = hrvData.filter((d) => d.hrvZscore !== null);
+    if (validHrvData.length < 7) {
+      return {
+        hasDivergence: false,
+        divergenceType: 'none',
+        severity: null,
+        loadTrend,
+        hrvTrend: 'insufficient_data',
+        daysSinceDivergence: null,
+        message: 'Insufficient HRV data for trend analysis',
+      };
+    }
+
+    const hrvZscores = validHrvData.map((d) => d.hrvZscore!);
+    const hrvRollingAvg = calculateRollingAvg(hrvZscores);
+
+    const recentHrvAvg = hrvRollingAvg[hrvRollingAvg.length - 1] || 0;
+    const earlierHrvAvg = hrvRollingAvg[Math.max(0, hrvRollingAvg.length - 8)] || recentHrvAvg;
+    const hrvChange = recentHrvAvg - earlierHrvAvg;
+
+    let hrvTrend: DivergenceAnalysis['hrvTrend'] = 'stable';
+    if (hrvChange > 0.3) {
+      hrvTrend = 'rising';
+    } else if (hrvChange < -0.5) {
+      hrvTrend = 'falling';
+    }
+
+    // Detect divergence: load rising + HRV falling
+    const hasDivergence = loadTrend === 'rising' && hrvTrend === 'falling';
+
+    if (!hasDivergence) {
+      return {
+        hasDivergence: false,
+        divergenceType: 'none',
+        severity: null,
+        loadTrend,
+        hrvTrend,
+        daysSinceDivergence: null,
+        message: null,
+      };
+    }
+
+    // Calculate days since divergence started
+    // Look backwards to find when the divergence pattern began
+    let daysSinceDivergence = 0;
+    for (let i = loads.length - 1; i >= 0 && daysSinceDivergence < loads.length; i--) {
+      const currentIdx = i;
+      const windowStart = Math.max(0, currentIdx - 6);
+
+      // Check if load was rising at this point
+      const windowLoads = compositeLoads.slice(windowStart, currentIdx + 1);
+      const windowFirstHalf = windowLoads.slice(0, Math.floor(windowLoads.length / 2));
+      const windowSecondHalf = windowLoads.slice(Math.floor(windowLoads.length / 2));
+      const firstHalfAvg =
+        windowFirstHalf.length > 0 ? windowFirstHalf.reduce((a, b) => a + b, 0) / windowFirstHalf.length : 0;
+      const secondHalfAvg =
+        windowSecondHalf.length > 0 ? windowSecondHalf.reduce((a, b) => a + b, 0) / windowSecondHalf.length : 0;
+      const loadWasRising = secondHalfAvg > firstHalfAvg * 1.05;
+
+      // Check if HRV was falling at this point
+      const windowHrv = hrvZscores.slice(windowStart, currentIdx + 1);
+      const firstHalfHrv = windowHrv.slice(0, Math.floor(windowHrv.length / 2));
+      const secondHalfHrv = windowHrv.slice(Math.floor(windowHrv.length / 2));
+      const firstHalfHrvAvg =
+        firstHalfHrv.length > 0 ? firstHalfHrv.reduce((a, b) => a + b, 0) / firstHalfHrv.length : 0;
+      const secondHalfHrvAvg =
+        secondHalfHrv.length > 0 ? secondHalfHrv.reduce((a, b) => a + b, 0) / secondHalfHrv.length : 0;
+      const hrvWasFalling = secondHalfHrvAvg < firstHalfHrvAvg - 0.3;
+
+      if (loadWasRising && hrvWasFalling) {
+        daysSinceDivergence++;
+      } else {
+        break;
+      }
+    }
+
+    // Determine severity based on days
+    let severity: DivergenceAnalysis['severity'] = null;
+    let message: string | null = null;
+
+    if (daysSinceDivergence >= 5) {
+      severity = 'alert';
+      message = `Training load rising while HRV declining for ${daysSinceDivergence} days. Consider reducing training intensity.`;
+    } else if (daysSinceDivergence >= 3) {
+      severity = 'warning';
+      message = `Training load rising while HRV declining for ${daysSinceDivergence} days. Monitor recovery closely.`;
+    }
+
+    return {
+      hasDivergence: true,
+      divergenceType: 'load_up_hrv_down',
+      severity,
+      loadTrend,
+      hrvTrend,
+      daysSinceDivergence,
+      message,
+    };
+  }
+
+  /**
+   * Get readiness trends with divergence analysis
+   */
+  async getReadinessTrends(userId: string, days: number = 14): Promise<ReadinessTrendsResult> {
+    const loads = await this.multiStreamLoadRepository.getDateRange(userId, days);
+    const divergence = await this.getDivergenceAnalysis(userId, days);
+    const hasDivergenceAlert = divergence.severity === 'alert';
+
+    const trendPoints: ReadinessTrendPoint[] = [];
+
+    for (const load of loads) {
+      const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, load.date);
+      const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null;
+      const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
+      const suppressionSeverity = hrvBaseline?.suppression_severity || null;
+
+      // Calculate composite load (combined ATL, normalized to 0-100)
+      const aerobicAtl = load.aerobic_atl ? parseFloat(load.aerobic_atl) : 0;
+      const mskAtl = load.msk_atl ? parseFloat(load.msk_atl) : 0;
+      const neuralAtl = load.neural_atl ? parseFloat(load.neural_atl) : 0;
+      const compositeLoad = Math.min(100, Math.round(((aerobicAtl + mskAtl + neuralAtl) / 3) * 100) / 100);
+
+      const readinessScore = load.readiness_score ? parseFloat(load.readiness_score) : 50;
+
+      const simpleRecommendation = this.getSimpleRecommendation(
+        readinessScore,
+        isHrvSuppressed,
+        suppressionSeverity,
+        hasDivergenceAlert,
+      );
+
+      trendPoints.push({
+        date: formatDateToYMD(load.date),
+        compositeLoad,
+        hrvZscore,
+        readinessScore,
+        simpleRecommendation,
+      });
+    }
+
+    // Calculate period info
+    const datesWithData = trendPoints.map((p) => p.date);
+    const startDate = datesWithData.length > 0 ? datesWithData[0] : formatDateToYMD(new Date());
+    const endDate = datesWithData.length > 0 ? datesWithData[datesWithData.length - 1] : formatDateToYMD(new Date());
+
+    return {
+      data: trendPoints,
+      divergence,
+      period: {
+        startDate,
+        endDate,
+        daysWithData: trendPoints.length,
+      },
+    };
   }
 }

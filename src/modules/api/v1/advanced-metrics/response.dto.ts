@@ -599,3 +599,105 @@ export class WellnessPerformanceCorrelationResponse extends ItemResponse<Wellnes
   @ValidateNested()
   declare data: WellnessPerformanceCorrelationDTO;
 }
+
+// Readiness Trends
+
+export type SimpleRecommendation = 'push' | 'maintain' | 'recover';
+
+export type DivergenceType = 'load_up_hrv_down' | 'load_up_recovery_down' | 'none';
+
+export class DivergenceAnalysisDTO {
+  @ApiProperty({ description: 'Whether a divergence pattern is detected' })
+  hasDivergence: boolean;
+
+  @ApiProperty({ enum: ['load_up_hrv_down', 'load_up_recovery_down', 'none'] })
+  @IsString()
+  divergenceType: DivergenceType;
+
+  @ApiPropertyOptional({ enum: ['warning', 'alert'], description: 'Severity of divergence' })
+  @IsString()
+  @IsOptional()
+  severity: 'warning' | 'alert' | null;
+
+  @ApiProperty({ enum: ['rising', 'stable', 'falling'] })
+  @IsString()
+  loadTrend: 'rising' | 'stable' | 'falling';
+
+  @ApiProperty({ enum: ['rising', 'stable', 'falling', 'insufficient_data'] })
+  @IsString()
+  hrvTrend: 'rising' | 'stable' | 'falling' | 'insufficient_data';
+
+  @ApiPropertyOptional({ type: Number, description: 'Days since divergence started' })
+  @IsNumber()
+  @IsOptional()
+  daysSinceDivergence: number | null;
+
+  @ApiPropertyOptional({ type: String, description: 'Human-readable divergence message' })
+  @IsString()
+  @IsOptional()
+  message: string | null;
+}
+
+export class ReadinessTrendPointDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Combined ATL normalized 0-100' })
+  @IsNumber()
+  compositeLoad: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'HRV z-score' })
+  @IsNumber()
+  @IsOptional()
+  hrvZscore: number | null;
+
+  @ApiProperty({ description: 'Readiness score (0-100)' })
+  @IsNumber()
+  readinessScore: number;
+
+  @ApiProperty({ enum: ['push', 'maintain', 'recover'] })
+  @IsString()
+  simpleRecommendation: SimpleRecommendation;
+}
+
+export class ReadinessTrendsPeriodDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  startDate: string;
+
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  endDate: string;
+
+  @ApiProperty({ description: 'Number of days with data' })
+  @IsNumber()
+  daysWithData: number;
+}
+
+export class ReadinessTrendsDTO {
+  @ApiProperty({ type: [ReadinessTrendPointDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReadinessTrendPointDTO)
+  data: ReadinessTrendPointDTO[];
+
+  @ApiProperty({ type: DivergenceAnalysisDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => DivergenceAnalysisDTO)
+  divergence: DivergenceAnalysisDTO;
+
+  @ApiProperty({ type: ReadinessTrendsPeriodDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ReadinessTrendsPeriodDTO)
+  period: ReadinessTrendsPeriodDTO;
+}
+
+export class ReadinessTrendsResponse extends ItemResponse<ReadinessTrendsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: ReadinessTrendsDTO;
+}

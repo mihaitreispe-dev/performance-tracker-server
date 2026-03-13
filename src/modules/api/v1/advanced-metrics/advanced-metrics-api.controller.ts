@@ -5,7 +5,14 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AdvancedMetricsApiService } from './advanced-metrics-api.service';
-import { CorrelationQuery, DateQuery, FitnessFatiguePredictionBody, HistoryQuery, ThresholdOverrideBody, WorkoutIdParam } from './request.dto';
+import {
+  CorrelationQuery,
+  DateQuery,
+  FitnessFatiguePredictionBody,
+  HistoryQuery,
+  ThresholdOverrideBody,
+  WorkoutIdParam,
+} from './request.dto';
 import {
   DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
@@ -15,6 +22,7 @@ import {
   MultiStreamLoadHistoryResponse,
   MultiStreamLoadResponse,
   ReadinessHistoryResponse,
+  ReadinessTrendsResponse,
   RpeTssCorrelationResponse,
   ThresholdOverrideResponse,
   ThresholdsResponse,
@@ -232,6 +240,18 @@ export class AdvancedMetricsApiController {
     @Query() query: HistoryQuery,
   ): Promise<ReadinessHistoryResponse> {
     return this.service.getReadinessHistory(req, query.days);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get readiness trends with divergence analysis' })
+  @ApiResponse({ status: HttpStatus.OK, type: ReadinessTrendsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('readiness/trends')
+  async getReadinessTrends(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: HistoryQuery,
+  ): Promise<ReadinessTrendsResponse> {
+    return this.service.getReadinessTrends(req, query.days ?? 14);
   }
 
   // ==========================================

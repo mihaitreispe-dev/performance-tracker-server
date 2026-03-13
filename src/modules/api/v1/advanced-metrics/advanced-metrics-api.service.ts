@@ -21,6 +21,7 @@ import {
   MultiStreamLoadHistoryResponse,
   MultiStreamLoadResponse,
   ReadinessHistoryResponse,
+  ReadinessTrendsResponse,
   RpeTssCorrelationResponse,
   RpeTssDataPointDTO,
   ThresholdOverrideResponse,
@@ -753,6 +754,37 @@ export class AdvancedMetricsApiService {
     });
   }
 
+  /**
+   * Get readiness trends with divergence analysis
+   */
+  async getReadinessTrends(req: Request & { user: AuthUser }, days: number = 14): Promise<ReadinessTrendsResponse> {
+    const userId = req.user.id;
+    const trends = await this.readinessService.getReadinessTrends(userId, days);
+
+    return new ReadinessTrendsResponse({
+      data: {
+        data: trends.data,
+        divergence: trends.divergence,
+        period: trends.period,
+      },
+    });
+  }
+
+  /**
+   * Get readiness trends for a specific user (coach access)
+   */
+  async getReadinessTrendsForUser(userId: string, days: number = 14): Promise<ReadinessTrendsResponse> {
+    const trends = await this.readinessService.getReadinessTrends(userId, days);
+
+    return new ReadinessTrendsResponse({
+      data: {
+        data: trends.data,
+        divergence: trends.divergence,
+        period: trends.period,
+      },
+    });
+  }
+
   // ==========================================
   // Subjective-Load Correlation methods
   // ==========================================
@@ -760,7 +792,10 @@ export class AdvancedMetricsApiService {
   /**
    * Get RPE vs TSS correlation data
    */
-  async getRpeTssCorrelation(req: Request & { user: AuthUser }, query: CorrelationQuery): Promise<RpeTssCorrelationResponse> {
+  async getRpeTssCorrelation(
+    req: Request & { user: AuthUser },
+    query: CorrelationQuery,
+  ): Promise<RpeTssCorrelationResponse> {
     const userId = req.user.id;
     const days = query.days ?? 90;
 
@@ -770,9 +805,10 @@ export class AdvancedMetricsApiService {
     // Build data points (simplified - no workout name lookup for now)
     const dataPoints: RpeTssDataPointDTO[] = records.map((record) => {
       return {
-        date: record.created_at instanceof Date
-          ? formatDateToYMD(record.created_at)
-          : String(record.created_at).split('T')[0],
+        date:
+          record.created_at instanceof Date
+            ? formatDateToYMD(record.created_at)
+            : String(record.created_at).split('T')[0],
         workoutName: null, // Could be enhanced to fetch via schedule if needed
         sessionRpe: record.session_rpe,
         srpeTss: Number(record.srpe_tss),
@@ -783,9 +819,10 @@ export class AdvancedMetricsApiService {
 
     // Calculate average ratio
     const validRatios = dataPoints.filter((d) => d.rpeTssRatio !== null).map((d) => d.rpeTssRatio!);
-    const averageRatio = validRatios.length > 0
-      ? Math.round((validRatios.reduce((sum, r) => sum + r, 0) / validRatios.length) * 100) / 100
-      : null;
+    const averageRatio =
+      validRatios.length > 0
+        ? Math.round((validRatios.reduce((sum, r) => sum + r, 0) / validRatios.length) * 100) / 100
+        : null;
 
     // Calculate trend direction (comparing first week to last week)
     let ratioTrend: 'increasing' | 'stable' | 'decreasing' = 'stable';
@@ -808,9 +845,10 @@ export class AdvancedMetricsApiService {
 
     // Check for accumulated fatigue warning (avg ratio > 1.3 over 7+ days)
     const recent7DaysRatios = dataPoints.slice(0, 7).filter((d) => d.rpeTssRatio !== null);
-    const recent7DaysAvg = recent7DaysRatios.length > 0
-      ? recent7DaysRatios.reduce((sum, d) => sum + d.rpeTssRatio!, 0) / recent7DaysRatios.length
-      : 0;
+    const recent7DaysAvg =
+      recent7DaysRatios.length > 0
+        ? recent7DaysRatios.reduce((sum, d) => sum + d.rpeTssRatio!, 0) / recent7DaysRatios.length
+        : 0;
     const accumulatedFatigueWarning = recent7DaysRatios.length >= 7 && recent7DaysAvg > 1.3;
 
     return new RpeTssCorrelationResponse({
@@ -848,10 +886,7 @@ export class AdvancedMetricsApiService {
     );
 
     const loadMap = new Map(
-      loadData.map((l) => [
-        l.date instanceof Date ? formatDateToYMD(l.date) : String(l.date),
-        l,
-      ]),
+      loadData.map((l) => [l.date instanceof Date ? formatDateToYMD(l.date) : String(l.date), l]),
     );
 
     // Build paired data for correlation
@@ -866,7 +901,13 @@ export class AdvancedMetricsApiService {
 
     for (const [date, checkin] of checkinMap) {
       const load = loadMap.get(date);
-      if (load?.readiness_score && checkin.sleep_quality && checkin.stress_level && checkin.muscle_soreness && checkin.energy_level) {
+      if (
+        load?.readiness_score &&
+        checkin.sleep_quality &&
+        checkin.stress_level &&
+        checkin.muscle_soreness &&
+        checkin.energy_level
+      ) {
         pairedData.push({
           date,
           sleep: checkin.sleep_quality,
@@ -882,7 +923,7 @@ export class AdvancedMetricsApiService {
     const correlations: WellnessCorrelationDTO[] = [];
 
     if (pairedData.length >= 5) {
-      const factors: Array<{ name: 'sleep' | 'stress' | 'soreness' | 'energy'; key: keyof typeof pairedData[0] }> = [
+      const factors: Array<{ name: 'sleep' | 'stress' | 'soreness' | 'energy'; key: keyof (typeof pairedData)[0] }> = [
         { name: 'sleep', key: 'sleep' },
         { name: 'stress', key: 'stress' },
         { name: 'soreness', key: 'soreness' },
@@ -908,18 +949,14 @@ export class AdvancedMetricsApiService {
     let riskScore = 0;
 
     // Check for consistently low energy
-    const avgEnergy = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.energy, 0) / pairedData.length
-      : 3;
+    const avgEnergy = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.energy, 0) / pairedData.length : 3;
     if (avgEnergy < 2.5) {
       riskScore += 20;
       riskFactors.push('Consistently low energy levels');
     }
 
     // Check for consistently high stress
-    const avgStress = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.stress, 0) / pairedData.length
-      : 3;
+    const avgStress = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.stress, 0) / pairedData.length : 3;
     if (avgStress < 2.5) {
       // Note: inverted scale (5 = no stress)
       riskScore += 15;
@@ -927,9 +964,8 @@ export class AdvancedMetricsApiService {
     }
 
     // Check for consistently high soreness
-    const avgSoreness = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.soreness, 0) / pairedData.length
-      : 3;
+    const avgSoreness =
+      pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.soreness, 0) / pairedData.length : 3;
     if (avgSoreness < 2.5) {
       // Note: inverted scale (5 = no soreness)
       riskScore += 20;
@@ -937,9 +973,7 @@ export class AdvancedMetricsApiService {
     }
 
     // Check for poor sleep
-    const avgSleep = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.sleep, 0) / pairedData.length
-      : 3;
+    const avgSleep = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.sleep, 0) / pairedData.length : 3;
     if (avgSleep < 2.5) {
       riskScore += 15;
       riskFactors.push('Poor sleep quality');
@@ -985,9 +1019,10 @@ export class AdvancedMetricsApiService {
     // Build data points
     const dataPoints: RpeTssDataPointDTO[] = records.map((record) => {
       return {
-        date: record.created_at instanceof Date
-          ? formatDateToYMD(record.created_at)
-          : String(record.created_at).split('T')[0],
+        date:
+          record.created_at instanceof Date
+            ? formatDateToYMD(record.created_at)
+            : String(record.created_at).split('T')[0],
         workoutName: null,
         sessionRpe: record.session_rpe,
         srpeTss: Number(record.srpe_tss),
@@ -998,9 +1033,10 @@ export class AdvancedMetricsApiService {
 
     // Calculate average ratio
     const validRatios = dataPoints.filter((d) => d.rpeTssRatio !== null).map((d) => d.rpeTssRatio!);
-    const averageRatio = validRatios.length > 0
-      ? Math.round((validRatios.reduce((sum, r) => sum + r, 0) / validRatios.length) * 100) / 100
-      : null;
+    const averageRatio =
+      validRatios.length > 0
+        ? Math.round((validRatios.reduce((sum, r) => sum + r, 0) / validRatios.length) * 100) / 100
+        : null;
 
     // Calculate trend direction (comparing first week to last week)
     let ratioTrend: 'increasing' | 'stable' | 'decreasing' = 'stable';
@@ -1023,9 +1059,10 @@ export class AdvancedMetricsApiService {
 
     // Check for accumulated fatigue warning (avg ratio > 1.3 over 7+ days)
     const recent7DaysRatios = dataPoints.slice(0, 7).filter((d) => d.rpeTssRatio !== null);
-    const recent7DaysAvg = recent7DaysRatios.length > 0
-      ? recent7DaysRatios.reduce((sum, d) => sum + d.rpeTssRatio!, 0) / recent7DaysRatios.length
-      : 0;
+    const recent7DaysAvg =
+      recent7DaysRatios.length > 0
+        ? recent7DaysRatios.reduce((sum, d) => sum + d.rpeTssRatio!, 0) / recent7DaysRatios.length
+        : 0;
     const accumulatedFatigueWarning = recent7DaysRatios.length >= 7 && recent7DaysAvg > 1.3;
 
     return new RpeTssCorrelationResponse({
@@ -1041,7 +1078,10 @@ export class AdvancedMetricsApiService {
   /**
    * Get wellness-performance correlation for a specific user (coach access)
    */
-  async getWellnessPerformanceCorrelationForUser(userId: string, days: number = 90): Promise<WellnessPerformanceCorrelationResponse> {
+  async getWellnessPerformanceCorrelationForUser(
+    userId: string,
+    days: number = 90,
+  ): Promise<WellnessPerformanceCorrelationResponse> {
     // Get wellness check-ins
     const checkins = await this.quickWellnessCheckinRepository.getDateRange(userId, days);
 
@@ -1057,10 +1097,7 @@ export class AdvancedMetricsApiService {
     );
 
     const loadMap = new Map(
-      loadData.map((l) => [
-        l.date instanceof Date ? formatDateToYMD(l.date) : String(l.date),
-        l,
-      ]),
+      loadData.map((l) => [l.date instanceof Date ? formatDateToYMD(l.date) : String(l.date), l]),
     );
 
     // Build paired data for correlation
@@ -1075,7 +1112,13 @@ export class AdvancedMetricsApiService {
 
     for (const [date, checkin] of checkinMap) {
       const load = loadMap.get(date);
-      if (load?.readiness_score && checkin.sleep_quality && checkin.stress_level && checkin.muscle_soreness && checkin.energy_level) {
+      if (
+        load?.readiness_score &&
+        checkin.sleep_quality &&
+        checkin.stress_level &&
+        checkin.muscle_soreness &&
+        checkin.energy_level
+      ) {
         pairedData.push({
           date,
           sleep: checkin.sleep_quality,
@@ -1091,7 +1134,7 @@ export class AdvancedMetricsApiService {
     const correlations: WellnessCorrelationDTO[] = [];
 
     if (pairedData.length >= 5) {
-      const factors: Array<{ name: 'sleep' | 'stress' | 'soreness' | 'energy'; key: keyof typeof pairedData[0] }> = [
+      const factors: Array<{ name: 'sleep' | 'stress' | 'soreness' | 'energy'; key: keyof (typeof pairedData)[0] }> = [
         { name: 'sleep', key: 'sleep' },
         { name: 'stress', key: 'stress' },
         { name: 'soreness', key: 'soreness' },
@@ -1117,36 +1160,29 @@ export class AdvancedMetricsApiService {
     let riskScore = 0;
 
     // Check for consistently low energy
-    const avgEnergy = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.energy, 0) / pairedData.length
-      : 3;
+    const avgEnergy = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.energy, 0) / pairedData.length : 3;
     if (avgEnergy < 2.5) {
       riskScore += 20;
       riskFactors.push('Consistently low energy levels');
     }
 
     // Check for consistently high stress
-    const avgStress = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.stress, 0) / pairedData.length
-      : 3;
+    const avgStress = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.stress, 0) / pairedData.length : 3;
     if (avgStress < 2.5) {
       riskScore += 15;
       riskFactors.push('Elevated stress levels');
     }
 
     // Check for consistently high soreness
-    const avgSoreness = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.soreness, 0) / pairedData.length
-      : 3;
+    const avgSoreness =
+      pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.soreness, 0) / pairedData.length : 3;
     if (avgSoreness < 2.5) {
       riskScore += 20;
       riskFactors.push('Persistent muscle soreness');
     }
 
     // Check for poor sleep
-    const avgSleep = pairedData.length > 0
-      ? pairedData.reduce((sum, d) => sum + d.sleep, 0) / pairedData.length
-      : 3;
+    const avgSleep = pairedData.length > 0 ? pairedData.reduce((sum, d) => sum + d.sleep, 0) / pairedData.length : 3;
     if (avgSleep < 2.5) {
       riskScore += 15;
       riskFactors.push('Poor sleep quality');
