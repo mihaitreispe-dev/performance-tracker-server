@@ -204,7 +204,11 @@ export class WearableSyncService {
           // Skip naps for now
           if (session.is_nap) continue;
 
-          await this.importSleepSession(userId, session, provider);
+          // Get overnight biometrics (HRV/RHR) for enrichment
+          const sleepDate = format(parseISO(session.start_time), 'yyyy-MM-dd');
+          const biometrics = await this.getOvernightBiometrics(owUserId, sleepDate, provider);
+
+          await this.importSleepSession(userId, session, provider, biometrics);
           synced++;
         } catch (error) {
           this.logger.error(`Failed to sync sleep session ${session.id}: ${error}`);
@@ -222,7 +226,12 @@ export class WearableSyncService {
   /**
    * Import a sleep session to our database
    */
-  private async importSleepSession(userId: string, session: OWSleepSession, provider: WearableProvider): Promise<void> {
+  private async importSleepSession(
+    userId: string,
+    session: OWSleepSession,
+    provider: WearableProvider,
+    biometrics?: { avgHrv?: number; avgRestingHr?: number },
+  ): Promise<void> {
     const startTime = parseISO(session.start_time);
     const endTime = parseISO(session.end_time);
     const logDate = format(startTime, 'yyyy-MM-dd');
@@ -237,11 +246,67 @@ export class WearableSyncService {
       light_duration_seconds: session.stages?.light_seconds ?? 0,
       deep_duration_seconds: session.stages?.deep_seconds ?? 0,
       rem_duration_seconds: session.stages?.rem_seconds ?? 0,
+      avg_hrv: biometrics?.avgHrv ?? null,
+      avg_resting_hr: biometrics?.avgRestingHr ?? null,
       source: provider,
       external_id: session.id,
     };
 
     await this.sleepLogRepo.upsertByExternalId(sleepLog);
+  }
+
+  /**
+   * Get overnight biometrics (HRV/RHR) for a given date from health metrics
+   */
+  private async getOvernightBiometrics(
+    owUserId: string,
+    dateStr: string,
+    provider: WearableProvider,
+  ): Promise<{ avgHrv?: number; avgRestingHr?: number }> {
+    const result: { avgHrv?: number; avgRestingHr?: number } = {};
+
+    try {
+      // Fetch HRV for the date
+      const hrvResponse = await this.openWearablesService.getTimeSeries(owUserId, 'hrv', {
+        startDate: dateStr,
+        endDate: dateStr,
+        limit: 100,
+      });
+
+      // Filter by provider and calculate average
+      const hrvSamples = hrvResponse.items.filter(
+        (item) =>
+          item.source?.provider &&
+          this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
+      );
+      if (hrvSamples.length > 0) {
+        const sum = hrvSamples.reduce((acc, item) => acc + item.value, 0);
+        result.avgHrv = Math.round(sum / hrvSamples.length);
+      }
+
+      // Fetch resting heart rate for the date
+      const hrResponse = await this.openWearablesService.getTimeSeries(owUserId, 'heart_rate', {
+        startDate: dateStr,
+        endDate: dateStr,
+        limit: 100,
+      });
+
+      // Filter by provider and calculate average (typically would be the minimum/resting)
+      const hrSamples = hrResponse.items.filter(
+        (item) =>
+          item.source?.provider &&
+          this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
+      );
+      if (hrSamples.length > 0) {
+        // For resting HR, we often want the minimum or average of overnight readings
+        const minHr = Math.min(...hrSamples.map((item) => item.value));
+        result.avgRestingHr = Math.round(minHr);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to fetch overnight biometrics for ${dateStr}: ${error}`);
+    }
+
+    return result;
   }
 
   /**

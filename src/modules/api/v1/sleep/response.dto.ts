@@ -103,3 +103,103 @@ export class SleepLogListResponse extends PageResponse<SleepLogDTO> {
   @ValidateNested()
   declare data: SleepLogDTO[];
 }
+
+// Daily Sleep Summary DTOs
+
+export class SleepStagesDTO {
+  @ApiProperty({ description: 'Awake duration in seconds' })
+  @IsNumber()
+  awake: number;
+
+  @ApiProperty({ description: 'Light sleep duration in seconds' })
+  @IsNumber()
+  light: number;
+
+  @ApiProperty({ description: 'Deep sleep duration in seconds' })
+  @IsNumber()
+  deep: number;
+
+  @ApiProperty({ description: 'REM sleep duration in seconds' })
+  @IsNumber()
+  rem: number;
+}
+
+export class DailySleepSourceDTO {
+  @ApiProperty({ description: 'Data source (manual, garmin, whoop, apple_health, oura)' })
+  @IsString()
+  source: string;
+
+  @ApiProperty({ description: 'Whether this is the primary/preferred source' })
+  isPrimary: boolean;
+
+  @ApiProperty({ type: SleepLogDTO })
+  @ValidateNested()
+  sleepLog: SleepLogDTO;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Computed or native sleep score (0-100)' })
+  @IsNumber()
+  @IsOptional()
+  computedScore: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Sleep quality rating (1-5)' })
+  @IsNumber()
+  @IsOptional()
+  qualityRating: number | null;
+}
+
+export class DailySleepSummaryDTO {
+  @ApiProperty({ type: String, format: 'date', description: 'Date of the summary (YYYY-MM-DD)' })
+  @IsString()
+  date: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Primary source for this date' })
+  @IsString()
+  @IsOptional()
+  primarySource: string | null;
+
+  @ApiProperty({ description: 'Whether synced data is available from any wearable' })
+  hasSyncedData: boolean;
+
+  @ApiProperty({ type: [DailySleepSourceDTO], description: 'All available sleep data sources for this date' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  sources: DailySleepSourceDTO[];
+
+  // Aggregated from primary source
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  totalDurationSeconds: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Sleep score (0-100)' })
+  @IsNumber()
+  @IsOptional()
+  sleepScore: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Sleep quality rating (1-5)' })
+  @IsNumber()
+  @IsOptional()
+  qualityRating: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  avgHrv: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  @IsNumber()
+  @IsOptional()
+  avgRestingHr: number | null;
+
+  @ApiPropertyOptional({ type: SleepStagesDTO, nullable: true })
+  @ValidateNested()
+  @IsOptional()
+  stages: SleepStagesDTO | null;
+}
+
+export class DailySleepSummaryResponse extends ItemResponse<DailySleepSummaryDTO> {
+  @ApiProperty({ type: DailySleepSummaryDTO })
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: DailySleepSummaryDTO;
+}

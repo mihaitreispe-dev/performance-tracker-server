@@ -20,11 +20,12 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import {
   CreateSleepLogBody,
   ListSleepLogsQuery,
+  SetPrimarySleepSourceBody,
   SleepLogDateParam,
   SleepLogIdParam,
   UpdateSleepLogBody,
 } from './request.dto';
-import { SleepLogListResponse, SleepLogResponse } from './response.dto';
+import { DailySleepSummaryResponse, SleepLogListResponse, SleepLogResponse } from './response.dto';
 import { SleepApiService } from './sleep-api.service';
 
 @ApiTags('sleep-logs')
@@ -55,6 +56,32 @@ export class SleepApiController {
     @Param() params: SleepLogDateParam,
   ): Promise<SleepLogListResponse> {
     return this.service.getByDate(req, params.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get daily sleep summary with all sources' })
+  @ApiResponse({ status: HttpStatus.OK, type: DailySleepSummaryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('daily/:date')
+  async getDailySummary(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: SleepLogDateParam,
+  ): Promise<DailySleepSummaryResponse> {
+    return this.service.getDailySummary(req, params.date);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Set primary sleep data source' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Unknown provider' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('primary-source')
+  async setPrimarySleepSource(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: SetPrimarySleepSourceBody,
+  ): Promise<void> {
+    return this.service.setPrimarySleepSource(req, body.provider);
   }
 
   @Version('1')

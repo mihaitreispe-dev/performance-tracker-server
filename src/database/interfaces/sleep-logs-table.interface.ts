@@ -2,6 +2,11 @@ import { Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 import { Timestamp } from './timestamp';
 
+/**
+ * Valid sleep log sources
+ */
+export type SleepLogSource = 'manual' | 'garmin' | 'whoop' | 'apple_health' | 'oura';
+
 export interface HrSample {
   timestampSeconds: number;
   heartRate: number;

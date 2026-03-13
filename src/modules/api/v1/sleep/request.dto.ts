@@ -155,3 +155,9 @@ export class SleepLogDateParam {
   @IsString()
   date: string;
 }
+
+export class SetPrimarySleepSourceBody {
+  @ApiProperty({ description: 'Provider to set as primary (manual, garmin, whoop, apple_health, oura)' })
+  @IsString()
+  provider: string;
+}
