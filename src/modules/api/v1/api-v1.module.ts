@@ -17,6 +17,7 @@ import { CoachingApiModule } from './coaching/coaching-api.module';
 import { DataExportApiModule } from './data-export/data-export.module';
 import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
+import { ExploreApiModule } from './explore/explore-api.module';
 import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
@@ -60,6 +61,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     WearablesApiModule.register(),
     DataImportApiModule.register(),
     DataExportApiModule.register(),
+    ExploreApiModule.register(),
     CoachingApiModule.register(),
     NotificationsApiModule.register(),
     RecoveryJournalModule.register(),
