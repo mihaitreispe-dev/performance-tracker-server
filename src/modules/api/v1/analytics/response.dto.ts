@@ -1,15 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsArray,
-  IsBoolean,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  IsUUID,
-  ValidateNested,
-} from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { CardioMetricType, WorkoutType } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';

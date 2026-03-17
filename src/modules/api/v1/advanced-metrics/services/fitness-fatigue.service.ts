@@ -1,5 +1,10 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
-import { NewFitnessFatigueDaily, TrainingRecommendation } from 'src/database/interfaces';
+import {
+  ACWRRiskLevel,
+  NewFitnessFatigueDaily,
+  OvertrainingRiskLevel,
+  TrainingRecommendation,
+} from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
@@ -14,6 +19,11 @@ export interface FitnessFatigueResult {
   dailyTss: number;
   rampRate: number | null;
   recommendation: TrainingRecommendation;
+  acwr: number | null; // Acute:Chronic Workload Ratio
+  acwrRiskLevel: ACWRRiskLevel | null;
+  monotony: number | null; // Training monotony (7-day)
+  strain: number | null; // Training strain (weekly load × monotony)
+  overtrainingRisk: OvertrainingRiskLevel | null;
 }
 
 export interface PMCChartData {
@@ -70,6 +80,13 @@ export class FitnessFatigueService {
     // Calculate ramp rate (weekly CTL change)
     const rampRate = await this.calculateRampRate(userId, date, ctl);
 
+    // Calculate ACWR (Acute:Chronic Workload Ratio)
+    const acwr = ctl > 0 ? atl / ctl : 0;
+    const acwrRiskLevel = this.getACWRRiskLevel(acwr);
+
+    // Calculate Monotony/Strain (7-day window)
+    const monotonyStrain = await this.calculateMonotonyStrain(userId, date, dailyTss);
+
     // Count workouts for the day
     const startOfDay = new Date(date);
     const endOfDay = new Date(date);
@@ -93,6 +110,11 @@ export class FitnessFatigueService {
       tsb: Math.round(tsb * 100) / 100,
       daily_tss: Math.round(dailyTss * 100) / 100,
       ramp_rate: rampRate,
+      acwr: acwr > 0 ? Math.round(acwr * 100) / 100 : null,
+      acwr_risk_level: acwr > 0 ? acwrRiskLevel : null,
+      monotony: monotonyStrain.monotony,
+      strain: monotonyStrain.strain,
+      overtraining_risk: monotonyStrain.risk,
       workout_count: workouts.length,
     };
 
@@ -106,6 +128,11 @@ export class FitnessFatigueService {
       dailyTss: Math.round(dailyTss * 100) / 100,
       rampRate,
       recommendation: this.getRecommendation(tsb),
+      acwr: acwr > 0 ? Math.round(acwr * 100) / 100 : null,
+      acwrRiskLevel: acwr > 0 ? acwrRiskLevel : null,
+      monotony: monotonyStrain.monotony,
+      strain: monotonyStrain.strain,
+      overtrainingRisk: monotonyStrain.risk,
     };
   }
 
@@ -239,6 +266,11 @@ export class FitnessFatigueService {
       dailyTss: Number.parseFloat(r.daily_tss),
       rampRate: r.ramp_rate ? Number.parseFloat(r.ramp_rate) : null,
       recommendation: this.getRecommendation(Number.parseFloat(r.tsb)),
+      acwr: r.acwr ? Number.parseFloat(r.acwr) : null,
+      acwrRiskLevel: (r.acwr_risk_level as ACWRRiskLevel) || null,
+      monotony: r.monotony ? Number.parseFloat(r.monotony) : null,
+      strain: r.strain ? Number.parseFloat(r.strain) : null,
+      overtrainingRisk: (r.overtraining_risk as OvertrainingRiskLevel) || null,
     }));
 
     // Get current (latest) values
@@ -276,6 +308,11 @@ export class FitnessFatigueService {
       dailyTss: Number.parseFloat(latest.daily_tss),
       rampRate: latest.ramp_rate ? Number.parseFloat(latest.ramp_rate) : null,
       recommendation: this.getRecommendation(tsb),
+      acwr: latest.acwr ? Number.parseFloat(latest.acwr) : null,
+      acwrRiskLevel: (latest.acwr_risk_level as ACWRRiskLevel) || null,
+      monotony: latest.monotony ? Number.parseFloat(latest.monotony) : null,
+      strain: latest.strain ? Number.parseFloat(latest.strain) : null,
+      overtrainingRisk: (latest.overtraining_risk as OvertrainingRiskLevel) || null,
     };
   }
 
@@ -294,6 +331,88 @@ export class FitnessFatigueService {
     const rampRate = currentCTL - weekAgoCTL;
 
     return Math.round(rampRate * 100) / 100;
+  }
+
+  /**
+   * Get ACWR risk level based on acute:chronic workload ratio
+   * Risk zones:
+   * - < 0.8: Undertraining (Blue)
+   * - 0.8 - 1.3: Optimal (Green)
+   * - 1.3 - 1.5: Elevated (Yellow)
+   * - > 1.5: High (Red)
+   */
+  private getACWRRiskLevel(acwr: number): ACWRRiskLevel {
+    if (acwr < 0.8) return ACWRRiskLevel.UNDERTRAINING;
+    if (acwr <= 1.3) return ACWRRiskLevel.OPTIMAL;
+    if (acwr <= 1.5) return ACWRRiskLevel.ELEVATED;
+    return ACWRRiskLevel.HIGH;
+  }
+
+  /**
+   * Calculate monotony and strain metrics for overtraining detection
+   * Uses a 7-day rolling window
+   *
+   * Formulas:
+   * - Monotony = Average Daily Load / Standard Deviation of Daily Load
+   * - Strain = Weekly Total Load × Monotony
+   *
+   * Thresholds:
+   * - Monotony > 1.5: Warning, > 2.0: Danger
+   * - Strain > 1500: Warning, > 2000: Danger
+   */
+  private async calculateMonotonyStrain(
+    userId: string,
+    date: Date,
+    todayTss: number,
+  ): Promise<{ monotony: number | null; strain: number | null; risk: OvertrainingRiskLevel | null }> {
+    // Get last 6 days of TSS (we have today's TSS already)
+    const weekStart = new Date(date);
+    weekStart.setDate(weekStart.getDate() - 6);
+
+    const records = await this.fitnessFatigueRepository.findMany({
+      filter: {
+        userId,
+        dateFrom: weekStart,
+        dateTo: new Date(date.getTime() - 24 * 60 * 60 * 1000), // Up to yesterday
+      },
+      sort: [{ field: 'date', direction: 'asc' }],
+    });
+
+    // Build 7-day TSS array
+    const dailyTSS: number[] = records.map((r) => Number.parseFloat(r.daily_tss));
+    dailyTSS.push(todayTss); // Add today's TSS
+
+    if (dailyTSS.length < 7) {
+      return { monotony: null, strain: null, risk: null };
+    }
+
+    // Calculate average
+    const avg = dailyTSS.reduce((a, b) => a + b, 0) / dailyTSS.length;
+
+    // Calculate standard deviation
+    const variance = dailyTSS.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / dailyTSS.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Calculate monotony (avoid division by zero)
+    const monotony = stdDev > 0 ? avg / stdDev : 0;
+
+    // Calculate strain (weekly total × monotony)
+    const weeklyTotal = dailyTSS.reduce((a, b) => a + b, 0);
+    const strain = weeklyTotal * monotony;
+
+    // Determine risk level
+    let risk: OvertrainingRiskLevel = OvertrainingRiskLevel.LOW;
+    if (strain > 2000 || monotony > 2.0) {
+      risk = OvertrainingRiskLevel.HIGH;
+    } else if (strain > 1500 || monotony > 1.5) {
+      risk = OvertrainingRiskLevel.MODERATE;
+    }
+
+    return {
+      monotony: Math.round(monotony * 100) / 100,
+      strain: Math.round(strain * 100) / 100,
+      risk,
+    };
   }
 
   /**
@@ -349,6 +468,9 @@ export class FitnessFatigueService {
       atl = atl + (dailyTss - atl) / this.ATL_DECAY;
       const tsb = ctl - atl;
 
+      // Calculate ACWR for prediction
+      const acwr = ctl > 0 ? atl / ctl : 0;
+
       predictions.push({
         date: formatDateToYMD(date),
         ctl: Math.round(ctl * 100) / 100,
@@ -357,6 +479,11 @@ export class FitnessFatigueService {
         dailyTss,
         rampRate: null,
         recommendation: this.getRecommendation(tsb),
+        acwr: acwr > 0 ? Math.round(acwr * 100) / 100 : null,
+        acwrRiskLevel: acwr > 0 ? this.getACWRRiskLevel(acwr) : null,
+        monotony: null, // Not calculated for predictions
+        strain: null,
+        overtrainingRisk: null,
       });
     }
 

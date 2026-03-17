@@ -425,4 +425,117 @@ export class BayesianParameterService {
       lastUpdateDate: params.last_update_date,
     };
   }
+
+  /**
+   * Get comprehensive Bayesian diagnostics for a user
+   * Includes convergence status, parameter drifts, and next update schedule
+   */
+  async getDiagnostics(userId: string): Promise<{
+    confidence: number;
+    dataPointsUsed: number;
+    mae7day: number | null;
+    mae30day: number | null;
+    convergenceStatus: 'converging' | 'stable' | 'diverging' | 'insufficient_data';
+    parameterDrifts: { param: string; current: number; default: number; percentChange: number }[];
+    recentRollbacks: number;
+    nextUpdateDate: string | null;
+    lastUpdateDate: Date | null;
+  }> {
+    const params = await this.loadModelParametersRepository.findByUserId(userId);
+
+    if (!params) {
+      return {
+        confidence: 0,
+        dataPointsUsed: 0,
+        mae7day: null,
+        mae30day: null,
+        convergenceStatus: 'insufficient_data',
+        parameterDrifts: [],
+        recentRollbacks: 0,
+        nextUpdateDate: null,
+        lastUpdateDate: null,
+      };
+    }
+
+    const dataPointsUsed = params.data_points_used;
+    const mae7day = params.mae_7day ? parseFloat(params.mae_7day) : null;
+    const mae30day = params.mae_30day ? parseFloat(params.mae_30day) : null;
+    const confidence = parseFloat(params.parameter_confidence);
+
+    // Determine convergence status
+    let convergenceStatus: 'converging' | 'stable' | 'diverging' | 'insufficient_data';
+
+    if (dataPointsUsed < this.MIN_DATA_POINTS) {
+      convergenceStatus = 'insufficient_data';
+    } else if (mae7day !== null && mae30day !== null) {
+      // Compare recent performance to longer-term performance
+      if (mae7day > mae30day * 1.2) {
+        // Recent predictions getting worse (7-day MAE is 20%+ higher than 30-day)
+        convergenceStatus = 'diverging';
+      } else if (mae7day < mae30day * 0.9 || confidence > 0.7) {
+        // Recent predictions improving or high confidence
+        convergenceStatus = confidence > 0.8 ? 'stable' : 'converging';
+      } else {
+        convergenceStatus = 'converging';
+      }
+    } else {
+      convergenceStatus = 'insufficient_data';
+    }
+
+    // Calculate parameter drifts with percent change
+    const parameterDrifts: { param: string; current: number; default: number; percentChange: number }[] = [];
+
+    for (const [key, config] of Object.entries(LearnableParameters)) {
+      const current = parseFloat((params as any)[key] ?? config.default);
+      const diff = current - config.default;
+      const percentChange = config.default !== 0 ? (diff / config.default) * 100 : 0;
+
+      if (Math.abs(diff) > 0.01) {
+        parameterDrifts.push({
+          param: key,
+          current: Math.round(current * 100) / 100,
+          default: config.default,
+          percentChange: Math.round(percentChange * 10) / 10,
+        });
+      }
+    }
+
+    // Count recent rollbacks from parameter history
+    const history = params.parameter_history || [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Count snapshots where MAE increased significantly (potential rollback triggers)
+    let recentRollbacks = 0;
+    for (let i = 1; i < history.length; i++) {
+      const prev = history[i - 1];
+      const curr = history[i];
+      if (prev.mae && curr.mae && curr.mae > prev.mae * 1.2) {
+        const snapshotDate = new Date(curr.date);
+        if (snapshotDate >= thirtyDaysAgo) {
+          recentRollbacks++;
+        }
+      }
+    }
+
+    // Calculate next update date (weekly from last update)
+    let nextUpdateDate: string | null = null;
+    if (params.last_update_date) {
+      const nextUpdate = new Date(params.last_update_date);
+      nextUpdate.setDate(nextUpdate.getDate() + this.UPDATE_FREQUENCY_DAYS);
+      nextUpdateDate = formatDateToYMD(nextUpdate);
+    }
+
+    return {
+      confidence,
+      dataPointsUsed,
+      mae7day,
+      mae30day,
+      convergenceStatus,
+      parameterDrifts,
+      recentRollbacks,
+      nextUpdateDate,
+      lastUpdateDate: params.last_update_date,
+    };
+  }
 }

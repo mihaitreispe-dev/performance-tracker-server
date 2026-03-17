@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { FitnessMetricType, TrainingRecommendation } from 'src/database/interfaces';
+import { ACWRRiskLevel, FitnessMetricType, OvertrainingRiskLevel, TrainingRecommendation } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -118,6 +118,31 @@ export class FitnessFatiguePointDTO {
   @ApiProperty({ enum: TrainingRecommendation })
   @IsEnumString(TrainingRecommendation)
   recommendation: TrainingRecommendation;
+
+  @ApiPropertyOptional({ type: Number, description: 'Acute:Chronic Workload Ratio for injury risk assessment' })
+  @IsNumber()
+  @IsOptional()
+  acwr?: number | null;
+
+  @ApiPropertyOptional({ enum: ACWRRiskLevel, description: 'ACWR risk level: undertraining (<0.8), optimal (0.8-1.3), elevated (1.3-1.5), high (>1.5)' })
+  @IsString()
+  @IsOptional()
+  acwrRiskLevel?: ACWRRiskLevel | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Training monotony (7-day avg load / std dev)' })
+  @IsNumber()
+  @IsOptional()
+  monotony?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Training strain (weekly load × monotony)' })
+  @IsNumber()
+  @IsOptional()
+  strain?: number | null;
+
+  @ApiPropertyOptional({ enum: OvertrainingRiskLevel, description: 'Overtraining risk based on monotony/strain' })
+  @IsString()
+  @IsOptional()
+  overtrainingRisk?: OvertrainingRiskLevel | null;
 }
 
 export class CurrentFormDTO {
@@ -700,4 +725,77 @@ export class ReadinessTrendsResponse extends ItemResponse<ReadinessTrendsDTO> {
   @IsObject({ always: true })
   @ValidateNested()
   declare data: ReadinessTrendsDTO;
+}
+
+// Bayesian Diagnostics
+
+export type ConvergenceStatus = 'converging' | 'stable' | 'diverging' | 'insufficient_data';
+
+export class ParameterDriftDTO {
+  @ApiProperty({ description: 'Parameter name' })
+  @IsString()
+  param: string;
+
+  @ApiProperty({ description: 'Current parameter value' })
+  @IsNumber()
+  current: number;
+
+  @ApiProperty({ description: 'Default parameter value' })
+  @IsNumber()
+  default: number;
+
+  @ApiProperty({ description: 'Percent change from default' })
+  @IsNumber()
+  percentChange: number;
+}
+
+export class BayesianDiagnosticsDTO {
+  @ApiProperty({ description: 'Model confidence (0.0-1.0)' })
+  @IsNumber()
+  confidence: number;
+
+  @ApiProperty({ description: 'Number of data points used for learning' })
+  @IsNumber()
+  dataPointsUsed: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Mean Absolute Error over last 7 days' })
+  @IsNumber()
+  @IsOptional()
+  mae7day?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Mean Absolute Error over last 30 days' })
+  @IsNumber()
+  @IsOptional()
+  mae30day?: number | null;
+
+  @ApiProperty({ enum: ['converging', 'stable', 'diverging', 'insufficient_data'], description: 'Model convergence status' })
+  @IsString()
+  convergenceStatus: ConvergenceStatus;
+
+  @ApiProperty({ type: [ParameterDriftDTO], description: 'Parameters that have drifted from defaults' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParameterDriftDTO)
+  parameterDrifts: ParameterDriftDTO[];
+
+  @ApiProperty({ description: 'Number of recent parameter rollbacks' })
+  @IsNumber()
+  recentRollbacks: number;
+
+  @ApiPropertyOptional({ type: String, format: 'date', description: 'Next scheduled parameter update date' })
+  @IsString()
+  @IsOptional()
+  nextUpdateDate?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Last parameter update date' })
+  @IsString()
+  @IsOptional()
+  lastUpdateDate?: string | null;
+}
+
+export class BayesianDiagnosticsResponse extends ItemResponse<BayesianDiagnosticsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: BayesianDiagnosticsDTO;
 }

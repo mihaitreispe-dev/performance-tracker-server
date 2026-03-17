@@ -14,6 +14,7 @@ import {
   WorkoutIdParam,
 } from './request.dto';
 import {
+  BayesianDiagnosticsResponse,
   DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
@@ -280,5 +281,18 @@ export class AdvancedMetricsApiController {
     @Query() query: CorrelationQuery,
   ): Promise<WellnessPerformanceCorrelationResponse> {
     return this.service.getWellnessPerformanceCorrelation(req, query);
+  }
+
+  // ==========================================
+  // Bayesian Diagnostics endpoint
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get Bayesian model diagnostics for personalized load parameters' })
+  @ApiResponse({ status: HttpStatus.OK, type: BayesianDiagnosticsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('bayesian-diagnostics')
+  async getBayesianDiagnostics(@Req() req: Request & { user: AuthUser }): Promise<BayesianDiagnosticsResponse> {
+    return this.service.getBayesianDiagnostics(req);
   }
 }

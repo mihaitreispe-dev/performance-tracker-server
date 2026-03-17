@@ -13,6 +13,7 @@ import { WorkoutRepository } from 'src/repositories/workout.repository';
 
 import { CorrelationQuery, FitnessFatiguePredictionBody, ThresholdOverrideBody } from './request.dto';
 import {
+  BayesianDiagnosticsResponse,
   DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
@@ -32,6 +33,7 @@ import {
   WellnessCorrelationDTO,
   WellnessPerformanceCorrelationResponse,
 } from './response.dto';
+import { BayesianParameterService } from './services/bayesian-parameter.service';
 import { FitnessFatigueService } from './services/fitness-fatigue.service';
 import { MultiStreamLoadService } from './services/multi-stream-load.service';
 import { ReadinessService } from './services/readiness.service';
@@ -46,6 +48,7 @@ export class AdvancedMetricsApiService {
     private readonly fitnessFatigueService: FitnessFatigueService,
     private readonly multiStreamLoadService: MultiStreamLoadService,
     private readonly readinessService: ReadinessService,
+    private readonly bayesianParameterService: BayesianParameterService,
     private readonly fitnessMetricsRepository: FitnessMetricsRepository,
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
     private readonly workoutRepository: WorkoutRepository,
@@ -1210,6 +1213,53 @@ export class AdvancedMetricsApiService {
         correlations,
         overtrainingRiskScore,
         riskFactors,
+      },
+    });
+  }
+
+  // ==========================================
+  // Bayesian Diagnostics methods
+  // ==========================================
+
+  /**
+   * Get Bayesian model diagnostics
+   */
+  async getBayesianDiagnostics(req: Request & { user: AuthUser }): Promise<BayesianDiagnosticsResponse> {
+    const userId = req.user.id;
+    const diagnostics = await this.bayesianParameterService.getDiagnostics(userId);
+
+    return new BayesianDiagnosticsResponse({
+      data: {
+        confidence: diagnostics.confidence,
+        dataPointsUsed: diagnostics.dataPointsUsed,
+        mae7day: diagnostics.mae7day,
+        mae30day: diagnostics.mae30day,
+        convergenceStatus: diagnostics.convergenceStatus,
+        parameterDrifts: diagnostics.parameterDrifts,
+        recentRollbacks: diagnostics.recentRollbacks,
+        nextUpdateDate: diagnostics.nextUpdateDate,
+        lastUpdateDate: diagnostics.lastUpdateDate?.toISOString() ?? null,
+      },
+    });
+  }
+
+  /**
+   * Get Bayesian model diagnostics for a specific user (coach access)
+   */
+  async getBayesianDiagnosticsForUser(userId: string): Promise<BayesianDiagnosticsResponse> {
+    const diagnostics = await this.bayesianParameterService.getDiagnostics(userId);
+
+    return new BayesianDiagnosticsResponse({
+      data: {
+        confidence: diagnostics.confidence,
+        dataPointsUsed: diagnostics.dataPointsUsed,
+        mae7day: diagnostics.mae7day,
+        mae30day: diagnostics.mae30day,
+        convergenceStatus: diagnostics.convergenceStatus,
+        parameterDrifts: diagnostics.parameterDrifts,
+        recentRollbacks: diagnostics.recentRollbacks,
+        nextUpdateDate: diagnostics.nextUpdateDate,
+        lastUpdateDate: diagnostics.lastUpdateDate?.toISOString() ?? null,
       },
     });
   }

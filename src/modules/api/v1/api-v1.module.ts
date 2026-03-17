@@ -35,6 +35,7 @@ import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file
 import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
 import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules-api.module';
 import { WorkoutsApiModule } from './workouts/workouts-api.module';
+import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     NotificationsApiModule.register(),
     RecoveryJournalModule.register(),
     WellnessModule.register(),
+    RaceCalendarApiModule.register(),
   ],
   providers: [
     {

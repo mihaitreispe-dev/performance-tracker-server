@@ -1,4 +1,7 @@
 import { AthleteIntakeTable } from './athlete-intake-table.interface';
+import { AthleteRacesTable } from './athlete-races-table.interface';
+import { PeriodizationPlansTable } from './periodization-plans-table.interface';
+import { RaceEventsTable } from './race-events-table.interface';
 import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
@@ -121,4 +124,9 @@ export interface Database {
   rpe_tss_tracking: RpeTssTrackingTable;
   quick_wellness_checkins: QuickWellnessCheckinsTable;
   illness_logs: IllnessLogsTable;
+
+  // Race Calendar
+  race_events: RaceEventsTable;
+  athlete_races: AthleteRacesTable;
+  periodization_plans: PeriodizationPlansTable;
 }
