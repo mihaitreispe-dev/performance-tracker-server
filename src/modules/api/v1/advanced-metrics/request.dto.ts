@@ -87,3 +87,141 @@ export class CorrelationQuery {
   @Transform(({ value }) => (value ? Number.parseInt(value, 10) : undefined))
   days?: number;
 }
+
+export class LthrSportQuery {
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for sport-specific LTHR (default: general)',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+}
+
+export class LthrHistoryQuery {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of days to include in history (default 90, max 365)',
+    example: 90,
+  })
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  @IsOptional()
+  @Transform(({ value }) => (value ? Number.parseInt(value, 10) : undefined))
+  days?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for sport-specific LTHR history',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+}
+
+export class ManualLthrBody {
+  @ApiProperty({
+    type: Number,
+    description: 'LTHR value in bpm',
+    example: 165,
+  })
+  @IsNumber()
+  @Min(60)
+  @Max(220)
+  value: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for this LTHR (default: general)',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Optional notes about the LTHR',
+    example: 'Measured during 20-min TT on 2024-01-15',
+  })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+// ==========================================
+// VO2Max DTOs
+// ==========================================
+
+export class Vo2MaxSportQuery {
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for sport-specific VO2max (default: general)',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+}
+
+export class Vo2MaxHistoryQuery {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Number of days to include in history (default 90, max 365)',
+    example: 90,
+  })
+  @IsNumber()
+  @Min(1)
+  @Max(365)
+  @IsOptional()
+  @Transform(({ value }) => (value ? Number.parseInt(value, 10) : undefined))
+  days?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for sport-specific VO2max history',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+}
+
+export class ManualVo2MaxBody {
+  @ApiProperty({
+    type: Number,
+    description: 'VO2max value in ml/kg/min',
+    example: 55,
+  })
+  @IsNumber()
+  @Min(20)
+  @Max(90)
+  value: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    enum: ['running', 'cycling', 'general'],
+    description: 'Sport type for this VO2max (default: general)',
+    example: 'running',
+  })
+  @IsString()
+  @IsOptional()
+  sport?: 'running' | 'cycling' | 'general';
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Optional notes about the VO2max measurement',
+    example: 'Measured during lab test on 2024-01-15',
+  })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}

@@ -7,6 +7,40 @@ import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
 // VO2 Max
 
+export type Vo2MaxAlgorithm = 'firstbeat_style' | 'hr_ratio' | 'cycling_power' | 'cooper_test' | 'manual';
+export type Vo2MaxSport = 'running' | 'cycling' | 'general';
+
+export class Vo2MaxConfidenceIntervalDTO {
+  @ApiProperty({ description: 'Lower bound of 95% confidence interval' })
+  @IsNumber()
+  lower: number;
+
+  @ApiProperty({ description: 'Upper bound of 95% confidence interval' })
+  @IsNumber()
+  upper: number;
+}
+
+export class Vo2MaxMetadataDTO {
+  @ApiPropertyOptional({ type: Number, description: 'R-squared value from regression' })
+  @IsNumber()
+  @IsOptional()
+  rSquared?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Number of steady-state segments used' })
+  @IsNumber()
+  @IsOptional()
+  segmentsUsed?: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Lookback period in days' })
+  @IsNumber()
+  @IsOptional()
+  lookbackDays?: number;
+
+  @ApiPropertyOptional({ description: 'Whether EWMA smoothing was applied' })
+  @IsOptional()
+  ewmaApplied?: boolean;
+}
+
 export class Vo2MaxDTO {
   @ApiPropertyOptional({ type: Number, description: 'VO2 max value in ml/kg/min' })
   @IsNumber()
@@ -21,9 +55,9 @@ export class Vo2MaxDTO {
   @IsNumber()
   dataPointsUsed: number;
 
-  @ApiProperty({ description: 'Algorithm used for calculation' })
+  @ApiProperty({ enum: ['firstbeat_style', 'hr_ratio', 'cycling_power', 'cooper_test', 'manual'], description: 'Algorithm used for calculation' })
   @IsString()
-  algorithm: string;
+  algorithm: Vo2MaxAlgorithm;
 
   @ApiPropertyOptional({ type: String, description: 'Reason if calculation failed' })
   @IsString()
@@ -39,6 +73,25 @@ export class Vo2MaxDTO {
   @IsNumber()
   @IsOptional()
   percentileRank?: number | null;
+
+  @ApiPropertyOptional({ enum: ['running', 'cycling', 'general'], description: 'Sport this estimate applies to' })
+  @IsString()
+  @IsOptional()
+  sport?: Vo2MaxSport | null;
+
+  @ApiPropertyOptional({ type: Vo2MaxConfidenceIntervalDTO, description: '95% confidence interval' })
+  @IsObject()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => Vo2MaxConfidenceIntervalDTO)
+  confidenceInterval?: Vo2MaxConfidenceIntervalDTO | null;
+
+  @ApiPropertyOptional({ type: Vo2MaxMetadataDTO, description: 'Additional calculation metadata' })
+  @IsObject()
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => Vo2MaxMetadataDTO)
+  metadata?: Vo2MaxMetadataDTO;
 }
 
 export class Vo2MaxResponse extends ItemResponse<Vo2MaxDTO> {
@@ -798,4 +851,170 @@ export class BayesianDiagnosticsResponse extends ItemResponse<BayesianDiagnostic
   @IsObject({ always: true })
   @ValidateNested()
   declare data: BayesianDiagnosticsDTO;
+}
+
+// LTHR (Lactate Threshold Heart Rate)
+
+export type LthrMethod = 'peak_rolling' | 'hrmc' | 'tt_segment' | 'race_effort' | 'manual';
+export type LthrSport = 'running' | 'cycling' | 'general';
+
+export class LthrMetadataDTO {
+  @ApiProperty({ description: 'Number of data points used for calculation' })
+  @IsNumber()
+  dataPointsUsed: number;
+
+  @ApiProperty({ description: 'Number of workouts analyzed' })
+  @IsNumber()
+  workoutsAnalyzed: number;
+
+  @ApiProperty({ description: 'Lookback period in days' })
+  @IsNumber()
+  lookbackDays: number;
+
+  @ApiPropertyOptional({ type: Number, description: 'Peak 20-minute HR' })
+  @IsNumber()
+  @IsOptional()
+  peak20?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'Peak 60-minute HR' })
+  @IsNumber()
+  @IsOptional()
+  peak60?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'HRMC (maximal constant HR) value' })
+  @IsNumber()
+  @IsOptional()
+  hrmcValue?: number | null;
+
+  @ApiPropertyOptional({ type: Number, description: 'HRMC window duration in minutes' })
+  @IsNumber()
+  @IsOptional()
+  hrmcWindowMinutes?: number | null;
+}
+
+export class LthrEstimateDTO {
+  @ApiProperty({ description: 'LTHR value in bpm' })
+  @IsNumber()
+  value: number;
+
+  @ApiProperty({ description: 'Confidence score (0.0-1.0)' })
+  @IsNumber()
+  confidence: number;
+
+  @ApiProperty({ enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'], description: 'Estimation method used' })
+  @IsString()
+  method: LthrMethod;
+
+  @ApiProperty({ enum: ['running', 'cycling', 'general'], description: 'Sport this LTHR applies to' })
+  @IsString()
+  sport: LthrSport;
+
+  @ApiProperty({ type: String, format: 'date-time', description: 'When this estimate was calculated' })
+  @IsString()
+  calculatedAt: string;
+
+  @ApiPropertyOptional({ type: Number, description: 'LTHR as percentage of max HR (if max HR is known)' })
+  @IsNumber()
+  @IsOptional()
+  percentOfMaxHR?: number | null;
+
+  @ApiProperty({ type: LthrMetadataDTO, description: 'Calculation metadata' })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => LthrMetadataDTO)
+  metadata: LthrMetadataDTO;
+}
+
+export class LthrResponse extends ItemResponse<LthrEstimateDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: LthrEstimateDTO;
+}
+
+export class LthrHistoryPointDTO {
+  @ApiProperty({ description: 'LTHR value in bpm' })
+  @IsNumber()
+  value: number;
+
+  @ApiProperty({ description: 'Confidence score (0.0-1.0)' })
+  @IsNumber()
+  confidence: number;
+
+  @ApiProperty({ enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'], description: 'Estimation method used' })
+  @IsString()
+  method: LthrMethod;
+
+  @ApiProperty({ enum: ['running', 'cycling', 'general'], description: 'Sport this LTHR applies to' })
+  @IsString()
+  sport: LthrSport;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  @IsString()
+  calculatedAt: string;
+}
+
+export class LthrHistoryDTO {
+  @ApiProperty({ type: [LthrHistoryPointDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LthrHistoryPointDTO)
+  history: LthrHistoryPointDTO[];
+
+  @ApiPropertyOptional({ type: Number, description: 'Change from first to last value' })
+  @IsNumber()
+  @IsOptional()
+  changeFromStart?: number | null;
+}
+
+export class LthrHistoryResponse extends ItemResponse<LthrHistoryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: LthrHistoryDTO;
+}
+
+export class LthrZoneDTO {
+  @ApiProperty({ description: 'Zone number (1-6)' })
+  @IsNumber()
+  zone: number;
+
+  @ApiProperty({ description: 'Zone name' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Minimum HR for this zone' })
+  @IsNumber()
+  minHR: number;
+
+  @ApiProperty({ description: 'Maximum HR for this zone' })
+  @IsNumber()
+  maxHR: number;
+
+  @ApiProperty({ description: 'Minimum % of LTHR' })
+  @IsNumber()
+  minPctLthr: number;
+
+  @ApiProperty({ description: 'Maximum % of LTHR' })
+  @IsNumber()
+  maxPctLthr: number;
+}
+
+export class LthrZonesDTO {
+  @ApiProperty({ description: 'LTHR value these zones are based on' })
+  @IsNumber()
+  lthr: number;
+
+  @ApiProperty({ type: [LthrZoneDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LthrZoneDTO)
+  zones: LthrZoneDTO[];
+}
+
+export class LthrZonesResponse extends ItemResponse<LthrZonesDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: LthrZonesDTO;
 }

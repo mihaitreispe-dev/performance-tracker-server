@@ -11,6 +11,15 @@ export interface TrainingStressMetadata {
   durationSeconds?: number;
   algorithm?: string;
   notes?: string;
+  // TRIMP calculation metadata
+  trimp_method?: 'banister_time_series' | 'banister_mean_hr' | 'edwards';
+  edwards_trimp?: number;
+  gender_used?: 'male' | 'female' | 'other';
+  // HR preprocessing metadata
+  hr_samples_total?: number;
+  hr_samples_cleaned?: number;
+  hr_spikes_removed?: number;
+  hr_gaps_interpolated?: number;
 }
 
 export interface TrainingStressScoresTable {

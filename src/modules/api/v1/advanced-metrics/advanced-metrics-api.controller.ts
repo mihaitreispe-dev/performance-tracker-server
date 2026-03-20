@@ -10,7 +10,13 @@ import {
   DateQuery,
   FitnessFatiguePredictionBody,
   HistoryQuery,
+  LthrHistoryQuery,
+  LthrSportQuery,
+  ManualLthrBody,
+  ManualVo2MaxBody,
   ThresholdOverrideBody,
+  Vo2MaxHistoryQuery,
+  Vo2MaxSportQuery,
   WorkoutIdParam,
 } from './request.dto';
 import {
@@ -20,6 +26,9 @@ import {
   FitnessFatigueResponse,
   HrvBaselineHistoryResponse,
   HrvBaselineResponse,
+  LthrHistoryResponse,
+  LthrResponse,
+  LthrZonesResponse,
   MultiStreamLoadHistoryResponse,
   MultiStreamLoadResponse,
   ReadinessHistoryResponse,
@@ -44,8 +53,11 @@ export class AdvancedMetricsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('vo2max')
-  async getVo2Max(@Req() req: Request & { user: AuthUser }): Promise<Vo2MaxResponse> {
-    return this.service.getVo2Max(req);
+  async getVo2Max(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: Vo2MaxSportQuery,
+  ): Promise<Vo2MaxResponse> {
+    return this.service.getVo2Max(req, query.sport);
   }
 
   @Version('1')
@@ -55,9 +67,33 @@ export class AdvancedMetricsApiController {
   @Get('vo2max/history')
   async getVo2MaxHistory(
     @Req() req: Request & { user: AuthUser },
-    @Query() query: HistoryQuery,
+    @Query() query: Vo2MaxHistoryQuery,
   ): Promise<Vo2MaxHistoryResponse> {
-    return this.service.getVo2MaxHistory(req, query.days);
+    return this.service.getVo2MaxHistory(req, query.days, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Trigger new VO2max estimation from recent workout data' })
+  @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('vo2max/estimate')
+  async estimateVo2Max(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: Vo2MaxSportQuery,
+  ): Promise<Vo2MaxResponse> {
+    return this.service.estimateVo2Max(req, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Set manual VO2max override' })
+  @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('vo2max/manual')
+  async setManualVo2Max(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: ManualVo2MaxBody,
+  ): Promise<Vo2MaxResponse> {
+    return this.service.setManualVo2Max(req, body);
   }
 
   @Version('1')
@@ -294,5 +330,69 @@ export class AdvancedMetricsApiController {
   @Get('bayesian-diagnostics')
   async getBayesianDiagnostics(@Req() req: Request & { user: AuthUser }): Promise<BayesianDiagnosticsResponse> {
     return this.service.getBayesianDiagnostics(req);
+  }
+
+  // ==========================================
+  // LTHR (Lactate Threshold Heart Rate) endpoints
+  // ==========================================
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get current LTHR estimation' })
+  @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('lthr')
+  async getLTHR(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: LthrSportQuery,
+  ): Promise<LthrResponse> {
+    return this.service.getLTHR(req, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get LTHR history over time' })
+  @ApiResponse({ status: HttpStatus.OK, type: LthrHistoryResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('lthr/history')
+  async getLTHRHistory(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: LthrHistoryQuery,
+  ): Promise<LthrHistoryResponse> {
+    return this.service.getLTHRHistory(req, query.days, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Get HR training zones based on LTHR' })
+  @ApiResponse({ status: HttpStatus.OK, type: LthrZonesResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('lthr/zones')
+  async getLTHRZones(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: LthrSportQuery,
+  ): Promise<LthrZonesResponse> {
+    return this.service.getLTHRZones(req, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Trigger new LTHR estimation from recent workout data' })
+  @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('lthr/estimate')
+  async estimateLTHR(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: LthrSportQuery,
+  ): Promise<LthrResponse> {
+    return this.service.estimateLTHR(req, query.sport);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Set manual LTHR override' })
+  @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('lthr/manual')
+  async setManualLTHR(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: ManualLthrBody,
+  ): Promise<LthrResponse> {
+    return this.service.setManualLTHR(req, body);
   }
 }

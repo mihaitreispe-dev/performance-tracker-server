@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { SleepLog, WearableDataCategory } from 'src/database/interfaces';
+import { SleepBaseline, SleepLog, WearableDataCategory } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { SleepLogFilter, SleepLogRepository } from 'src/repositories/sleep-log.repository';
 import { WearableProviderPriorityRepository } from 'src/repositories/wearable-provider-priority.repository';
@@ -10,12 +10,17 @@ import {
   DailySleepSourceDTO,
   DailySleepSummaryDTO,
   DailySleepSummaryResponse,
+  EnhancedSleepMetricsDTO,
+  SleepInsightDTO,
   SleepLogDTO,
   SleepLogListResponse,
   SleepLogResponse,
+  SleepScoreBreakdownDTO,
   SleepStagesDTO,
+  SleepZScoresDTO,
 } from './response.dto';
-import { SleepScoreService } from './sleep-score.service';
+import { SleepBaselineService } from './sleep-baseline.service';
+import { EnhancedScoreResult, SleepScoreService } from './sleep-score.service';
 
 @Injectable()
 export class SleepApiService {
@@ -25,6 +30,7 @@ export class SleepApiService {
     private readonly sleepLogRepository: SleepLogRepository,
     private readonly priorityRepo: WearableProviderPriorityRepository,
     private readonly sleepScoreService: SleepScoreService,
+    private readonly sleepBaselineService: SleepBaselineService,
   ) {}
 
   async list(req: Request & { user: AuthUser }, query: ListSleepLogsQuery): Promise<SleepLogListResponse> {
@@ -171,6 +177,9 @@ export class SleepApiService {
     // Get the user's priority provider for sleep
     const priorityProvider = await this.priorityRepo.getHighestPriorityProvider(userId, WearableDataCategory.SLEEP);
 
+    // Get baseline for enhanced scoring
+    const baseline = await this.sleepBaselineService.getOrCalculateBaseline(userId, logDate);
+
     // Determine primary source
     let primarySource: string | null = null;
     if (sleepLogs.length > 0) {
@@ -215,6 +224,14 @@ export class SleepApiService {
     let avgRestingHr: number | null = null;
     let stages: SleepStagesDTO | null = null;
 
+    // Enhanced scoring fields
+    let scoreConfidence: number | null = null;
+    let scoreBreakdown: SleepScoreBreakdownDTO | null = null;
+    let zScores: SleepZScoresDTO | null = null;
+    let insights: SleepInsightDTO[] = [];
+    let enhancedMetrics: EnhancedSleepMetricsDTO | null = null;
+    let sleepDebt7Day: number | null = null;
+
     if (primaryLog) {
       totalDurationSeconds = primaryLog.total_duration_seconds;
       avgHrv = primaryLog.avg_hrv;
@@ -226,9 +243,22 @@ export class SleepApiService {
         rem: primaryLog.rem_duration_seconds,
       };
 
-      const scoreResult = this.sleepScoreService.computeScore(primaryLog);
-      sleepScore = scoreResult.score;
-      qualityRating = scoreResult.qualityRating;
+      // Use enhanced scoring
+      const enhancedResult = this.sleepScoreService.computeEnhancedScore(primaryLog, baseline);
+      sleepScore = enhancedResult.score;
+      qualityRating = enhancedResult.qualityRating;
+      scoreConfidence = enhancedResult.confidence;
+      scoreBreakdown = enhancedResult.breakdown;
+      zScores = enhancedResult.zScores;
+      insights = enhancedResult.insights;
+
+      // Build enhanced metrics
+      enhancedMetrics = this.buildEnhancedMetrics(primaryLog);
+
+      // Get sleep debt from baseline
+      if (baseline?.sleep_debt_7day !== null && baseline?.sleep_debt_7day !== undefined) {
+        sleepDebt7Day = this.sleepBaselineService.sleepDebtToHours(baseline.sleep_debt_7day);
+      }
     }
 
     const summary: DailySleepSummaryDTO = {
@@ -242,9 +272,32 @@ export class SleepApiService {
       avgHrv,
       avgRestingHr,
       stages,
+      // Enhanced fields
+      scoreConfidence,
+      scoreBreakdown,
+      zScores,
+      insights,
+      enhancedMetrics,
+      sleepDebt7Day,
     };
 
     return { data: summary };
+  }
+
+  /**
+   * Build enhanced metrics DTO from sleep log
+   */
+  private buildEnhancedMetrics(log: SleepLog): EnhancedSleepMetricsDTO {
+    return {
+      sleepOnsetLatencySeconds: log.sleep_onset_latency_seconds,
+      wasoSeconds: log.waso_seconds,
+      wasoCount: log.waso_count,
+      timeInBedSeconds: log.time_in_bed_seconds,
+      sleepEfficiency: log.sleep_efficiency ? parseFloat(log.sleep_efficiency) : null,
+      hrNadir: log.hr_nadir,
+      hrvFirstHalfAvg: log.hrv_first_half_avg ? parseFloat(log.hrv_first_half_avg) : null,
+      hrvSecondHalfAvg: log.hrv_second_half_avg ? parseFloat(log.hrv_second_half_avg) : null,
+    };
   }
 
   /**

@@ -2,7 +2,11 @@ import type { ColumnType, Insertable, Selectable, Updateable } from 'kysely';
 
 export const FitnessMetricType = {
   VO2_MAX: 'vo2_max',
-  LTHR: 'lthr', // Lactate Threshold Heart Rate
+  VO2_MAX_RUNNING: 'vo2_max_running', // VO2max for running
+  VO2_MAX_CYCLING: 'vo2_max_cycling', // VO2max for cycling
+  LTHR: 'lthr', // Lactate Threshold Heart Rate (general)
+  LTHR_RUNNING: 'lthr_running', // LTHR for running
+  LTHR_CYCLING: 'lthr_cycling', // LTHR for cycling
   LTP: 'ltp', // Lactate Threshold Pace
   FTP: 'ftp', // Functional Threshold Power
   RHR: 'rhr', // Resting Heart Rate
@@ -17,6 +21,18 @@ export interface FitnessMetricMetadata {
   algorithm?: string;
   sourceType?: 'calculated' | 'manual' | 'imported';
   notes?: string;
+  // LTHR-specific metadata
+  peak20?: number;
+  peak60?: number;
+  hrmcValue?: number;
+  hrmcWindowMinutes?: number;
+  // VO2max-specific metadata
+  sport?: 'running' | 'cycling' | 'general';
+  segmentsUsed?: number;
+  lookbackDays?: number;
+  ewmaApplied?: boolean;
+  confidenceInterval?: { lower: number; upper: number };
+  previousEstimate?: number;
 }
 
 export interface FitnessMetricsTable {

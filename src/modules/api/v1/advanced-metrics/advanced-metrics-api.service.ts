@@ -8,10 +8,11 @@ import { HrvBaselineRepository } from 'src/repositories/hrv-baseline.repository'
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
 import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
+import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 
-import { CorrelationQuery, FitnessFatiguePredictionBody, ThresholdOverrideBody } from './request.dto';
+import { CorrelationQuery, FitnessFatiguePredictionBody, ManualLthrBody, ManualVo2MaxBody, ThresholdOverrideBody } from './request.dto';
 import {
   BayesianDiagnosticsResponse,
   DailyReadinessResponse,
@@ -19,6 +20,10 @@ import {
   FitnessFatigueResponse,
   HrvBaselineHistoryResponse,
   HrvBaselineResponse,
+  LthrHistoryResponse,
+  LthrResponse,
+  LthrSport,
+  LthrZonesResponse,
   MultiStreamLoadHistoryResponse,
   MultiStreamLoadResponse,
   ReadinessHistoryResponse,
@@ -30,11 +35,14 @@ import {
   TrainingStressResponse,
   Vo2MaxHistoryResponse,
   Vo2MaxResponse,
+  Vo2MaxSport,
   WellnessCorrelationDTO,
   WellnessPerformanceCorrelationResponse,
 } from './response.dto';
+import { Vo2MaxSport as Vo2MaxSportType } from './services/vo2max.service';
 import { BayesianParameterService } from './services/bayesian-parameter.service';
 import { FitnessFatigueService } from './services/fitness-fatigue.service';
+import { LthrEstimationService } from './services/lthr-estimation.service';
 import { MultiStreamLoadService } from './services/multi-stream-load.service';
 import { ReadinessService } from './services/readiness.service';
 import { TrainingStressService } from './services/training-stress.service';
@@ -49,6 +57,7 @@ export class AdvancedMetricsApiService {
     private readonly multiStreamLoadService: MultiStreamLoadService,
     private readonly readinessService: ReadinessService,
     private readonly bayesianParameterService: BayesianParameterService,
+    private readonly lthrEstimationService: LthrEstimationService,
     private readonly fitnessMetricsRepository: FitnessMetricsRepository,
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
     private readonly workoutRepository: WorkoutRepository,
@@ -56,20 +65,21 @@ export class AdvancedMetricsApiService {
     private readonly hrvBaselineRepository: HrvBaselineRepository,
     private readonly rpeTssTrackingRepository: RpeTssTrackingRepository,
     private readonly quickWellnessCheckinRepository: QuickWellnessCheckinRepository,
+    private readonly userSettingsRepository: UserSettingsRepository,
   ) {}
 
   /**
    * Get current VO2 max with fitness category
    */
-  async getVo2Max(req: Request & { user: AuthUser }): Promise<Vo2MaxResponse> {
+  async getVo2Max(req: Request & { user: AuthUser }, sport?: Vo2MaxSport): Promise<Vo2MaxResponse> {
     const userId = req.user.id;
 
     // Try to get latest stored value first
-    let result = await this.vo2MaxService.getLatestVo2Max(userId);
+    let result = await this.vo2MaxService.getLatestVo2Max(userId, sport as Vo2MaxSportType | undefined);
 
     // If no stored value or it's old, calculate a new one
     if (!result) {
-      result = await this.vo2MaxService.calculateVo2Max(userId);
+      result = await this.vo2MaxService.calculateVo2MaxEnhanced(userId, sport as Vo2MaxSportType | undefined);
     }
 
     // Calculate fitness category based on VO2 max (simplified - would need age/gender for accuracy)
@@ -108,6 +118,14 @@ export class AdvancedMetricsApiService {
         reason: result.reason || null,
         fitnessCategory,
         percentileRank,
+        sport: result.sport || null,
+        confidenceInterval: result.confidenceInterval || null,
+        metadata: result.metadata ? {
+          rSquared: result.metadata.rSquared,
+          segmentsUsed: result.metadata.segmentsUsed,
+          lookbackDays: result.metadata.lookbackDays,
+          ewmaApplied: result.metadata.ewmaApplied,
+        } : undefined,
       },
     });
   }
@@ -115,9 +133,9 @@ export class AdvancedMetricsApiService {
   /**
    * Get VO2 max history
    */
-  async getVo2MaxHistory(req: Request & { user: AuthUser }, days: number = 90): Promise<Vo2MaxHistoryResponse> {
+  async getVo2MaxHistory(req: Request & { user: AuthUser }, days: number = 90, sport?: Vo2MaxSport): Promise<Vo2MaxHistoryResponse> {
     const userId = req.user.id;
-    const history = await this.vo2MaxService.getVo2MaxHistory(userId, days);
+    const history = await this.vo2MaxService.getVo2MaxHistory(userId, days, sport as Vo2MaxSportType | undefined);
 
     const historyPoints = history.map((h) => ({
       calculatedAt: h.calculated_at.toISOString(),
@@ -149,6 +167,115 @@ export class AdvancedMetricsApiService {
         history: historyPoints,
         changeFromStart,
         changeFrom30Days,
+      },
+    });
+  }
+
+  /**
+   * Trigger new VO2max estimation from recent workout data
+   */
+  async estimateVo2Max(req: Request & { user: AuthUser }, sport?: Vo2MaxSport): Promise<Vo2MaxResponse> {
+    const userId = req.user.id;
+    const result = await this.vo2MaxService.calculateVo2MaxEnhanced(userId, sport as Vo2MaxSportType | undefined);
+
+    // Calculate fitness category
+    let fitnessCategory: string | null = null;
+    let percentileRank: number | null = null;
+
+    if (result.value) {
+      const vo2 = result.value;
+      if (vo2 >= 60) {
+        fitnessCategory = 'Elite';
+        percentileRank = 99;
+      } else if (vo2 >= 52) {
+        fitnessCategory = 'Excellent';
+        percentileRank = 90;
+      } else if (vo2 >= 45) {
+        fitnessCategory = 'Good';
+        percentileRank = 75;
+      } else if (vo2 >= 38) {
+        fitnessCategory = 'Fair';
+        percentileRank = 50;
+      } else if (vo2 >= 30) {
+        fitnessCategory = 'Below Average';
+        percentileRank = 30;
+      } else {
+        fitnessCategory = 'Poor';
+        percentileRank = 10;
+      }
+    }
+
+    return new Vo2MaxResponse({
+      data: {
+        value: result.value,
+        confidence: result.confidence,
+        dataPointsUsed: result.dataPointsUsed,
+        algorithm: result.algorithm,
+        reason: result.reason || null,
+        fitnessCategory,
+        percentileRank,
+        sport: result.sport || null,
+        confidenceInterval: result.confidenceInterval || null,
+        metadata: result.metadata ? {
+          rSquared: result.metadata.rSquared,
+          segmentsUsed: result.metadata.segmentsUsed,
+          lookbackDays: result.metadata.lookbackDays,
+          ewmaApplied: result.metadata.ewmaApplied,
+        } : undefined,
+      },
+    });
+  }
+
+  /**
+   * Set manual VO2max override
+   */
+  async setManualVo2Max(req: Request & { user: AuthUser }, body: ManualVo2MaxBody): Promise<Vo2MaxResponse> {
+    const userId = req.user.id;
+    const result = await this.vo2MaxService.setManualVo2Max(
+      userId,
+      body.value,
+      (body.sport as Vo2MaxSportType) || 'general',
+      body.notes,
+    );
+
+    // Calculate fitness category
+    let fitnessCategory: string | null = null;
+    let percentileRank: number | null = null;
+
+    if (result.value) {
+      const vo2 = result.value;
+      if (vo2 >= 60) {
+        fitnessCategory = 'Elite';
+        percentileRank = 99;
+      } else if (vo2 >= 52) {
+        fitnessCategory = 'Excellent';
+        percentileRank = 90;
+      } else if (vo2 >= 45) {
+        fitnessCategory = 'Good';
+        percentileRank = 75;
+      } else if (vo2 >= 38) {
+        fitnessCategory = 'Fair';
+        percentileRank = 50;
+      } else if (vo2 >= 30) {
+        fitnessCategory = 'Below Average';
+        percentileRank = 30;
+      } else {
+        fitnessCategory = 'Poor';
+        percentileRank = 10;
+      }
+    }
+
+    return new Vo2MaxResponse({
+      data: {
+        value: result.value,
+        confidence: result.confidence,
+        dataPointsUsed: 0,
+        algorithm: 'manual',
+        reason: null,
+        fitnessCategory,
+        percentileRank,
+        sport: result.sport || null,
+        confidenceInterval: null,
       },
     });
   }
@@ -342,13 +469,13 @@ export class AdvancedMetricsApiService {
   /**
    * Get VO2 max for a specific user (coach access)
    */
-  async getVo2MaxForUser(userId: string): Promise<Vo2MaxResponse> {
+  async getVo2MaxForUser(userId: string, sport?: Vo2MaxSport): Promise<Vo2MaxResponse> {
     // Try to get latest stored value first
-    let result = await this.vo2MaxService.getLatestVo2Max(userId);
+    let result = await this.vo2MaxService.getLatestVo2Max(userId, sport as Vo2MaxSportType | undefined);
 
     // If no stored value or it's old, calculate a new one
     if (!result) {
-      result = await this.vo2MaxService.calculateVo2Max(userId);
+      result = await this.vo2MaxService.calculateVo2MaxEnhanced(userId, sport as Vo2MaxSportType | undefined);
     }
 
     // Calculate fitness category based on VO2 max
@@ -387,6 +514,14 @@ export class AdvancedMetricsApiService {
         reason: result.reason || null,
         fitnessCategory,
         percentileRank,
+        sport: result.sport || null,
+        confidenceInterval: result.confidenceInterval || null,
+        metadata: result.metadata ? {
+          rSquared: result.metadata.rSquared,
+          segmentsUsed: result.metadata.segmentsUsed,
+          lookbackDays: result.metadata.lookbackDays,
+          ewmaApplied: result.metadata.ewmaApplied,
+        } : undefined,
       },
     });
   }
@@ -394,8 +529,8 @@ export class AdvancedMetricsApiService {
   /**
    * Get VO2 max history for a specific user (coach access)
    */
-  async getVo2MaxHistoryForUser(userId: string, days: number = 90): Promise<Vo2MaxHistoryResponse> {
-    const history = await this.vo2MaxService.getVo2MaxHistory(userId, days);
+  async getVo2MaxHistoryForUser(userId: string, days: number = 90, sport?: Vo2MaxSport): Promise<Vo2MaxHistoryResponse> {
+    const history = await this.vo2MaxService.getVo2MaxHistory(userId, days, sport as Vo2MaxSportType | undefined);
 
     const historyPoints = history.map((h) => ({
       calculatedAt: h.calculated_at.toISOString(),
@@ -1282,5 +1417,262 @@ export class AdvancedMetricsApiService {
 
     if (denominator === 0) return 0;
     return numerator / denominator;
+  }
+
+  // ==========================================
+  // LTHR (Lactate Threshold Heart Rate) methods
+  // ==========================================
+
+  /**
+   * Get current LTHR estimation
+   */
+  async getLTHR(req: Request & { user: AuthUser }, sport?: LthrSport): Promise<LthrResponse> {
+    const userId = req.user.id;
+
+    // Try to get latest stored value
+    let estimate = await this.lthrEstimationService.getCurrentLTHR(userId, sport);
+
+    // If no stored value, calculate a new one
+    if (!estimate || estimate.value === 0) {
+      estimate = await this.lthrEstimationService.estimateLTHR(userId, sport);
+    }
+
+    // Get max HR if available for % calculation
+    const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
+    const userSettings = await this.userSettingsRepository.findByUserId(userId);
+    const maxHR = maxHRMetric
+      ? Number.parseFloat(maxHRMetric.value)
+      : userSettings?.hr_zones?.maxHr ?? null;
+
+    const percentOfMaxHR = maxHR && estimate.value > 0
+      ? Math.round((estimate.value / maxHR) * 100)
+      : null;
+
+    return new LthrResponse({
+      data: {
+        value: estimate.value,
+        confidence: estimate.confidence,
+        method: estimate.method,
+        sport: estimate.sport,
+        calculatedAt: estimate.calculatedAt.toISOString(),
+        percentOfMaxHR,
+        metadata: {
+          dataPointsUsed: estimate.metadata.dataPointsUsed,
+          workoutsAnalyzed: estimate.metadata.workoutsAnalyzed,
+          lookbackDays: estimate.metadata.lookbackDays,
+          peak20: estimate.metadata.peak20 ?? null,
+          peak60: estimate.metadata.peak60 ?? null,
+          hrmcValue: estimate.metadata.hrmcValue ?? null,
+          hrmcWindowMinutes: estimate.metadata.hrmcWindowMinutes ?? null,
+        },
+      },
+    });
+  }
+
+  /**
+   * Get LTHR history
+   */
+  async getLTHRHistory(
+    req: Request & { user: AuthUser },
+    days = 90,
+    sport?: LthrSport,
+  ): Promise<LthrHistoryResponse> {
+    const userId = req.user.id;
+    const history = await this.lthrEstimationService.getLTHRHistory(userId, days, sport);
+
+    const historyPoints = history.map((h) => ({
+      value: h.value,
+      confidence: h.confidence,
+      method: h.method,
+      sport: h.sport,
+      calculatedAt: h.calculatedAt.toISOString(),
+    }));
+
+    // Calculate change from start
+    let changeFromStart: number | null = null;
+    if (historyPoints.length >= 2) {
+      const first = historyPoints[0].value;
+      const last = historyPoints[historyPoints.length - 1].value;
+      changeFromStart = Math.round(last - first);
+    }
+
+    return new LthrHistoryResponse({
+      data: {
+        history: historyPoints,
+        changeFromStart,
+      },
+    });
+  }
+
+  /**
+   * Get HR training zones based on LTHR
+   */
+  async getLTHRZones(req: Request & { user: AuthUser }, sport?: LthrSport): Promise<LthrZonesResponse> {
+    const userId = req.user.id;
+
+    // Get current LTHR
+    let estimate = await this.lthrEstimationService.getCurrentLTHR(userId, sport);
+    if (!estimate || estimate.value === 0) {
+      estimate = await this.lthrEstimationService.estimateLTHR(userId, sport);
+    }
+
+    const lthr = estimate.value;
+
+    // Define LTHR-based zones
+    const zones = [
+      { zone: 1, name: 'Recovery', minPctLthr: 0, maxPctLthr: 85 },
+      { zone: 2, name: 'Aerobic', minPctLthr: 85, maxPctLthr: 89 },
+      { zone: 3, name: 'Tempo', minPctLthr: 90, maxPctLthr: 94 },
+      { zone: 4, name: 'Threshold', minPctLthr: 95, maxPctLthr: 99 },
+      { zone: 5, name: 'VO2max', minPctLthr: 100, maxPctLthr: 102 },
+      { zone: 6, name: 'Anaerobic', minPctLthr: 103, maxPctLthr: 120 },
+    ];
+
+    const zonesWithHR = zones.map((z) => ({
+      zone: z.zone,
+      name: z.name,
+      minHR: Math.round((lthr * z.minPctLthr) / 100),
+      maxHR: Math.round((lthr * z.maxPctLthr) / 100),
+      minPctLthr: z.minPctLthr,
+      maxPctLthr: z.maxPctLthr,
+    }));
+
+    return new LthrZonesResponse({
+      data: {
+        lthr,
+        zones: zonesWithHR,
+      },
+    });
+  }
+
+  /**
+   * Trigger new LTHR estimation
+   */
+  async estimateLTHR(req: Request & { user: AuthUser }, sport?: LthrSport): Promise<LthrResponse> {
+    const userId = req.user.id;
+
+    const estimate = await this.lthrEstimationService.estimateLTHR(userId, sport);
+
+    // Store the estimate
+    if (estimate.value > 0) {
+      await this.lthrEstimationService.estimateFromPeakRolling(userId, sport);
+    }
+
+    // Get max HR for % calculation
+    const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
+    const userSettings = await this.userSettingsRepository.findByUserId(userId);
+    const maxHR = maxHRMetric
+      ? Number.parseFloat(maxHRMetric.value)
+      : userSettings?.hr_zones?.maxHr ?? null;
+
+    const percentOfMaxHR = maxHR && estimate.value > 0
+      ? Math.round((estimate.value / maxHR) * 100)
+      : null;
+
+    return new LthrResponse({
+      data: {
+        value: estimate.value,
+        confidence: estimate.confidence,
+        method: estimate.method,
+        sport: estimate.sport,
+        calculatedAt: estimate.calculatedAt.toISOString(),
+        percentOfMaxHR,
+        metadata: {
+          dataPointsUsed: estimate.metadata.dataPointsUsed,
+          workoutsAnalyzed: estimate.metadata.workoutsAnalyzed,
+          lookbackDays: estimate.metadata.lookbackDays,
+          peak20: estimate.metadata.peak20 ?? null,
+          peak60: estimate.metadata.peak60 ?? null,
+          hrmcValue: estimate.metadata.hrmcValue ?? null,
+          hrmcWindowMinutes: estimate.metadata.hrmcWindowMinutes ?? null,
+        },
+      },
+    });
+  }
+
+  /**
+   * Set manual LTHR override
+   */
+  async setManualLTHR(req: Request & { user: AuthUser }, body: ManualLthrBody): Promise<LthrResponse> {
+    const userId = req.user.id;
+
+    const estimate = await this.lthrEstimationService.setManualLTHR(
+      userId,
+      body.value,
+      body.sport,
+      body.notes,
+    );
+
+    // Get max HR for % calculation
+    const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
+    const userSettings = await this.userSettingsRepository.findByUserId(userId);
+    const maxHR = maxHRMetric
+      ? Number.parseFloat(maxHRMetric.value)
+      : userSettings?.hr_zones?.maxHr ?? null;
+
+    const percentOfMaxHR = maxHR && estimate.value > 0
+      ? Math.round((estimate.value / maxHR) * 100)
+      : null;
+
+    return new LthrResponse({
+      data: {
+        value: estimate.value,
+        confidence: estimate.confidence,
+        method: estimate.method,
+        sport: estimate.sport,
+        calculatedAt: estimate.calculatedAt.toISOString(),
+        percentOfMaxHR,
+        metadata: {
+          dataPointsUsed: 0,
+          workoutsAnalyzed: 0,
+          lookbackDays: 0,
+          peak20: null,
+          peak60: null,
+          hrmcValue: null,
+          hrmcWindowMinutes: null,
+        },
+      },
+    });
+  }
+
+  /**
+   * Get LTHR for a specific user (coach access)
+   */
+  async getLTHRForUser(userId: string, sport?: LthrSport): Promise<LthrResponse> {
+    let estimate = await this.lthrEstimationService.getCurrentLTHR(userId, sport);
+
+    if (!estimate || estimate.value === 0) {
+      estimate = await this.lthrEstimationService.estimateLTHR(userId, sport);
+    }
+
+    const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
+    const userSettings = await this.userSettingsRepository.findByUserId(userId);
+    const maxHR = maxHRMetric
+      ? Number.parseFloat(maxHRMetric.value)
+      : userSettings?.hr_zones?.maxHr ?? null;
+
+    const percentOfMaxHR = maxHR && estimate.value > 0
+      ? Math.round((estimate.value / maxHR) * 100)
+      : null;
+
+    return new LthrResponse({
+      data: {
+        value: estimate.value,
+        confidence: estimate.confidence,
+        method: estimate.method,
+        sport: estimate.sport,
+        calculatedAt: estimate.calculatedAt.toISOString(),
+        percentOfMaxHR,
+        metadata: {
+          dataPointsUsed: estimate.metadata.dataPointsUsed,
+          workoutsAnalyzed: estimate.metadata.workoutsAnalyzed,
+          lookbackDays: estimate.metadata.lookbackDays,
+          peak20: estimate.metadata.peak20 ?? null,
+          peak60: estimate.metadata.peak60 ?? null,
+          hrmcValue: estimate.metadata.hrmcValue ?? null,
+          hrmcWindowMinutes: estimate.metadata.hrmcWindowMinutes ?? null,
+        },
+      },
+    });
   }
 }

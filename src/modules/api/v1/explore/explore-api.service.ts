@@ -67,6 +67,9 @@ const METRIC_CHAPTERS: MetricChapterDTO[] = [
     chapter: 'Cardio',
     metrics: [
       { id: 'vo2max', label: 'VO2 Max', unit: 'ml/kg/min' },
+      { id: 'lthr', label: 'Lactate Threshold HR', unit: 'bpm' },
+      { id: 'lthrRunning', label: 'LTHR (Running)', unit: 'bpm' },
+      { id: 'lthrCycling', label: 'LTHR (Cycling)', unit: 'bpm' },
     ],
   },
 ];
@@ -225,6 +228,12 @@ export class ExploreApiService {
       // Cardio metrics
       case 'vo2max':
         return this.fetchVo2MaxMetric(userId, startDate, endDate);
+      case 'lthr':
+        return this.fetchLthrMetric(userId, 'lthr', startDate, endDate);
+      case 'lthrRunning':
+        return this.fetchLthrMetric(userId, 'lthr_running', startDate, endDate);
+      case 'lthrCycling':
+        return this.fetchLthrMetric(userId, 'lthr_cycling', startDate, endDate);
 
       default:
         throw new BadRequestException(`Metric ${metricId} not implemented`);
@@ -482,6 +491,36 @@ export class ExploreApiService {
       filter: {
         userId,
         metricType: 'vo2_max' as any,
+        dateFrom: startDate,
+        dateTo: endDate,
+      },
+      sort: [{ field: 'calculated_at', direction: 'asc' }],
+    });
+
+    const valueMap = new Map<string, number | null>();
+    for (const entry of data) {
+      const date = entry.calculated_at instanceof Date
+        ? formatDateToYMD(entry.calculated_at)
+        : formatDateToYMD(new Date(entry.calculated_at));
+      valueMap.set(date, entry.value ? Number(entry.value) : null);
+    }
+
+    return this.generateDateRange(startDate, endDate, valueMap);
+  }
+
+  /**
+   * Fetch LTHR (Lactate Threshold Heart Rate) from fitness metrics
+   */
+  private async fetchLthrMetric(
+    userId: string,
+    metricType: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<MetricDataPointDTO[]> {
+    const data = await this.fitnessMetricsRepository.findMany({
+      filter: {
+        userId,
+        metricType: metricType as any,
         dateFrom: startDate,
         dateTo: endDate,
       },

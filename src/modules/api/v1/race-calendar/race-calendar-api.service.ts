@@ -2,10 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import { NewAthleteRace } from 'src/database/interfaces/athlete-races-table.interface';
 import type { PeriodizationPhase } from 'src/database/interfaces/periodization-plans-table.interface';
+import { PredictionStatus, RacePrediction } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AthleteRaceRepository, AthleteRaceWithEvent } from 'src/repositories/athlete-race.repository';
 import { PeriodizationPlanRepository } from 'src/repositories/periodization-plan.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
+import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
 
 import {
   ActiveNetworkService,
@@ -22,7 +24,7 @@ import {
   UpdateAthleteRaceBody,
   UpdatePeriodizationBody,
 } from './request.dto';
-import { AthleteRaceDTO, PeriodizationPlanDTO, RaceEventDTO } from './response.dto';
+import { AthleteRaceDTO, PeriodizationPlanDTO, RaceEventDTO, RacePredictionSummaryDTO } from './response.dto';
 import { AthleteLevel } from './types';
 
 @Injectable()
@@ -33,6 +35,7 @@ export class RaceCalendarApiService {
     private readonly raceEventRepo: RaceEventRepository,
     private readonly athleteRaceRepo: AthleteRaceRepository,
     private readonly periodizationPlanRepo: PeriodizationPlanRepository,
+    private readonly racePredictionRepo: RacePredictionRepository,
     private readonly activeNetworkService: ActiveNetworkService,
     private readonly runSignUpService: RunSignUpService,
     private readonly worldTriathlonService: WorldTriathlonService,
@@ -205,7 +208,24 @@ export class RaceCalendarApiService {
 
   async listAthleteRaces(req: Request & { user: AuthUser }): Promise<AthleteRaceDTO[]> {
     const races = await this.athleteRaceRepo.findManyByUserId(req.user.id);
-    return races.map((r) => this.mapAthleteRaceToDTO(r));
+
+    // Fetch predictions for all races
+    const predictions = await this.racePredictionRepo.findMany({
+      filter: {
+        userId: req.user.id,
+        status: PredictionStatus.CURRENT,
+      },
+    });
+
+    // Create a map of race_id -> prediction
+    const predictionMap = new Map<string, RacePrediction>();
+    for (const prediction of predictions) {
+      if (prediction.athlete_race_id) {
+        predictionMap.set(prediction.athlete_race_id, prediction);
+      }
+    }
+
+    return races.map((r) => this.mapAthleteRaceToDTO(r, predictionMap.get(r.id)));
   }
 
   async getAthleteRace(req: Request & { user: AuthUser }, raceId: string): Promise<AthleteRaceDTO> {
@@ -213,7 +233,11 @@ export class RaceCalendarApiService {
     if (!race || race.user_id !== req.user.id) {
       throw new NotFoundException('Race not found');
     }
-    return this.mapAthleteRaceToDTO(race);
+
+    // Get current prediction for this race
+    const prediction = await this.racePredictionRepo.findCurrentForRace(req.user.id, raceId);
+
+    return this.mapAthleteRaceToDTO(race, prediction || undefined);
   }
 
   async createAthleteRace(req: Request & { user: AuthUser }, body: CreateAthleteRaceBody): Promise<AthleteRaceDTO> {
@@ -496,8 +520,8 @@ export class RaceCalendarApiService {
     };
   }
 
-  private mapAthleteRaceToDTO(race: AthleteRaceWithEvent): AthleteRaceDTO {
-    return {
+  private mapAthleteRaceToDTO(race: AthleteRaceWithEvent, prediction?: RacePrediction): AthleteRaceDTO {
+    const dto: AthleteRaceDTO = {
       id: race.id,
       user_id: race.user_id,
       race_event_id: race.race_event_id,
@@ -513,6 +537,35 @@ export class RaceCalendarApiService {
       created_at: race.created_at.toISOString(),
       updated_at: race.updated_at.toISOString(),
     };
+
+    if (prediction) {
+      dto.prediction = this.mapPredictionSummaryDTO(prediction);
+    }
+
+    return dto;
+  }
+
+  private mapPredictionSummaryDTO(prediction: RacePrediction): RacePredictionSummaryDTO {
+    return {
+      predicted_time_seconds: prediction.predicted_time_seconds,
+      predicted_time_formatted: this.formatTimeToString(prediction.predicted_time_seconds),
+      confidence_score: Number.parseFloat(prediction.confidence_score),
+      target_pace_per_km: prediction.target_pace_per_km
+        ? Number.parseFloat(prediction.target_pace_per_km)
+        : undefined,
+      goal_achievability: prediction.goal_achievability || undefined,
+    };
+  }
+
+  private formatTimeToString(totalSeconds: number): string {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
   private mapPeriodizationPlanToDTO(plan: {

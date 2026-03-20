@@ -3,9 +3,11 @@ import {
   CardioMetric,
   CardioMetricType,
   FitnessMetricType,
+  Gender,
   NewTrainingStressScore,
   TrainingStressScore,
 } from 'src/database/interfaces';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
@@ -32,6 +34,16 @@ interface HRZoneTime {
   timeSeconds: number;
 }
 
+interface HRPreprocessingResult {
+  metrics: CardioMetric[];
+  stats: {
+    totalSamples: number;
+    samplesRemoved: number;
+    spikesRemoved: number;
+    gapsInterpolated: number;
+  };
+}
+
 @Injectable()
 export class TrainingStressService {
   constructor(
@@ -41,6 +53,7 @@ export class TrainingStressService {
     private readonly trainingStressRepository: TrainingStressRepository,
     private readonly fitnessMetricsRepository: FitnessMetricsRepository,
     private readonly workoutRouteRepository: WorkoutRouteRepository,
+    private readonly athleteProfileMetricsRepository: AthleteProfileMetricsRepository,
   ) {}
 
   /**
@@ -56,7 +69,7 @@ export class TrainingStressService {
     const maxHR = userSettings?.hr_zones?.maxHr;
 
     // Get HR metrics
-    const hrMetrics = await this.cardioMetricsRepository.findMany({
+    const rawHrMetrics = await this.cardioMetricsRepository.findMany({
       filter: {
         workoutExecutionId: workoutExecutionId,
         metricType: CardioMetricType.HEART_RATE,
@@ -84,6 +97,12 @@ export class TrainingStressService {
     const lthrMetric = await this.fitnessMetricsRepository.getLatestByType(execution.user_id, FitnessMetricType.LTHR);
     const lthr = lthrMetric ? Number.parseFloat(lthrMetric.value) : maxHR ? maxHR * 0.85 : null;
 
+    // Get athlete gender for sex-specific TRIMP coefficients
+    const gender = await this.athleteProfileMetricsRepository.getGenderByUserId(execution.user_id);
+
+    // Preprocess HR metrics (remove artifacts, spikes, interpolate short gaps)
+    const { metrics: hrMetrics, stats: hrPreprocessingStats } = this.preprocessHRMetrics(rawHrMetrics);
+
     const result: TrainingStressResult = {
       tss: null,
       trimp: null,
@@ -96,15 +115,21 @@ export class TrainingStressService {
       normalizedPower: null,
     };
 
-    const durationSeconds = execution.duration_seconds;
-    const durationMinutes = durationSeconds / 60;
+    // Track additional metrics for metadata
+    let edwardsTrimp: number | null = null;
 
-    // Calculate TRIMP (Training Impulse) using Banister method
+    const durationSeconds = execution.duration_seconds;
+
+    // Calculate TRIMP (Training Impulse) using time-series Banister method
     if (hrMetrics.length > 0 && maxHR) {
       const avgHR = this.calculateAverageHR(hrMetrics);
-      result.trimp = this.calculateTRIMP(avgHR, maxHR, restingHR, durationMinutes);
+      // Use time-series TRIMP with sex-specific coefficients
+      result.trimp = this.calculateTRIMP(hrMetrics, maxHR, restingHR, gender);
 
-      // Calculate HR-based TSS (HRSS)
+      // Also calculate Edwards TRIMP as alternative metric
+      edwardsTrimp = this.calculateEdwardsTRIMP(hrMetrics, maxHR);
+
+      // Calculate HR-based TSS (HRSS) using preprocessed metrics
       if (lthr) {
         result.hrss = this.calculateHRSS(hrMetrics, maxHR, restingHR, lthr, durationSeconds);
         result.intensityFactor = avgHR / lthr;
@@ -171,25 +196,257 @@ export class TrainingStressService {
       result.tss = result.hrss;
     }
 
-    // Store the result
-    await this.storeResult(workoutExecutionId, result);
+    // Store the result with extended metadata
+    await this.storeResult(workoutExecutionId, result, {
+      edwardsTrimp,
+      hrPreprocessingStats,
+      genderUsed: gender,
+    });
 
     return result;
   }
 
   /**
-   * Calculate TRIMP using Banister method
-   * TRIMP = T × ΔHR × 0.64e^(1.92×ΔHR) [men - using as default]
+   * Calculate TRIMP using time-series Banister method with sex-specific coefficients
+   * Integrates per-sample: TRIMP = Σ Δt_min × HRR(t) × (k × e^(b × HRR(t)))
+   *
+   * Male coefficients: k=0.64, b=1.92
+   * Female coefficients: k=0.86, b=1.67
+   *
+   * Using time-series integration is more accurate for interval/HIIT workouts
+   * as it captures within-session HR fluctuations that mean-HR TRIMP misses.
    */
-  private calculateTRIMP(avgHR: number, maxHR: number, restingHR: number, durationMinutes: number): number {
-    const hrReserve = (avgHR - restingHR) / (maxHR - restingHR);
-    const hrReserveClamped = Math.max(0, Math.min(1, hrReserve));
+  private calculateTRIMP(
+    hrMetrics: CardioMetric[],
+    maxHR: number,
+    restingHR: number,
+    gender: Gender | null,
+  ): number {
+    if (hrMetrics.length < 2) {
+      return 0;
+    }
 
-    // Using male coefficients (k=0.64, b=1.92)
-    // Female would be (k=0.86, b=1.67)
-    const trimp = durationMinutes * hrReserveClamped * 0.64 * Math.exp(1.92 * hrReserveClamped);
+    // Sex-specific coefficients based on research
+    // Female athletes show different lactate response curves
+    const [k, b] = gender === Gender.FEMALE ? [0.86, 1.67] : [0.64, 1.92];
+
+    let trimp = 0;
+
+    for (let i = 1; i < hrMetrics.length; i++) {
+      const hr = Number.parseFloat(hrMetrics[i].value);
+      const prevTime = new Date(hrMetrics[i - 1].recorded_at).getTime();
+      const currTime = new Date(hrMetrics[i].recorded_at).getTime();
+      const dt = (currTime - prevTime) / 1000; // seconds
+
+      // Skip gaps > 60 seconds (device dropout, pause, etc.)
+      if (dt <= 0 || dt > 60) {
+        continue;
+      }
+
+      const dtMinutes = dt / 60;
+
+      // Calculate HR reserve fraction, clamped to [0, 1]
+      const hrReserve = Math.max(0, Math.min(1, (hr - restingHR) / (maxHR - restingHR)));
+
+      // Accumulate TRIMP contribution from this sample
+      trimp += dtMinutes * hrReserve * k * Math.exp(b * hrReserve);
+    }
 
     return Math.round(trimp * 10) / 10;
+  }
+
+  /**
+   * Calculate Edwards TRIMP using 5-zone weighted method
+   * TRIMP_Edwards = Σ (minutes in zone z) × z
+   *
+   * Zone weights: 1, 2, 3, 4, 5 for zones 1-5
+   * Zone boundaries based on %HRmax:
+   * - Zone 1: 50-60%
+   * - Zone 2: 60-70%
+   * - Zone 3: 70-80%
+   * - Zone 4: 80-90%
+   * - Zone 5: 90-100%
+   *
+   * Benefits:
+   * - More robust to parameter noise (doesn't require exact HRmax/HRrest)
+   * - Easy to explain to athletes
+   * - Transparent calculation
+   */
+  private calculateEdwardsTRIMP(hrMetrics: CardioMetric[], maxHR: number): number {
+    if (hrMetrics.length < 2) {
+      return 0;
+    }
+
+    // Zone definitions: %HRmax ranges
+    const zones = [
+      { zone: 1, min: 50, max: 60 },
+      { zone: 2, min: 60, max: 70 },
+      { zone: 3, min: 70, max: 80 },
+      { zone: 4, min: 80, max: 90 },
+      { zone: 5, min: 90, max: 100 },
+    ];
+
+    const zoneMinutes = new Map<number, number>();
+    zones.forEach((z) => zoneMinutes.set(z.zone, 0));
+
+    for (let i = 1; i < hrMetrics.length; i++) {
+      const hr = Number.parseFloat(hrMetrics[i].value);
+      const hrPct = (hr / maxHR) * 100;
+
+      const prevTime = new Date(hrMetrics[i - 1].recorded_at).getTime();
+      const currTime = new Date(hrMetrics[i].recorded_at).getTime();
+      const dt = (currTime - prevTime) / 1000;
+
+      // Skip gaps > 60 seconds
+      if (dt <= 0 || dt > 60) {
+        continue;
+      }
+
+      const dtMinutes = dt / 60;
+
+      // Assign time to appropriate zone
+      for (const zone of zones) {
+        if (hrPct >= zone.min && hrPct < zone.max) {
+          zoneMinutes.set(zone.zone, (zoneMinutes.get(zone.zone) || 0) + dtMinutes);
+          break;
+        }
+      }
+
+      // Handle HR >= 100% maxHR (put in zone 5)
+      if (hrPct >= 100) {
+        zoneMinutes.set(5, (zoneMinutes.get(5) || 0) + dtMinutes);
+      }
+    }
+
+    // Sum: minutes × zone weight
+    let edwardsTRIMP = 0;
+    zones.forEach((z) => {
+      edwardsTRIMP += (zoneMinutes.get(z.zone) || 0) * z.zone;
+    });
+
+    return Math.round(edwardsTRIMP * 10) / 10;
+  }
+
+  /**
+   * Preprocess HR metrics to remove artifacts and improve data quality
+   *
+   * Steps:
+   * 1. Remove out-of-bounds values (< hrMin or > hrMax)
+   * 2. De-spike: remove implausible HR jumps (> maxJumpBpmPerSec)
+   * 3. Interpolate short gaps (≤ maxInterpGapSec)
+   *
+   * This preprocessing prevents garbage-in-garbage-out from flaky HR straps.
+   */
+  private preprocessHRMetrics(
+    hrMetrics: CardioMetric[],
+    hrMin = 35,
+    hrMax = 220,
+    maxJumpBpmPerSec = 25,
+    maxInterpGapSec = 10,
+  ): HRPreprocessingResult {
+    const totalSamples = hrMetrics.length;
+    let samplesRemoved = 0;
+    let spikesRemoved = 0;
+    let gapsInterpolated = 0;
+
+    if (hrMetrics.length === 0) {
+      return {
+        metrics: [],
+        stats: { totalSamples: 0, samplesRemoved: 0, spikesRemoved: 0, gapsInterpolated: 0 },
+      };
+    }
+
+    // Step 1: Remove out-of-bounds values
+    let filtered = hrMetrics.filter((m) => {
+      const hr = Number.parseFloat(m.value);
+      const isValid = hr >= hrMin && hr <= hrMax;
+      if (!isValid) {
+        samplesRemoved++;
+      }
+      return isValid;
+    });
+
+    // Step 2: De-spike (remove implausible HR jumps)
+    const despiked: CardioMetric[] = [];
+    for (let i = 0; i < filtered.length; i++) {
+      if (i === 0) {
+        despiked.push(filtered[i]);
+        continue;
+      }
+
+      const prevHR = Number.parseFloat(despiked[despiked.length - 1].value);
+      const currHR = Number.parseFloat(filtered[i].value);
+      const prevTime = new Date(despiked[despiked.length - 1].recorded_at).getTime();
+      const currTime = new Date(filtered[i].recorded_at).getTime();
+      const dt = (currTime - prevTime) / 1000;
+
+      // If dt is 0 or negative, skip this sample
+      if (dt <= 0) {
+        samplesRemoved++;
+        continue;
+      }
+
+      // Check if HR change rate is within acceptable limits
+      const hrChangePerSec = Math.abs(currHR - prevHR) / dt;
+
+      if (hrChangePerSec <= maxJumpBpmPerSec) {
+        despiked.push(filtered[i]);
+      } else {
+        spikesRemoved++;
+      }
+    }
+
+    filtered = despiked;
+
+    // Step 3: Interpolate short gaps
+    // Identify gaps and insert interpolated samples
+    const interpolated: CardioMetric[] = [];
+
+    for (let i = 0; i < filtered.length; i++) {
+      if (i === 0) {
+        interpolated.push(filtered[i]);
+        continue;
+      }
+
+      const prevTime = new Date(filtered[i - 1].recorded_at).getTime();
+      const currTime = new Date(filtered[i].recorded_at).getTime();
+      const gapSec = (currTime - prevTime) / 1000;
+
+      // If there's a short gap (between 2 and maxInterpGapSec seconds), interpolate
+      if (gapSec > 2 && gapSec <= maxInterpGapSec) {
+        const prevHR = Number.parseFloat(filtered[i - 1].value);
+        const currHR = Number.parseFloat(filtered[i].value);
+
+        // Calculate number of interpolation points (approximately 1 per second)
+        const numInterpolations = Math.floor(gapSec) - 1;
+
+        for (let j = 1; j <= numInterpolations; j++) {
+          const ratio = j / (numInterpolations + 1);
+          const interpHR = prevHR + (currHR - prevHR) * ratio;
+          const interpTime = new Date(prevTime + (currTime - prevTime) * ratio);
+
+          // Create an interpolated metric (use previous metric as template)
+          interpolated.push({
+            ...filtered[i - 1],
+            value: interpHR.toFixed(1),
+            recorded_at: interpTime,
+          });
+          gapsInterpolated++;
+        }
+      }
+
+      interpolated.push(filtered[i]);
+    }
+
+    return {
+      metrics: interpolated,
+      stats: {
+        totalSamples,
+        samplesRemoved,
+        spikesRemoved,
+        gapsInterpolated,
+      },
+    };
   }
 
   /**
@@ -384,7 +641,15 @@ export class TrainingStressService {
     return scores.reduce((total, score) => total + Number.parseFloat(score.tss || '0'), 0);
   }
 
-  private async storeResult(workoutExecutionId: string, result: TrainingStressResult): Promise<void> {
+  private async storeResult(
+    workoutExecutionId: string,
+    result: TrainingStressResult,
+    extendedMeta?: {
+      edwardsTrimp: number | null;
+      hrPreprocessingStats: HRPreprocessingResult['stats'];
+      genderUsed: Gender | null;
+    },
+  ): Promise<void> {
     const data: NewTrainingStressScore = {
       workout_execution_id: workoutExecutionId,
       tss: result.tss,
@@ -402,6 +667,15 @@ export class TrainingStressService {
         powerUsed: result.normalizedPower !== null,
         paceUsed: result.normalizedPace !== null,
         algorithm: 'banister_trimp',
+        // Extended metadata for TRIMP calculations
+        trimp_method: 'banister_time_series',
+        edwards_trimp: extendedMeta?.edwardsTrimp ?? undefined,
+        gender_used: extendedMeta?.genderUsed ?? undefined,
+        // HR preprocessing stats
+        hr_samples_total: extendedMeta?.hrPreprocessingStats.totalSamples,
+        hr_samples_cleaned: extendedMeta?.hrPreprocessingStats.samplesRemoved,
+        hr_spikes_removed: extendedMeta?.hrPreprocessingStats.spikesRemoved,
+        hr_gaps_interpolated: extendedMeta?.hrPreprocessingStats.gapsInterpolated,
       },
     };
 

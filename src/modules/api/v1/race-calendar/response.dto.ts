@@ -2,6 +2,23 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import type { CourseMetrics, PeriodizationPhase } from './types';
 
+export class RacePredictionSummaryDTO {
+  @ApiProperty({ description: 'Predicted time in seconds' })
+  predicted_time_seconds: number;
+
+  @ApiProperty({ description: 'Formatted predicted time (HH:MM:SS)' })
+  predicted_time_formatted: string;
+
+  @ApiProperty({ description: 'Confidence score (0-1)' })
+  confidence_score: number;
+
+  @ApiPropertyOptional({ description: 'Target pace in seconds per km' })
+  target_pace_per_km?: number;
+
+  @ApiPropertyOptional({ enum: ['very_likely', 'likely', 'possible', 'unlikely'] })
+  goal_achievability?: string;
+}
+
 export class RaceEventDTO {
   @ApiProperty()
   id: string;
@@ -85,6 +102,9 @@ export class AthleteRaceDTO {
 
   @ApiPropertyOptional()
   notes: string | null;
+
+  @ApiPropertyOptional({ type: RacePredictionSummaryDTO, description: 'Current prediction for this race' })
+  prediction?: RacePredictionSummaryDTO;
 
   @ApiProperty()
   created_at: string;

@@ -1,8 +1,12 @@
 import { AthleteIntakeTable } from './athlete-intake-table.interface';
+import { AthleteProfileMetricsTable } from './athlete-profile-metrics-table.interface';
 import { AthleteRacesTable } from './athlete-races-table.interface';
+import { HistoricalRaceResultsTable } from './historical-race-results-table.interface';
 import { PeriodizationPlansTable } from './periodization-plans-table.interface';
 import { RaceEventsTable } from './race-events-table.interface';
+import { RacePredictionsTable } from './race-predictions-table.interface';
 import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
+import { SleepBaselinesTable } from './sleep-baselines-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
@@ -129,4 +133,12 @@ export interface Database {
   race_events: RaceEventsTable;
   athlete_races: AthleteRacesTable;
   periodization_plans: PeriodizationPlansTable;
+
+  // Race Predictions
+  athlete_profile_metrics: AthleteProfileMetricsTable;
+  race_predictions: RacePredictionsTable;
+  historical_race_results: HistoricalRaceResultsTable;
+
+  // Sleep baselines for enhanced sleep scoring
+  sleep_baselines: SleepBaselinesTable;
 }

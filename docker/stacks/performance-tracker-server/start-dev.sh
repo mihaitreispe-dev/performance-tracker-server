@@ -10,3 +10,4 @@ docker stack deploy \
     --prune \
     -c docker/stacks/performance-tracker-server/docker-compose.dev.yml \
     performance-tracker-server
+-

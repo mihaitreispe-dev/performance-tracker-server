@@ -12,6 +12,19 @@ export interface HrSample {
   heartRate: number;
 }
 
+/**
+ * Breakdown of sleep score subscores
+ */
+export interface SleepScoreBreakdown {
+  durationSubscore: number;
+  efficiencySubscore: number;
+  architectureSubscore: number;
+  hrvSubscore: number;
+  hrSubscore: number;
+  sleepDebtPenalty: number;
+  baselineBonus: number;
+}
+
 export interface SleepLogsTable {
   id: Generated<string>;
   user_id: string;
@@ -28,6 +41,20 @@ export interface SleepLogsTable {
   hr_samples: HrSample[] | null;
   source: Generated<string>;
   external_id: string | null;
+
+  // Enhanced sleep metrics
+  sleep_onset_latency_seconds: number | null;
+  waso_seconds: number | null;
+  waso_count: number | null;
+  time_in_bed_seconds: number | null;
+  hr_nadir: number | null;
+  hr_nadir_timestamp: Timestamp | null;
+  hrv_first_half_avg: string | null; // Stored as decimal
+  hrv_second_half_avg: string | null;
+  sleep_efficiency: string | null; // Stored as decimal
+  computed_score: number | null;
+  computed_score_breakdown: SleepScoreBreakdown | null;
+
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   DefaultLoadModelParameters,
   LimitingStream,
@@ -14,6 +14,10 @@ import { LoadModelParametersRepository } from 'src/repositories/load-model-param
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
 import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { RecoveryJournalRepository } from 'src/repositories/recovery-journal.repository';
+import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
+
+import { SleepBaselineService } from '../../sleep/sleep-baseline.service';
+import { SleepScoreService } from '../../sleep/sleep-score.service';
 
 export interface ReadinessResult {
   date: string;
@@ -28,7 +32,8 @@ export interface ReadinessResult {
     neuralContribution: number;
     hrvContribution: number;
     journalContribution: number;
-    quickWellnessContribution: number; // New: quick check-in contribution
+    quickWellnessContribution: number;
+    sleepContribution: number; // Enhanced sleep score contribution
   };
   recommendation: ReadinessRecommendation;
 }
@@ -82,12 +87,17 @@ export interface ReadinessTrend {
 
 @Injectable()
 export class ReadinessService {
+  private readonly logger = new Logger(ReadinessService.name);
+
   constructor(
     private readonly multiStreamLoadRepository: MultiStreamLoadRepository,
     private readonly hrvBaselineRepository: HrvBaselineRepository,
     private readonly recoveryJournalRepository: RecoveryJournalRepository,
     private readonly loadModelParametersRepository: LoadModelParametersRepository,
     private readonly quickWellnessCheckinRepository: QuickWellnessCheckinRepository,
+    private readonly sleepLogRepository: SleepLogRepository,
+    private readonly sleepScoreService: SleepScoreService,
+    private readonly sleepBaselineService: SleepBaselineService,
   ) {}
 
   /**
@@ -112,6 +122,9 @@ export class ReadinessService {
     // Get quick wellness check-in
     const quickWellnessCheckin = await this.quickWellnessCheckinRepository.findByUserAndDate(userId, targetDate);
 
+    // Calculate enhanced sleep contribution
+    const sleepContribution = await this.calculateSleepContribution(userId, targetDate);
+
     // Calculate TSB contributions (normalized to 0-100)
     const aerobicTsb = loadData?.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : 0;
     const mskTsb = loadData?.msk_tsb ? parseFloat(loadData.msk_tsb) : 0;
@@ -133,21 +146,49 @@ export class ReadinessService {
     // Calculate quick wellness check-in contribution
     const quickWellnessContribution = this.calculateQuickWellnessContribution(quickWellnessCheckin);
 
-    // Weight the components - adjusted weights to include quick wellness check-in (15%)
-    // If quick wellness check-in exists, use it; otherwise use journal contribution
+    // Weight the components - adjusted weights to include sleep contribution
+    // New weights: aerobic 0.18, msk 0.15, neural 0.15, hrv 0.12, sleep 0.15, journal 0.10, quickWellness 0.15
     const hasQuickWellness = quickWellnessCheckin !== null;
-    const baseReadiness = hasQuickWellness
-      ? aerobicContribution * 0.22 +
+    const hasSleepData = sleepContribution !== 50; // 50 is neutral/no data
+
+    let baseReadiness: number;
+    if (hasQuickWellness && hasSleepData) {
+      // Full data: include all components
+      baseReadiness =
+        aerobicContribution * 0.18 +
+        mskContribution * 0.15 +
+        neuralContribution * 0.15 +
+        hrvContribution * 0.12 +
+        sleepContribution * 0.15 +
+        journalContribution * 0.1 +
+        quickWellnessContribution * 0.15;
+    } else if (hasSleepData) {
+      // Sleep but no quick wellness
+      baseReadiness =
+        aerobicContribution * 0.2 +
+        mskContribution * 0.17 +
+        neuralContribution * 0.17 +
+        hrvContribution * 0.16 +
+        sleepContribution * 0.18 +
+        journalContribution * 0.12;
+    } else if (hasQuickWellness) {
+      // Quick wellness but no sleep
+      baseReadiness =
+        aerobicContribution * 0.22 +
         mskContribution * 0.18 +
         neuralContribution * 0.18 +
         hrvContribution * 0.17 +
         journalContribution * 0.1 +
-        quickWellnessContribution * 0.15
-      : aerobicContribution * 0.25 +
+        quickWellnessContribution * 0.15;
+    } else {
+      // Basic: no quick wellness, no sleep data
+      baseReadiness =
+        aerobicContribution * 0.25 +
         mskContribution * 0.2 +
         neuralContribution * 0.2 +
         hrvContribution * 0.2 +
         journalContribution * 0.15;
+    }
 
     // Apply confidence-weighted blending with population model
     const confidence = params.parameter_confidence || 0;
@@ -181,6 +222,7 @@ export class ReadinessService {
       journalContribution,
       isHrvSuppressed,
       quickWellnessContribution,
+      sleepContribution,
     );
 
     // Get recommendation
@@ -210,9 +252,43 @@ export class ReadinessService {
         hrvContribution: Math.round(hrvContribution * 100) / 100,
         journalContribution: Math.round(journalContribution * 100) / 100,
         quickWellnessContribution: Math.round(quickWellnessContribution * 100) / 100,
+        sleepContribution: Math.round(sleepContribution * 100) / 100,
       },
       recommendation,
     };
+  }
+
+  /**
+   * Calculate enhanced sleep contribution using SleepScoreService
+   */
+  private async calculateSleepContribution(userId: string, date: Date): Promise<number> {
+    try {
+      const sleepLogs = await this.sleepLogRepository.findByUserAndDate(userId, date);
+
+      if (sleepLogs.length === 0) {
+        // Fall back to recovery journal sleep_quality_rating if available
+        const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, date);
+        if (journalEntry?.sleep_quality_rating) {
+          // Convert 1-5 rating to 0-100 scale
+          return ((journalEntry.sleep_quality_rating - 1) / 4) * 100;
+        }
+        return 50; // Neutral if no sleep data
+      }
+
+      // Find primary log (prefer wearable over manual)
+      const primaryLog = sleepLogs.find((l) => l.source !== 'manual') || sleepLogs[0];
+
+      // Get baseline for enhanced scoring
+      const baseline = await this.sleepBaselineService.getOrCalculateBaseline(userId, date);
+
+      // Compute enhanced score
+      const scoreResult = this.sleepScoreService.computeEnhancedScore(primaryLog, baseline);
+
+      return scoreResult.score;
+    } catch (error) {
+      this.logger.warn(`Failed to calculate sleep contribution for user ${userId}: ${error}`);
+      return 50; // Neutral on error
+    }
   }
 
   /**
@@ -242,6 +318,9 @@ export class ReadinessService {
     const quickWellnessCheckin = await this.quickWellnessCheckinRepository.findByUserAndDate(userId, latest.date);
     const quickWellnessContribution = this.calculateQuickWellnessContribution(quickWellnessCheckin);
 
+    // Calculate sleep contribution
+    const sleepContribution = await this.calculateSleepContribution(userId, latest.date);
+
     const readinessScore = parseFloat(latest.readiness_score);
     const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
 
@@ -256,6 +335,7 @@ export class ReadinessService {
         journalContribution,
         isHrvSuppressed,
         quickWellnessContribution,
+        sleepContribution,
       ),
       limitingStream: latest.limiting_stream,
       isHrvSuppressed,
@@ -267,6 +347,7 @@ export class ReadinessService {
         hrvContribution,
         journalContribution,
         quickWellnessContribution,
+        sleepContribution,
       },
       recommendation: this.getRecommendation(readinessScore, isHrvSuppressed),
     };
@@ -454,6 +535,7 @@ export class ReadinessService {
     journalContribution: number,
     isHrvSuppressed: boolean,
     quickWellnessContribution: number = 50,
+    sleepContribution: number = 50,
   ): string {
     if (isHrvSuppressed) {
       return 'HRV Suppression';
@@ -466,6 +548,7 @@ export class ReadinessService {
       { name: 'HRV Status', value: hrvContribution },
       { name: 'Subjective Recovery', value: journalContribution },
       { name: 'Quick Wellness', value: quickWellnessContribution },
+      { name: 'Sleep Quality', value: sleepContribution },
     ];
 
     const minFactor = factors.reduce((min, f) => (f.value < min.value ? f : min), factors[0]);
