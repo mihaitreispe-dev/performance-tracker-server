@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   LimitingStream,
   LoadModelParameterValues,
@@ -14,9 +14,10 @@ import { LoadModelParametersRepository } from 'src/repositories/load-model-param
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
-import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
+
 import { TrainingStressService } from './training-stress.service';
 
 export interface StreamLoads {
@@ -72,15 +73,15 @@ export class MultiStreamLoadService {
     const yesterdayData = await this.multiStreamLoadRepository.findByUserAndDate(userId, yesterday);
 
     const previousCTL = {
-      aerobic: yesterdayData ? parseFloat(yesterdayData.aerobic_ctl || '0') : 0,
-      msk: yesterdayData ? parseFloat(yesterdayData.msk_ctl || '0') : 0,
-      neural: yesterdayData ? parseFloat(yesterdayData.neural_ctl || '0') : 0,
+      aerobic: yesterdayData ? Number.parseFloat(yesterdayData.aerobic_ctl || '0') : 0,
+      msk: yesterdayData ? Number.parseFloat(yesterdayData.msk_ctl || '0') : 0,
+      neural: yesterdayData ? Number.parseFloat(yesterdayData.neural_ctl || '0') : 0,
     };
 
     const previousATL = {
-      aerobic: yesterdayData ? parseFloat(yesterdayData.aerobic_atl || '0') : 0,
-      msk: yesterdayData ? parseFloat(yesterdayData.msk_atl || '0') : 0,
-      neural: yesterdayData ? parseFloat(yesterdayData.neural_atl || '0') : 0,
+      aerobic: yesterdayData ? Number.parseFloat(yesterdayData.aerobic_atl || '0') : 0,
+      msk: yesterdayData ? Number.parseFloat(yesterdayData.msk_atl || '0') : 0,
+      neural: yesterdayData ? Number.parseFloat(yesterdayData.neural_atl || '0') : 0,
     };
 
     // Get all workouts for the day
@@ -114,7 +115,7 @@ export class MultiStreamLoadService {
 
         // Get session RPE data from execution
         const sessionRpe = execution.session_rpe ?? null;
-        const srpeTss = execution.srpe_tss ? parseFloat(execution.srpe_tss) : null;
+        const srpeTss = execution.srpe_tss ? Number.parseFloat(execution.srpe_tss) : null;
 
         return {
           execution,
@@ -213,10 +214,7 @@ export class MultiStreamLoadService {
    * Calculate stream-specific loads from workout data
    * Integrates session RPE (sRPE-TSS) when available using Foster method
    */
-  private calculateStreamLoads(
-    workouts: WorkoutWithStress[],
-    params: LoadModelParameterValues,
-  ): StreamLoads {
+  private calculateStreamLoads(workouts: WorkoutWithStress[], params: LoadModelParameterValues): StreamLoads {
     let aerobic = 0;
     let msk = 0;
     let neural = 0;
@@ -228,7 +226,7 @@ export class MultiStreamLoadService {
 
       // Integrate session RPE when available
       if (workout.sessionRpe && workout.srpeTss) {
-        const calculatedTss = workout.stress?.tss ? parseFloat(workout.stress.tss) : null;
+        const calculatedTss = workout.stress?.tss ? Number.parseFloat(workout.stress.tss) : null;
 
         // Use sRPE as neural load indicator for all workout types (not just strength)
         const durationMin = (workout.execution.duration_seconds || 0) / 60;
@@ -257,11 +255,8 @@ export class MultiStreamLoadService {
    * Calculate aerobic load contribution
    * AEROBIC: run_rTSS×1.0 + bike_TSS×0.85 + swim×0.7 + strength×0.3
    */
-  private calculateAerobicLoad(
-    workout: WorkoutWithStress,
-    params: LoadModelParameterValues,
-  ): number {
-    const tss = workout.stress?.tss ? parseFloat(workout.stress.tss) : 0;
+  private calculateAerobicLoad(workout: WorkoutWithStress, params: LoadModelParameterValues): number {
+    const tss = workout.stress?.tss ? Number.parseFloat(workout.stress.tss) : 0;
     const sportType = this.getSportType(workout.workoutType);
 
     switch (sportType) {
@@ -321,7 +316,7 @@ export class MultiStreamLoadService {
     const rpe = workout.sessionRpe ?? workout.avgRpe ?? 5;
 
     // Anaerobic TE indicates high-intensity neural load
-    const anaerobicTE = workout.stress?.anaerobic_te ? parseFloat(workout.stress.anaerobic_te) : 0;
+    const anaerobicTE = workout.stress?.anaerobic_te ? Number.parseFloat(workout.stress.anaerobic_te) : 0;
 
     // Base neural load from intensity
     let neuralLoad = anaerobicTE * 10; // TE 0-5 → 0-50
@@ -329,7 +324,7 @@ export class MultiStreamLoadService {
     // Add RPE-squared factor for heavy efforts
     // Previously only for strength, now applies to all workout types when RPE >= 7
     if (rpe >= 7) {
-      const rpeContribution = (rpe * rpe) / 10 * durationMinutes / 30;
+      const rpeContribution = (((rpe * rpe) / 10) * durationMinutes) / 30;
       // Strength gets full contribution, others get partial
       if (sportType === 'strength') {
         neuralLoad += rpeContribution;
@@ -400,9 +395,7 @@ export class MultiStreamLoadService {
       filter: { workoutExecutionId: executionId },
     });
 
-    const rpeValues = setCompletions
-      .filter((sc) => sc.rpe !== null)
-      .map((sc) => sc.rpe!);
+    const rpeValues = setCompletions.filter((sc) => sc.rpe !== null).map((sc) => sc.rpe!);
 
     if (rpeValues.length === 0) return null;
 
@@ -418,10 +411,144 @@ export class MultiStreamLoadService {
   }
 
   /**
-   * Get multi-stream load history
+   * Get multi-stream load history with gaps filled and extended to today
    */
-  async getHistory(userId: string, days: number = 90): Promise<MultiStreamLoadDaily[]> {
-    return this.multiStreamLoadRepository.getDateRange(userId, days);
+  async getHistory(userId: string, days: number = 90): Promise<DailyStreamMetrics[]> {
+    const records = await this.multiStreamLoadRepository.getDateRange(userId, days);
+
+    // If no data, return empty array
+    if (records.length === 0) {
+      return [];
+    }
+
+    // Get user's parameters for decay constants
+    const params = await this.loadModelParametersRepository.getParametersWithDefaults(userId);
+
+    // Create a map of existing records by date
+    const recordMap = new Map<string, MultiStreamLoadDaily>();
+    for (const r of records) {
+      recordMap.set(formatDateToYMD(r.date), r);
+    }
+
+    // Generate all dates from (today - days) to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - days + 1);
+
+    const result: DailyStreamMetrics[] = [];
+
+    // Decay factors per day with no training (load = 0)
+    const aerobicCtlDecay = 1 - 1 / params.aerobic_ctl_decay;
+    const aerobicAtlDecay = 1 - 1 / params.aerobic_atl_decay;
+    const mskCtlDecay = 1 - 1 / params.msk_ctl_decay;
+    const mskAtlDecay = 1 - 1 / params.msk_atl_decay;
+    const neuralCtlDecay = 1 - 1 / params.neural_ctl_decay;
+    const neuralAtlDecay = 1 - 1 / params.neural_atl_decay;
+
+    // Track last known values for decay
+    let lastAerobic = { ctl: 0, atl: 0 };
+    let lastMsk = { ctl: 0, atl: 0 };
+    let lastNeural = { ctl: 0, atl: 0 };
+
+    const currentDate = new Date(startDate);
+    while (currentDate <= today) {
+      const dateStr = formatDateToYMD(currentDate);
+      const existingRecord = recordMap.get(dateStr);
+
+      if (existingRecord) {
+        // Use actual data
+        lastAerobic = {
+          ctl: Number.parseFloat(existingRecord.aerobic_ctl || '0'),
+          atl: Number.parseFloat(existingRecord.aerobic_atl || '0'),
+        };
+        lastMsk = {
+          ctl: Number.parseFloat(existingRecord.msk_ctl || '0'),
+          atl: Number.parseFloat(existingRecord.msk_atl || '0'),
+        };
+        lastNeural = {
+          ctl: Number.parseFloat(existingRecord.neural_ctl || '0'),
+          atl: Number.parseFloat(existingRecord.neural_atl || '0'),
+        };
+
+        result.push({
+          date: dateStr,
+          aerobic: {
+            ctl: this.round(lastAerobic.ctl),
+            atl: this.round(lastAerobic.atl),
+            tsb: this.round(Number.parseFloat(existingRecord.aerobic_tsb || '0')),
+            dailyLoad: this.round(Number.parseFloat(existingRecord.aerobic_daily_load || '0')),
+          },
+          msk: {
+            ctl: this.round(lastMsk.ctl),
+            atl: this.round(lastMsk.atl),
+            tsb: this.round(Number.parseFloat(existingRecord.msk_tsb || '0')),
+            dailyLoad: this.round(Number.parseFloat(existingRecord.msk_daily_load || '0')),
+          },
+          neural: {
+            ctl: this.round(lastNeural.ctl),
+            atl: this.round(lastNeural.atl),
+            tsb: this.round(Number.parseFloat(existingRecord.neural_tsb || '0')),
+            dailyLoad: this.round(Number.parseFloat(existingRecord.neural_daily_load || '0')),
+          },
+          limitingStream: existingRecord.limiting_stream,
+        });
+      } else if (lastAerobic.ctl > 0 || lastMsk.ctl > 0 || lastNeural.ctl > 0) {
+        // No data for this day but we have previous values - apply decay
+        lastAerobic = {
+          ctl: this.round(lastAerobic.ctl * aerobicCtlDecay),
+          atl: this.round(lastAerobic.atl * aerobicAtlDecay),
+        };
+        lastMsk = {
+          ctl: this.round(lastMsk.ctl * mskCtlDecay),
+          atl: this.round(lastMsk.atl * mskAtlDecay),
+        };
+        lastNeural = {
+          ctl: this.round(lastNeural.ctl * neuralCtlDecay),
+          atl: this.round(lastNeural.atl * neuralAtlDecay),
+        };
+
+        // Floor small values to 0
+        if (lastAerobic.ctl < 0.1) lastAerobic.ctl = 0;
+        if (lastAerobic.atl < 0.1) lastAerobic.atl = 0;
+        if (lastMsk.ctl < 0.1) lastMsk.ctl = 0;
+        if (lastMsk.atl < 0.1) lastMsk.atl = 0;
+        if (lastNeural.ctl < 0.1) lastNeural.ctl = 0;
+        if (lastNeural.atl < 0.1) lastNeural.atl = 0;
+
+        const aerobicTsb = this.round(lastAerobic.ctl - lastAerobic.atl);
+        const mskTsb = this.round(lastMsk.ctl - lastMsk.atl);
+        const neuralTsb = this.round(lastNeural.ctl - lastNeural.atl);
+
+        result.push({
+          date: dateStr,
+          aerobic: {
+            ctl: lastAerobic.ctl,
+            atl: lastAerobic.atl,
+            tsb: aerobicTsb,
+            dailyLoad: 0,
+          },
+          msk: {
+            ctl: lastMsk.ctl,
+            atl: lastMsk.atl,
+            tsb: mskTsb,
+            dailyLoad: 0,
+          },
+          neural: {
+            ctl: lastNeural.ctl,
+            atl: lastNeural.atl,
+            tsb: neuralTsb,
+            dailyLoad: 0,
+          },
+          limitingStream: this.identifyLimitingStream(aerobicTsb, mskTsb, neuralTsb),
+        });
+      }
+      // If all CTLs are 0, skip this date (no data yet)
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return result;
   }
 
   /**
@@ -507,7 +634,7 @@ export class MultiStreamLoadService {
                 workoutType,
                 avgRpe,
                 sessionRpe: execution.session_rpe ?? null,
-                srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : null,
+                srpeTss: execution.srpe_tss ? Number.parseFloat(execution.srpe_tss) : null,
               };
             }),
           );

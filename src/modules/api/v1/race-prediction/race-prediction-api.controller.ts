@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,14 +10,25 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
   Version,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { RacePredictionApiService } from './race-prediction-api.service';
 import {
+  CourseBasedPredictionBody,
   GeneratePredictionBody,
   PredictionHistoryQuery,
   QuickPredictionBody,
@@ -26,6 +38,7 @@ import {
 } from './request.dto';
 import {
   AthleteProfileMetricsDTO,
+  CourseBasedPredictionDTO,
   HistoricalRaceResultDTO,
   PredictionAccuracyStatsDTO,
   RacePredictionDTO,
@@ -81,6 +94,111 @@ export class RacePredictionApiController {
     @Body() body: QuickPredictionBody,
   ): Promise<RacePredictionDTO> {
     return this.service.quickPrediction(req, body);
+  }
+
+  @Version('1')
+  @Post('me/predictions/quick')
+  @ApiOperation({ summary: 'Generate quick prediction for current user' })
+  @ApiResponse({ status: 201, type: RacePredictionDTO })
+  async quickPredictionMe(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: QuickPredictionBody,
+  ): Promise<RacePredictionDTO> {
+    return this.service.quickPrediction(req, body);
+  }
+
+  // ==========================================================================
+  // Course-Based Predictions
+  // ==========================================================================
+
+  @Version('1')
+  @Post('me/predictions/course')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+      fileFilter: (_req, file, callback) => {
+        const allowedMimeTypes = [
+          'application/gpx+xml',
+          'application/xml',
+          'text/xml',
+          'application/octet-stream', // FIT files
+        ];
+        const allowedExtensions = ['.gpx', '.fit'];
+        const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+
+        if (allowedMimeTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+          callback(null, true);
+        } else {
+          callback(new BadRequestException('Only GPX and FIT files are allowed'), false);
+        }
+      },
+    }),
+  )
+  @ApiOperation({
+    summary: 'Generate course-based prediction from GPX/FIT file',
+    description:
+      'Upload a GPX or FIT file containing a course with elevation data to get ' +
+      'a grade-adjusted race prediction using the Minetti model.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Course file and prediction options',
+    schema: {
+      type: 'object',
+      required: ['file', 'sport'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'GPX or FIT file with course elevation data',
+        },
+        sport: {
+          type: 'string',
+          enum: ['run'],
+          description: 'Sport type (currently only running supported)',
+        },
+        distance_meters: {
+          type: 'number',
+          description: 'Override distance (if different from file)',
+        },
+        segment_distance_meters: {
+          type: 'number',
+          default: 1000,
+          description: 'Segment size for splits (default: 1000m)',
+        },
+        apply_fade_factor: {
+          type: 'boolean',
+          default: false,
+          description: 'Apply fade factor for longer races',
+        },
+        downhill_speed_cap_mps: {
+          type: 'number',
+          description: 'Max downhill speed in m/s (default: 4.17)',
+        },
+        smoothing_window_meters: {
+          type: 'number',
+          default: 100,
+          description: 'Elevation smoothing window (default: 100m)',
+        },
+        race_date: {
+          type: 'string',
+          format: 'date',
+          description: 'Target race date for TSB projection',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, type: CourseBasedPredictionDTO })
+  @ApiResponse({ status: 400, description: 'Invalid file or insufficient data' })
+  async courseBasedPrediction(
+    @Req() req: Request & { user: AuthUser },
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: CourseBasedPredictionBody,
+  ): Promise<CourseBasedPredictionDTO> {
+    if (!file) {
+      throw new BadRequestException('Course file is required');
+    }
+    return this.service.courseBasedPrediction(req, file, body);
   }
 
   // ==========================================================================

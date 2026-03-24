@@ -18,6 +18,7 @@ import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.rep
 
 import { AdvancedMetricsApiModule } from '../advanced-metrics/advanced-metrics-api.module';
 import { AnalyticsApiModule } from '../analytics/analytics-api.module';
+import { RaceCalendarApiModule } from '../race-calendar/race-calendar-api.module';
 import { WorkoutPlansApiModule } from '../workout-plans/workout-plans-api.module';
 import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 import { CoachingApiController } from './coaching-api.controller';
@@ -38,6 +39,7 @@ export class CoachingApiModule {
           AnalyticsApiModule.register(),
           AdvancedMetricsApiModule.register(),
           ScheduledPromptsModule.register(),
+          RaceCalendarApiModule.register(),
         ],
         providers: [
           CoachingApiService,

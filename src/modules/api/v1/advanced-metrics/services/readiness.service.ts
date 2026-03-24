@@ -1,15 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   DefaultLoadModelParameters,
+  IllnessType,
   LimitingStream,
   LoadModelParameterValues,
   NewMultiStreamLoadDaily,
   QuickWellnessCheckin,
   RecoveryJournalEntry,
-  StreamType,
 } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
+import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { HrvBaselineRepository } from 'src/repositories/hrv-baseline.repository';
+import { IllnessLogRepository } from 'src/repositories/illness-log.repository';
 import { LoadModelParametersRepository } from 'src/repositories/load-model-parameters.repository';
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
 import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
@@ -18,6 +20,79 @@ import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
 
 import { SleepBaselineService } from '../../sleep/sleep-baseline.service';
 import { SleepScoreService } from '../../sleep/sleep-score.service';
+import { HrvBaselineService } from './hrv-baseline.service';
+
+// ==========================================
+// Enhanced Readiness Types (v2)
+// ==========================================
+
+export interface RecoveryBlockScores {
+  sleepScore: number;
+  nocturnalHrvScore: number;
+  rhrDeltaScore: number;
+  hrNadirScore: number;
+  blockScore: number;
+  weight: number;
+}
+
+export interface LoadBlockScores {
+  aerobicTsbScore: number;
+  mskTsbScore: number;
+  neuralTsbScore: number;
+  monotonyPenalty: number;
+  strainPenalty: number;
+  blockScore: number;
+  weight: number;
+}
+
+export interface SubjectiveBlockScores {
+  quickWellnessScore: number;
+  journalScore: number;
+  blockScore: number;
+  weight: number;
+}
+
+export interface IllnessBlockScores {
+  alcoholPenalty: number;
+  illnessOverride: boolean;
+  illnessSeverity: number | null;
+  blockScore: number;
+  weight: number;
+}
+
+export interface ReadinessComponentScores {
+  recovery: RecoveryBlockScores;
+  load: LoadBlockScores;
+  subjective: SubjectiveBlockScores;
+  illness: IllnessBlockScores;
+}
+
+export interface ReadinessConfidence {
+  overall: number; // 0-1
+  dataCompleteness: number; // % of data present
+  baselineQuality: number; // quality of baseline data
+}
+
+export type DataQualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'minimal';
+
+export interface EnhancedReadinessResult extends ReadinessResult {
+  confidence: ReadinessConfidence;
+  componentScores: ReadinessComponentScores;
+  dataQuality: DataQualityLevel;
+  version: number;
+}
+
+// Base weight configuration (mid-range of research recommendations)
+const BASE_WEIGHTS = {
+  recovery: 0.5, // 45-55%
+  load: 0.3, // 25-35%
+  subjective: 0.15, // 10-20%
+  illness: 0.05, // 5-15%
+};
+
+// ==========================================
+// Legacy Readiness Types (v1)
+// ==========================================
 
 export interface ReadinessResult {
   date: string;
@@ -98,6 +173,9 @@ export class ReadinessService {
     private readonly sleepLogRepository: SleepLogRepository,
     private readonly sleepScoreService: SleepScoreService,
     private readonly sleepBaselineService: SleepBaselineService,
+    private readonly fitnessFatigueRepository: FitnessFatigueRepository,
+    private readonly illnessLogRepository: IllnessLogRepository,
+    private readonly hrvBaselineService: HrvBaselineService,
   ) {}
 
   /**
@@ -126,9 +204,9 @@ export class ReadinessService {
     const sleepContribution = await this.calculateSleepContribution(userId, targetDate);
 
     // Calculate TSB contributions (normalized to 0-100)
-    const aerobicTsb = loadData?.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : 0;
-    const mskTsb = loadData?.msk_tsb ? parseFloat(loadData.msk_tsb) : 0;
-    const neuralTsb = loadData?.neural_tsb ? parseFloat(loadData.neural_tsb) : 0;
+    const aerobicTsb = loadData?.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : 0;
+    const mskTsb = loadData?.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : 0;
+    const neuralTsb = loadData?.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : 0;
 
     // Normalize TSB to 0-100 scale (TSB of -25 to +25 → 0-100)
     const aerobicContribution = this.normalizeTsb(aerobicTsb);
@@ -136,7 +214,7 @@ export class ReadinessService {
     const neuralContribution = this.normalizeTsb(neuralTsb);
 
     // Calculate HRV contribution (based on z-score)
-    const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : 0;
+    const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : 0;
     const hrvContribution = this.normalizeHrvZscore(hrvZscore);
     const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
 
@@ -303,10 +381,10 @@ export class ReadinessService {
     const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, latest.date);
     const params = await this.loadModelParametersRepository.getParametersWithDefaults(userId);
 
-    const aerobicTsb = latest.aerobic_tsb ? parseFloat(latest.aerobic_tsb) : 0;
-    const mskTsb = latest.msk_tsb ? parseFloat(latest.msk_tsb) : 0;
-    const neuralTsb = latest.neural_tsb ? parseFloat(latest.neural_tsb) : 0;
-    const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : 0;
+    const aerobicTsb = latest.aerobic_tsb ? Number.parseFloat(latest.aerobic_tsb) : 0;
+    const mskTsb = latest.msk_tsb ? Number.parseFloat(latest.msk_tsb) : 0;
+    const neuralTsb = latest.neural_tsb ? Number.parseFloat(latest.neural_tsb) : 0;
+    const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : 0;
 
     const aerobicContribution = this.normalizeTsb(aerobicTsb);
     const mskContribution = this.normalizeTsb(mskTsb);
@@ -321,7 +399,7 @@ export class ReadinessService {
     // Calculate sleep contribution
     const sleepContribution = await this.calculateSleepContribution(userId, latest.date);
 
-    const readinessScore = parseFloat(latest.readiness_score);
+    const readinessScore = Number.parseFloat(latest.readiness_score);
     const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
 
     return {
@@ -369,9 +447,9 @@ export class ReadinessService {
     }
 
     const latest = history[history.length - 1];
-    const current = latest.readiness_score ? parseFloat(latest.readiness_score) : 50;
+    const current = latest.readiness_score ? Number.parseFloat(latest.readiness_score) : 50;
 
-    const scores = history.filter((h) => h.readiness_score).map((h) => parseFloat(h.readiness_score!));
+    const scores = history.filter((h) => h.readiness_score).map((h) => Number.parseFloat(h.readiness_score!));
     const weekAvg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 50;
 
     // Determine trend
@@ -446,7 +524,7 @@ export class ReadinessService {
 
     // Alcohol units (negative impact)
     if (entry.alcohol_units) {
-      const units = parseFloat(entry.alcohol_units);
+      const units = Number.parseFloat(entry.alcohol_units);
       score -= units * 5 * params.w_alcohol;
     }
 
@@ -600,12 +678,12 @@ export class ReadinessService {
     const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, targetDate);
     const params = await this.loadModelParametersRepository.getParametersWithDefaults(userId);
 
-    const aerobicTsb = loadData?.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : 0;
-    const mskTsb = loadData?.msk_tsb ? parseFloat(loadData.msk_tsb) : 0;
-    const neuralTsb = loadData?.neural_tsb ? parseFloat(loadData.neural_tsb) : 0;
-    const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null;
+    const aerobicTsb = loadData?.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : 0;
+    const mskTsb = loadData?.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : 0;
+    const neuralTsb = loadData?.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : 0;
+    const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : null;
 
-    let readinessScore = loadData?.readiness_score ? parseFloat(loadData.readiness_score) : 50;
+    const readinessScore = loadData?.readiness_score ? Number.parseFloat(loadData.readiness_score) : 50;
     const hrvOverride = !!loadData?.readiness_override_reason;
     const journalContribution = journalEntry ? this.calculateJournalContribution(journalEntry, params) : null;
 
@@ -661,11 +739,11 @@ export class ReadinessService {
       const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, load.date);
       const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, load.date);
 
-      const aerobicTsb = load.aerobic_tsb ? parseFloat(load.aerobic_tsb) : 0;
-      const mskTsb = load.msk_tsb ? parseFloat(load.msk_tsb) : 0;
-      const neuralTsb = load.neural_tsb ? parseFloat(load.neural_tsb) : 0;
-      const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null;
-      const readinessScore = load.readiness_score ? parseFloat(load.readiness_score) : 50;
+      const aerobicTsb = load.aerobic_tsb ? Number.parseFloat(load.aerobic_tsb) : 0;
+      const mskTsb = load.msk_tsb ? Number.parseFloat(load.msk_tsb) : 0;
+      const neuralTsb = load.neural_tsb ? Number.parseFloat(load.neural_tsb) : 0;
+      const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : null;
+      const readinessScore = load.readiness_score ? Number.parseFloat(load.readiness_score) : 50;
 
       let limitingFactor: string | null = null;
       if (load.limiting_stream) {
@@ -753,15 +831,15 @@ export class ReadinessService {
       const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, load.date);
       hrvData.push({
         date: formatDateToYMD(load.date),
-        hrvZscore: hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null,
+        hrvZscore: hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : null,
       });
     }
 
     // Calculate composite load (combined ATL from all streams, normalized to 0-100)
     const loadDataWithComposite = loads.map((load) => {
-      const aerobicAtl = load.aerobic_atl ? parseFloat(load.aerobic_atl) : 0;
-      const mskAtl = load.msk_atl ? parseFloat(load.msk_atl) : 0;
-      const neuralAtl = load.neural_atl ? parseFloat(load.neural_atl) : 0;
+      const aerobicAtl = load.aerobic_atl ? Number.parseFloat(load.aerobic_atl) : 0;
+      const mskAtl = load.msk_atl ? Number.parseFloat(load.msk_atl) : 0;
+      const neuralAtl = load.neural_atl ? Number.parseFloat(load.neural_atl) : 0;
       // Average ATL across streams, normalized (ATL typically 0-100+)
       const compositeLoad = Math.min(100, (aerobicAtl + mskAtl + neuralAtl) / 3);
       return {
@@ -908,17 +986,17 @@ export class ReadinessService {
 
     for (const load of loads) {
       const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, load.date);
-      const hrvZscore = hrvBaseline?.hrv_zscore ? parseFloat(hrvBaseline.hrv_zscore) : null;
+      const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : null;
       const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
       const suppressionSeverity = hrvBaseline?.suppression_severity || null;
 
       // Calculate composite load (combined ATL, normalized to 0-100)
-      const aerobicAtl = load.aerobic_atl ? parseFloat(load.aerobic_atl) : 0;
-      const mskAtl = load.msk_atl ? parseFloat(load.msk_atl) : 0;
-      const neuralAtl = load.neural_atl ? parseFloat(load.neural_atl) : 0;
+      const aerobicAtl = load.aerobic_atl ? Number.parseFloat(load.aerobic_atl) : 0;
+      const mskAtl = load.msk_atl ? Number.parseFloat(load.msk_atl) : 0;
+      const neuralAtl = load.neural_atl ? Number.parseFloat(load.neural_atl) : 0;
       const compositeLoad = Math.min(100, Math.round(((aerobicAtl + mskAtl + neuralAtl) / 3) * 100) / 100);
 
-      const readinessScore = load.readiness_score ? parseFloat(load.readiness_score) : 50;
+      const readinessScore = load.readiness_score ? Number.parseFloat(load.readiness_score) : 50;
 
       const simpleRecommendation = this.getSimpleRecommendation(
         readinessScore,
@@ -950,5 +1028,516 @@ export class ReadinessService {
         daysWithData: trendPoints.length,
       },
     };
+  }
+
+  // ==========================================
+  // Enhanced Readiness (v2) Implementation
+  // ==========================================
+
+  /**
+   * Calculate enhanced daily readiness score (v2)
+   * Uses research-backed 4-block structure with proper weight distribution
+   */
+  async calculateEnhancedReadiness(userId: string, date: Date): Promise<EnhancedReadinessResult> {
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Get personalized parameters
+    const params = await this.loadModelParametersRepository.getParametersWithDefaults(userId);
+
+    // Get all required data
+    const loadData = await this.multiStreamLoadRepository.findByUserAndDate(userId, targetDate);
+    const hrvBaseline = await this.hrvBaselineRepository.findByUserAndDate(userId, targetDate);
+    const journalEntry = await this.recoveryJournalRepository.findByUserAndDate(userId, targetDate);
+    const quickWellnessCheckin = await this.quickWellnessCheckinRepository.findByUserAndDate(userId, targetDate);
+    const fitnessFatigueData = await this.fitnessFatigueRepository.findByUserAndDate(userId, targetDate);
+
+    // Calculate each block
+    const recoveryBlock = await this.calculateRecoveryBlock(userId, targetDate, hrvBaseline);
+    const loadBlock = await this.calculateLoadBlock(loadData, fitnessFatigueData);
+    const subjectiveBlock = this.calculateSubjectiveBlock(quickWellnessCheckin, journalEntry, params);
+    const illnessBlock = await this.calculateIllnessBehaviorBlock(userId, journalEntry);
+
+    // Calculate dynamic weights based on data availability
+    const weights = this.calculateDynamicWeights(recoveryBlock, loadBlock, subjectiveBlock, illnessBlock);
+
+    // Update block weights
+    recoveryBlock.weight = weights.recovery;
+    loadBlock.weight = weights.load;
+    subjectiveBlock.weight = weights.subjective;
+    illnessBlock.weight = weights.illness;
+
+    // Calculate weighted readiness score
+    let readinessScore =
+      recoveryBlock.blockScore * weights.recovery +
+      loadBlock.blockScore * weights.load +
+      subjectiveBlock.blockScore * weights.subjective +
+      illnessBlock.blockScore * weights.illness;
+
+    // Apply illness override caps
+    if (illnessBlock.illnessOverride) {
+      const severity = illnessBlock.illnessSeverity ?? 0;
+      if (severity >= 6) {
+        readinessScore = Math.min(readinessScore, 40);
+      } else if (severity >= 3) {
+        readinessScore = Math.min(readinessScore, 60);
+      }
+    }
+
+    // Apply HRV suppression override
+    const isHrvSuppressed = hrvBaseline?.is_suppressed || false;
+    let overrideReason: string | null = null;
+    if (isHrvSuppressed && hrvBaseline?.suppression_severity) {
+      const override = this.getHrvOverride(hrvBaseline.suppression_severity);
+      if (readinessScore > override.maxScore) {
+        readinessScore = override.maxScore;
+        overrideReason = `HRV ${hrvBaseline.suppression_severity} suppression`;
+      }
+    }
+
+    // Calculate confidence
+    const confidence = this.calculateConfidence(
+      recoveryBlock,
+      loadBlock,
+      subjectiveBlock,
+      illnessBlock,
+      hrvBaseline !== null,
+      loadData !== null,
+    );
+
+    // Determine data quality level
+    const dataQuality = this.getDataQualityLevel(confidence.dataCompleteness);
+
+    // Identify limiting factor
+    const limitingStream = loadData?.limiting_stream || null;
+    const limitingFactor = this.identifyEnhancedLimitingFactor(recoveryBlock, loadBlock, subjectiveBlock, illnessBlock);
+
+    // Get recommendation
+    const recommendation = this.getRecommendation(readinessScore, isHrvSuppressed);
+
+    // Build legacy components for backwards compatibility
+    const aerobicTsb = loadData?.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : 0;
+    const mskTsb = loadData?.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : 0;
+    const neuralTsb = loadData?.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : 0;
+    const hrvZscore = hrvBaseline?.hrv_zscore ? Number.parseFloat(hrvBaseline.hrv_zscore) : 0;
+
+    // Update the multi-stream load record with readiness
+    if (loadData) {
+      const updateData: Partial<NewMultiStreamLoadDaily> = {
+        readiness_score: Math.round(readinessScore * 100) / 100,
+        readiness_override_reason: overrideReason,
+        limiting_stream: limitingStream,
+      };
+      await this.multiStreamLoadRepository.update(loadData.id, updateData);
+    }
+
+    return {
+      // Legacy fields
+      date: formatDateToYMD(targetDate),
+      readinessScore: Math.round(readinessScore * 100) / 100,
+      limitingFactor,
+      limitingStream,
+      isHrvSuppressed,
+      overrideReason,
+      components: {
+        aerobicContribution: this.normalizeTsb(aerobicTsb),
+        mskContribution: this.normalizeTsb(mskTsb),
+        neuralContribution: this.normalizeTsb(neuralTsb),
+        hrvContribution: this.normalizeHrvZscore(hrvZscore),
+        journalContribution: subjectiveBlock.journalScore,
+        quickWellnessContribution: subjectiveBlock.quickWellnessScore,
+        sleepContribution: recoveryBlock.sleepScore,
+      },
+      recommendation,
+      // Enhanced fields
+      confidence,
+      componentScores: {
+        recovery: recoveryBlock,
+        load: loadBlock,
+        subjective: subjectiveBlock,
+        illness: illnessBlock,
+      },
+      dataQuality,
+      version: 2,
+    };
+  }
+
+  /**
+   * Calculate Recovery Block (45-55% weight)
+   * Components: Sleep (40%), Nocturnal HRV (30%), RHR Delta (15%), HR Nadir (15%)
+   */
+  private async calculateRecoveryBlock(
+    userId: string,
+    date: Date,
+    hrvBaseline: Awaited<ReturnType<HrvBaselineRepository['findByUserAndDate']>>,
+  ): Promise<RecoveryBlockScores> {
+    // Sleep Score (40% of block)
+    const sleepScore = await this.calculateSleepContribution(userId, date);
+
+    // Nocturnal HRV (30% of block) - use z-score normalized
+    let nocturnalHrvScore = 50; // Neutral default
+    if (hrvBaseline?.hrv_zscore) {
+      const hrvZscore = Number.parseFloat(hrvBaseline.hrv_zscore);
+      nocturnalHrvScore = this.normalizeHrvZscore(hrvZscore);
+    }
+
+    // RHR Delta (15% of block) - today's RHR vs 7-day average
+    let rhrDeltaScore = 50; // Neutral default
+    if (hrvBaseline?.resting_hr) {
+      const rhrDelta = await this.calculateRhrDelta(userId, date, Number.parseFloat(hrvBaseline.resting_hr));
+      // RHR lower than average is good (score > 50), higher is bad (score < 50)
+      // Delta of -5bpm → 75, 0 → 50, +5bpm → 25
+      rhrDeltaScore = Math.max(0, Math.min(100, 50 - rhrDelta * 5));
+    }
+
+    // HR Nadir (15% of block) - sleep HR nadir vs baseline
+    let hrNadirScore = 50; // Neutral default
+    const sleepBaseline = await this.sleepBaselineService.getOrCalculateBaseline(userId, date);
+    if (sleepBaseline?.hr_nadir_14day_avg) {
+      const sleepLogs = await this.sleepLogRepository.findByUserAndDate(userId, date);
+      const primaryLog = sleepLogs.find((l) => l.source !== 'manual') || sleepLogs[0];
+      if (primaryLog?.hr_nadir) {
+        const baselineNadir = Number.parseFloat(sleepBaseline.hr_nadir_14day_avg);
+        const nadirDelta = primaryLog.hr_nadir - baselineNadir;
+        // Lower nadir is better: -5bpm from baseline → 75, 0 → 50, +5bpm → 25
+        hrNadirScore = Math.max(0, Math.min(100, 50 - nadirDelta * 5));
+      }
+    }
+
+    // Calculate block score (weighted average)
+    const blockScore = sleepScore * 0.4 + nocturnalHrvScore * 0.3 + rhrDeltaScore * 0.15 + hrNadirScore * 0.15;
+
+    return {
+      sleepScore: Math.round(sleepScore * 100) / 100,
+      nocturnalHrvScore: Math.round(nocturnalHrvScore * 100) / 100,
+      rhrDeltaScore: Math.round(rhrDeltaScore * 100) / 100,
+      hrNadirScore: Math.round(hrNadirScore * 100) / 100,
+      blockScore: Math.round(blockScore * 100) / 100,
+      weight: BASE_WEIGHTS.recovery,
+    };
+  }
+
+  /**
+   * Calculate RHR Delta (today vs 7-day average)
+   */
+  private async calculateRhrDelta(userId: string, date: Date, todayRhr: number): Promise<number> {
+    const history = await this.hrvBaselineRepository.getDateRange(userId, 7);
+    const rhrValues = history.filter((h) => h.resting_hr && h.date < date).map((h) => Number.parseFloat(h.resting_hr!));
+
+    if (rhrValues.length === 0) {
+      return 0; // No historical data
+    }
+
+    const avgRhr = rhrValues.reduce((sum, v) => sum + v, 0) / rhrValues.length;
+    return todayRhr - avgRhr;
+  }
+
+  /**
+   * Calculate Load Block (25-35% weight)
+   * Components: TSB contributions (60%), Monotony penalty (20%), Strain penalty (20%)
+   */
+  private async calculateLoadBlock(
+    loadData: Awaited<ReturnType<MultiStreamLoadRepository['findByUserAndDate']>>,
+    fitnessFatigueData: Awaited<ReturnType<FitnessFatigueRepository['findByUserAndDate']>>,
+  ): Promise<LoadBlockScores> {
+    // TSB contributions (60% of block)
+    const aerobicTsb = loadData?.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : 0;
+    const mskTsb = loadData?.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : 0;
+    const neuralTsb = loadData?.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : 0;
+
+    const aerobicTsbScore = this.normalizeTsb(aerobicTsb);
+    const mskTsbScore = this.normalizeTsb(mskTsb);
+    const neuralTsbScore = this.normalizeTsb(neuralTsb);
+
+    // Average TSB score
+    const avgTsbScore = (aerobicTsbScore + mskTsbScore + neuralTsbScore) / 3;
+
+    // Monotony penalty (20% of block)
+    let monotonyPenalty = 0;
+    const monotony = fitnessFatigueData?.monotony ? Number.parseFloat(fitnessFatigueData.monotony) : null;
+    if (monotony !== null) {
+      if (monotony > 2.0) {
+        monotonyPenalty = 15; // Severe
+      } else if (monotony > 1.5) {
+        monotonyPenalty = 5; // Warning
+      }
+    }
+
+    // Strain penalty (20% of block)
+    let strainPenalty = 0;
+    const strain = fitnessFatigueData?.strain ? Number.parseFloat(fitnessFatigueData.strain) : null;
+    if (strain !== null) {
+      if (strain > 2000) {
+        strainPenalty = 15; // Severe
+      } else if (strain > 1500) {
+        strainPenalty = 5; // Warning
+      }
+    }
+
+    // Calculate block score
+    // TSB contributes 60% (100 = no fatigue), penalties reduce from 100
+    const tsbComponent = avgTsbScore * 0.6;
+    const monotonyComponent = (100 - monotonyPenalty * 5) * 0.2; // Scale penalty to 0-100
+    const strainComponent = (100 - strainPenalty * 5) * 0.2;
+    const blockScore = tsbComponent + monotonyComponent + strainComponent;
+
+    return {
+      aerobicTsbScore: Math.round(aerobicTsbScore * 100) / 100,
+      mskTsbScore: Math.round(mskTsbScore * 100) / 100,
+      neuralTsbScore: Math.round(neuralTsbScore * 100) / 100,
+      monotonyPenalty,
+      strainPenalty,
+      blockScore: Math.round(blockScore * 100) / 100,
+      weight: BASE_WEIGHTS.load,
+    };
+  }
+
+  /**
+   * Calculate Subjective Block (10-20% weight)
+   * Components: Quick Wellness (50%), Recovery Journal (50%)
+   */
+  private calculateSubjectiveBlock(
+    quickWellness: QuickWellnessCheckin | null | undefined,
+    journalEntry: RecoveryJournalEntry | null | undefined,
+    params: LoadModelParameterValues,
+  ): SubjectiveBlockScores {
+    const quickWellnessScore = this.calculateQuickWellnessContribution(quickWellness);
+    const journalScore = this.calculateJournalContribution(journalEntry ?? null, params);
+
+    // Weight based on what data is available
+    let blockScore: number;
+    if (quickWellness && journalEntry) {
+      blockScore = quickWellnessScore * 0.5 + journalScore * 0.5;
+    } else if (quickWellness) {
+      blockScore = quickWellnessScore;
+    } else if (journalEntry) {
+      blockScore = journalScore;
+    } else {
+      blockScore = 50; // Neutral
+    }
+
+    return {
+      quickWellnessScore: Math.round(quickWellnessScore * 100) / 100,
+      journalScore: Math.round(journalScore * 100) / 100,
+      blockScore: Math.round(blockScore * 100) / 100,
+      weight: BASE_WEIGHTS.subjective,
+    };
+  }
+
+  /**
+   * Calculate Illness/Behavior Block (5-15% weight)
+   * Components: Illness override, Alcohol penalty
+   */
+  private async calculateIllnessBehaviorBlock(
+    userId: string,
+    journalEntry: RecoveryJournalEntry | null | undefined,
+  ): Promise<IllnessBlockScores> {
+    // Check for active illness
+    const activeIllnesses = await this.illnessLogRepository.getActiveForUser(userId);
+    const illnessOverride = activeIllnesses.length > 0;
+    let illnessSeverity: number | null = null;
+
+    if (illnessOverride) {
+      // Use the highest severity among active illnesses
+      illnessSeverity = Math.max(...activeIllnesses.map((i) => i.severity));
+
+      // Check for fever type (hard cap at 30)
+      const hasFever = activeIllnesses.some((i) => i.illness_type === IllnessType.FEVER);
+      if (hasFever && illnessSeverity < 6) {
+        illnessSeverity = 6; // Treat fever as at least severity 6
+      }
+    }
+
+    // Alcohol penalty (explicit, not buried in journal)
+    let alcoholPenalty = 0;
+    if (journalEntry?.alcohol_units) {
+      const units = Number.parseFloat(journalEntry.alcohol_units);
+      if (units >= 5) {
+        alcoholPenalty = 25;
+      } else if (units >= 3) {
+        alcoholPenalty = 15;
+      } else if (units >= 1) {
+        alcoholPenalty = 5;
+      }
+    }
+
+    // Calculate block score
+    // Start at 100, subtract penalties
+    let blockScore = 100;
+
+    // Apply illness impact
+    if (illnessOverride && illnessSeverity) {
+      // Severity 1-10 maps to 10-100 point reduction
+      blockScore -= illnessSeverity * 10;
+    }
+
+    // Apply alcohol penalty
+    blockScore -= alcoholPenalty;
+
+    blockScore = Math.max(0, Math.min(100, blockScore));
+
+    return {
+      alcoholPenalty,
+      illnessOverride,
+      illnessSeverity,
+      blockScore: Math.round(blockScore * 100) / 100,
+      weight: BASE_WEIGHTS.illness,
+    };
+  }
+
+  /**
+   * Calculate dynamic weights based on data availability
+   */
+  private calculateDynamicWeights(
+    recovery: RecoveryBlockScores,
+    _load: LoadBlockScores,
+    subjective: SubjectiveBlockScores,
+    illness: IllnessBlockScores,
+  ): { recovery: number; load: number; subjective: number; illness: number } {
+    const weights = { ...BASE_WEIGHTS };
+
+    // Check if illness is active - increase illness weight
+    if (illness.illnessOverride) {
+      weights.illness = 0.15;
+      // Reduce others proportionally
+      const reduction = 0.1 / 3;
+      weights.recovery -= reduction;
+      weights.load -= reduction;
+      weights.subjective -= reduction;
+    }
+
+    // If subjective data is complete (both quick wellness and journal), can increase weight
+    if (subjective.quickWellnessScore !== 50 && subjective.journalScore !== 50) {
+      weights.subjective = Math.min(0.2, weights.subjective + 0.03);
+      weights.recovery -= 0.03;
+    }
+
+    // If recovery data is sparse, redistribute weight to load
+    if (recovery.sleepScore === 50 && recovery.nocturnalHrvScore === 50) {
+      const shift = 0.1;
+      weights.load += shift;
+      weights.recovery -= shift;
+    }
+
+    // Normalize weights to sum to 1
+    const totalWeight = weights.recovery + weights.load + weights.subjective + weights.illness;
+    weights.recovery /= totalWeight;
+    weights.load /= totalWeight;
+    weights.subjective /= totalWeight;
+    weights.illness /= totalWeight;
+
+    return weights;
+  }
+
+  /**
+   * Calculate confidence score based on data completeness and quality
+   */
+  private calculateConfidence(
+    recovery: RecoveryBlockScores,
+    load: LoadBlockScores,
+    subjective: SubjectiveBlockScores,
+    _illness: IllnessBlockScores,
+    hasHrvBaseline: boolean,
+    hasLoadData: boolean,
+  ): ReadinessConfidence {
+    // Data completeness (each component contributes ~11%)
+    let completeness = 0;
+
+    // Sleep data present (+11%)
+    if (recovery.sleepScore !== 50) completeness += 0.11;
+
+    // Sleep baseline present (+11%)
+    if (recovery.hrNadirScore !== 50) completeness += 0.11;
+
+    // HRV data present (+11%)
+    if (recovery.nocturnalHrvScore !== 50) completeness += 0.11;
+
+    // HRV baseline present (+11%)
+    if (hasHrvBaseline) completeness += 0.11;
+
+    // Load data present (+11%)
+    if (hasLoadData) completeness += 0.11;
+
+    // Monotony/strain available (+11%)
+    if (load.monotonyPenalty !== 0 || load.strainPenalty !== 0) completeness += 0.11;
+
+    // Quick wellness present (+11%)
+    if (subjective.quickWellnessScore !== 50) completeness += 0.11;
+
+    // Recovery journal present (+11%)
+    if (subjective.journalScore !== 50) completeness += 0.11;
+
+    // Illness data checked (+12%)
+    completeness += 0.12; // Always checked
+
+    completeness = Math.min(1, completeness);
+
+    // Baseline quality (based on how much baseline data we have)
+    let baselineQuality = 0.5; // Default
+    if (hasHrvBaseline) baselineQuality += 0.25;
+    if (recovery.hrNadirScore !== 50) baselineQuality += 0.25;
+    baselineQuality = Math.min(1, baselineQuality);
+
+    // Overall confidence (weighted average)
+    const overall = completeness * 0.7 + baselineQuality * 0.3;
+
+    return {
+      overall: Math.round(overall * 100) / 100,
+      dataCompleteness: Math.round(completeness * 100) / 100,
+      baselineQuality: Math.round(baselineQuality * 100) / 100,
+    };
+  }
+
+  /**
+   * Get data quality level from completeness score
+   */
+  private getDataQualityLevel(completeness: number): DataQualityLevel {
+    if (completeness >= 0.85) return 'excellent';
+    if (completeness >= 0.7) return 'good';
+    if (completeness >= 0.5) return 'fair';
+    if (completeness >= 0.3) return 'poor';
+    return 'minimal';
+  }
+
+  /**
+   * Identify limiting factor from enhanced blocks
+   */
+  private identifyEnhancedLimitingFactor(
+    recovery: RecoveryBlockScores,
+    load: LoadBlockScores,
+    subjective: SubjectiveBlockScores,
+    illness: IllnessBlockScores,
+  ): string {
+    // Check illness first (hard override)
+    if (illness.illnessOverride && illness.illnessSeverity && illness.illnessSeverity >= 5) {
+      return 'Active Illness';
+    }
+
+    // Check for significant alcohol impact
+    if (illness.alcoholPenalty >= 15) {
+      return 'Alcohol Recovery';
+    }
+
+    // Find the lowest contributing block
+    const blocks = [
+      { name: 'Sleep Quality', score: recovery.sleepScore },
+      { name: 'HRV Status', score: recovery.nocturnalHrvScore },
+      { name: 'Resting HR', score: recovery.rhrDeltaScore },
+      { name: 'Aerobic Fatigue', score: load.aerobicTsbScore },
+      { name: 'Musculoskeletal Fatigue', score: load.mskTsbScore },
+      { name: 'Neural Fatigue', score: load.neuralTsbScore },
+      { name: 'Subjective Recovery', score: subjective.blockScore },
+    ];
+
+    // Check monotony/strain
+    if (load.monotonyPenalty >= 15) {
+      blocks.push({ name: 'Training Monotony', score: 25 });
+    }
+    if (load.strainPenalty >= 15) {
+      blocks.push({ name: 'Training Strain', score: 25 });
+    }
+
+    const minBlock = blocks.reduce((min, b) => (b.score < min.score ? b : min), blocks[0]);
+    return minBlock.score < 40 ? minBlock.name : 'None';
   }
 }

@@ -2,6 +2,123 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import type { CourseMetrics, PeriodizationPhase } from './types';
 
+// =============================================================================
+// Course Prediction DTOs
+// =============================================================================
+
+export class CourseMetricsDTO {
+  @ApiProperty({ description: 'Total course distance in meters' })
+  total_distance_meters: number;
+
+  @ApiProperty({ description: 'Total elevation gain in meters' })
+  elevation_gain_meters: number;
+
+  @ApiProperty({ description: 'Total elevation loss in meters' })
+  elevation_loss_meters: number;
+
+  @ApiProperty({ description: 'Maximum elevation in meters' })
+  max_elevation_meters: number;
+
+  @ApiProperty({ description: 'Minimum elevation in meters' })
+  min_elevation_meters: number;
+
+  @ApiPropertyOptional({ description: 'Steepest grade as a percentage' })
+  steepest_grade_percent: number | null;
+
+  @ApiProperty({ description: 'Number of GPS points in the course' })
+  num_points: number;
+}
+
+export class CourseSegmentPredictionDTO {
+  @ApiProperty()
+  segment_number: number;
+
+  @ApiProperty()
+  start_distance_meters: number;
+
+  @ApiProperty()
+  end_distance_meters: number;
+
+  @ApiProperty()
+  average_grade_percent: number;
+
+  @ApiProperty()
+  elevation_gain: number;
+
+  @ApiProperty()
+  elevation_loss: number;
+
+  @ApiProperty()
+  adjusted_pace_seconds_per_km: number;
+
+  @ApiProperty()
+  segment_time_seconds: number;
+
+  @ApiProperty()
+  cumulative_time_seconds: number;
+}
+
+export class ElevationProfilePointDTO {
+  @ApiProperty()
+  distance: number;
+
+  @ApiProperty()
+  elevation: number;
+
+  @ApiProperty()
+  pace: number;
+}
+
+export class CoursePredictionSummaryDTO {
+  @ApiProperty({ description: 'Predicted finish time in seconds' })
+  predicted_time_seconds: number;
+
+  @ApiProperty({ description: 'Formatted predicted time (HH:MM:SS)' })
+  predicted_time_formatted: string;
+
+  @ApiProperty({ description: 'Confidence score (0-1)' })
+  confidence_score: number;
+
+  @ApiProperty({ description: 'Total elevation gain' })
+  total_elevation_gain: number;
+
+  @ApiProperty({ description: 'Total elevation loss' })
+  total_elevation_loss: number;
+}
+
+export class CourseBasedPredictionDTO {
+  @ApiProperty({ description: 'Predicted finish time in seconds' })
+  predicted_time_seconds: number;
+
+  @ApiProperty({ description: 'Formatted predicted time' })
+  predicted_time_formatted: string;
+
+  @ApiProperty({ description: 'What the time would be on a flat course' })
+  flat_equivalent_time_seconds: number;
+
+  @ApiProperty({ description: 'Confidence score (0-1)' })
+  confidence_score: number;
+
+  @ApiProperty({ type: [CourseSegmentPredictionDTO] })
+  segments: CourseSegmentPredictionDTO[];
+
+  @ApiProperty({ type: [ElevationProfilePointDTO] })
+  elevation_profile: ElevationProfilePointDTO[];
+
+  @ApiProperty()
+  summary: {
+    total_elevation_gain: number;
+    total_elevation_loss: number;
+    steepest_climb_percent: number;
+    steepest_descent_percent: number;
+    average_grade_percent: number;
+  };
+}
+
+// =============================================================================
+// Race Prediction Summary
+// =============================================================================
+
 export class RacePredictionSummaryDTO {
   @ApiProperty({ description: 'Predicted time in seconds' })
   predicted_time_seconds: number;
@@ -100,6 +217,12 @@ export class AthleteRaceDTO {
   @ApiPropertyOptional()
   course_file_path: string | null;
 
+  @ApiPropertyOptional({ type: CourseMetricsDTO, description: 'Course metrics if course file uploaded' })
+  course_metrics?: CourseMetricsDTO;
+
+  @ApiPropertyOptional({ type: CoursePredictionSummaryDTO, description: 'Course-based prediction summary' })
+  course_prediction?: CoursePredictionSummaryDTO;
+
   @ApiPropertyOptional()
   notes: string | null;
 
@@ -143,6 +266,9 @@ export class CourseUploadResponseDTO {
   @ApiProperty({ enum: ['gpx', 'fit'] })
   file_type: 'gpx' | 'fit';
 
-  @ApiProperty()
-  metrics: CourseMetrics;
+  @ApiProperty({ type: CourseMetricsDTO })
+  metrics: CourseMetricsDTO;
+
+  @ApiPropertyOptional({ type: CourseBasedPredictionDTO, description: 'Course-based prediction if generated' })
+  prediction?: CourseBasedPredictionDTO;
 }

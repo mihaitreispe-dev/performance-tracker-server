@@ -60,6 +60,8 @@ export interface RacePredictionMetadata {
   };
   ensemble_weights?: Record<string, number>;
   prediction_variance?: number;
+  generated_by?: 'daily_cron' | 'backfill' | 'manual' | 'quick';
+  prediction_date?: string;
 }
 
 export interface RacePredictionsTable {

@@ -34,6 +34,7 @@ export class WorkoutFileImportsApiModule {
           CardioStepRepository,
         ],
         controllers: [WorkoutFileImportsApiController],
+        exports: [WorkoutFileParserService],
       };
     }
     return this.instance;

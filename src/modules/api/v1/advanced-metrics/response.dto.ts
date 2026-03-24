@@ -1,7 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsNumber, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
-import { ACWRRiskLevel, FitnessMetricType, OvertrainingRiskLevel, TrainingRecommendation } from 'src/database/interfaces';
+import {
+  ACWRRiskLevel,
+  FitnessMetricType,
+  OvertrainingRiskLevel,
+  TrainingRecommendation,
+} from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -55,7 +60,10 @@ export class Vo2MaxDTO {
   @IsNumber()
   dataPointsUsed: number;
 
-  @ApiProperty({ enum: ['firstbeat_style', 'hr_ratio', 'cycling_power', 'cooper_test', 'manual'], description: 'Algorithm used for calculation' })
+  @ApiProperty({
+    enum: ['firstbeat_style', 'hr_ratio', 'cycling_power', 'cooper_test', 'manual'],
+    description: 'Algorithm used for calculation',
+  })
   @IsString()
   algorithm: Vo2MaxAlgorithm;
 
@@ -177,7 +185,10 @@ export class FitnessFatiguePointDTO {
   @IsOptional()
   acwr?: number | null;
 
-  @ApiPropertyOptional({ enum: ACWRRiskLevel, description: 'ACWR risk level: undertraining (<0.8), optimal (0.8-1.3), elevated (1.3-1.5), high (>1.5)' })
+  @ApiPropertyOptional({
+    enum: ACWRRiskLevel,
+    description: 'ACWR risk level: undertraining (<0.8), optimal (0.8-1.3), elevated (1.3-1.5), high (>1.5)',
+  })
   @IsString()
   @IsOptional()
   acwrRiskLevel?: ACWRRiskLevel | null;
@@ -579,6 +590,250 @@ export class ReadinessHistoryResponse extends ItemResponse<ReadinessHistoryDTO> 
   declare data: ReadinessHistoryDTO;
 }
 
+// Enhanced Readiness (v2)
+
+export class RecoveryBlockScoresDTO {
+  @ApiProperty({ description: 'Sleep score (0-100)' })
+  @IsNumber()
+  sleepScore: number;
+
+  @ApiProperty({ description: 'Nocturnal HRV score (0-100)' })
+  @IsNumber()
+  nocturnalHrvScore: number;
+
+  @ApiProperty({ description: 'RHR delta score (0-100)' })
+  @IsNumber()
+  rhrDeltaScore: number;
+
+  @ApiProperty({ description: 'HR nadir score (0-100)' })
+  @IsNumber()
+  hrNadirScore: number;
+
+  @ApiProperty({ description: 'Combined block score (0-100)' })
+  @IsNumber()
+  blockScore: number;
+
+  @ApiProperty({ description: 'Weight applied to this block (0-1)' })
+  @IsNumber()
+  weight: number;
+}
+
+export class LoadBlockScoresDTO {
+  @ApiProperty({ description: 'Aerobic TSB score (0-100)' })
+  @IsNumber()
+  aerobicTsbScore: number;
+
+  @ApiProperty({ description: 'MSK TSB score (0-100)' })
+  @IsNumber()
+  mskTsbScore: number;
+
+  @ApiProperty({ description: 'Neural TSB score (0-100)' })
+  @IsNumber()
+  neuralTsbScore: number;
+
+  @ApiProperty({ description: 'Monotony penalty (0-15 points)' })
+  @IsNumber()
+  monotonyPenalty: number;
+
+  @ApiProperty({ description: 'Strain penalty (0-15 points)' })
+  @IsNumber()
+  strainPenalty: number;
+
+  @ApiProperty({ description: 'Combined block score (0-100)' })
+  @IsNumber()
+  blockScore: number;
+
+  @ApiProperty({ description: 'Weight applied to this block (0-1)' })
+  @IsNumber()
+  weight: number;
+}
+
+export class SubjectiveBlockScoresDTO {
+  @ApiProperty({ description: 'Quick wellness score (0-100)' })
+  @IsNumber()
+  quickWellnessScore: number;
+
+  @ApiProperty({ description: 'Journal score (0-100)' })
+  @IsNumber()
+  journalScore: number;
+
+  @ApiProperty({ description: 'Combined block score (0-100)' })
+  @IsNumber()
+  blockScore: number;
+
+  @ApiProperty({ description: 'Weight applied to this block (0-1)' })
+  @IsNumber()
+  weight: number;
+}
+
+export class IllnessBlockScoresDTO {
+  @ApiProperty({ description: 'Alcohol penalty (0-25 points)' })
+  @IsNumber()
+  alcoholPenalty: number;
+
+  @ApiProperty({ description: 'Whether illness override is active' })
+  illnessOverride: boolean;
+
+  @ApiPropertyOptional({ type: Number, description: 'Illness severity (1-10)' })
+  @IsNumber()
+  @IsOptional()
+  illnessSeverity: number | null;
+
+  @ApiProperty({ description: 'Combined block score (0-100)' })
+  @IsNumber()
+  blockScore: number;
+
+  @ApiProperty({ description: 'Weight applied to this block (0-1)' })
+  @IsNumber()
+  weight: number;
+}
+
+export class ReadinessComponentScoresDTO {
+  @ApiProperty({ type: RecoveryBlockScoresDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RecoveryBlockScoresDTO)
+  recovery: RecoveryBlockScoresDTO;
+
+  @ApiProperty({ type: LoadBlockScoresDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => LoadBlockScoresDTO)
+  load: LoadBlockScoresDTO;
+
+  @ApiProperty({ type: SubjectiveBlockScoresDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SubjectiveBlockScoresDTO)
+  subjective: SubjectiveBlockScoresDTO;
+
+  @ApiProperty({ type: IllnessBlockScoresDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => IllnessBlockScoresDTO)
+  illness: IllnessBlockScoresDTO;
+}
+
+export class ReadinessConfidenceDTO {
+  @ApiProperty({ description: 'Overall confidence (0-1)' })
+  @IsNumber()
+  overall: number;
+
+  @ApiProperty({ description: 'Data completeness (0-1)' })
+  @IsNumber()
+  dataCompleteness: number;
+
+  @ApiProperty({ description: 'Baseline quality (0-1)' })
+  @IsNumber()
+  baselineQuality: number;
+}
+
+export type DataQualityLevel = 'excellent' | 'good' | 'fair' | 'poor' | 'minimal';
+
+export class ReadinessComponentsDTO {
+  @ApiProperty({ description: 'Aerobic contribution (0-100)' })
+  @IsNumber()
+  aerobicContribution: number;
+
+  @ApiProperty({ description: 'MSK contribution (0-100)' })
+  @IsNumber()
+  mskContribution: number;
+
+  @ApiProperty({ description: 'Neural contribution (0-100)' })
+  @IsNumber()
+  neuralContribution: number;
+
+  @ApiProperty({ description: 'HRV contribution (0-100)' })
+  @IsNumber()
+  hrvContribution: number;
+
+  @ApiProperty({ description: 'Journal contribution (0-100)' })
+  @IsNumber()
+  journalContribution: number;
+
+  @ApiProperty({ description: 'Quick wellness contribution (0-100)' })
+  @IsNumber()
+  quickWellnessContribution: number;
+
+  @ApiProperty({ description: 'Sleep contribution (0-100)' })
+  @IsNumber()
+  sleepContribution: number;
+}
+
+export type ReadinessRecommendation =
+  | 'peak_ready'
+  | 'ready_for_hard'
+  | 'moderate_load'
+  | 'easy_day'
+  | 'rest_recommended'
+  | 'rest_required';
+
+export class EnhancedDailyReadinessDTO {
+  @ApiProperty({ type: String, format: 'date' })
+  @IsString()
+  date: string;
+
+  @ApiProperty({ description: 'Composite readiness score (0-100)' })
+  @IsNumber()
+  readinessScore: number;
+
+  @ApiProperty({ description: 'Limiting factor description' })
+  @IsString()
+  limitingFactor: string;
+
+  @ApiPropertyOptional({ type: String, enum: ['aerobic', 'msk', 'neural'] })
+  @IsString()
+  @IsOptional()
+  limitingStream: string | null;
+
+  @ApiProperty({ description: 'Whether HRV is suppressed' })
+  isHrvSuppressed: boolean;
+
+  @ApiPropertyOptional({ type: String, description: 'Override reason if applied' })
+  @IsString()
+  @IsOptional()
+  overrideReason: string | null;
+
+  @ApiProperty({ type: ReadinessComponentsDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ReadinessComponentsDTO)
+  components: ReadinessComponentsDTO;
+
+  @ApiProperty({
+    enum: ['peak_ready', 'ready_for_hard', 'moderate_load', 'easy_day', 'rest_recommended', 'rest_required'],
+  })
+  @IsString()
+  recommendation: ReadinessRecommendation;
+
+  @ApiProperty({ type: ReadinessConfidenceDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ReadinessConfidenceDTO)
+  confidence: ReadinessConfidenceDTO;
+
+  @ApiProperty({ type: ReadinessComponentScoresDTO })
+  @IsObject()
+  @ValidateNested()
+  @Type(() => ReadinessComponentScoresDTO)
+  componentScores: ReadinessComponentScoresDTO;
+
+  @ApiProperty({ enum: ['excellent', 'good', 'fair', 'poor', 'minimal'] })
+  @IsString()
+  dataQuality: DataQualityLevel;
+
+  @ApiProperty({ description: 'Version of the readiness algorithm' })
+  @IsNumber()
+  version: number;
+}
+
+export class EnhancedDailyReadinessResponse extends ItemResponse<EnhancedDailyReadinessDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: EnhancedDailyReadinessDTO;
+}
+
 // RPE-TSS Correlation
 
 export class RpeTssDataPointDTO {
@@ -821,7 +1076,10 @@ export class BayesianDiagnosticsDTO {
   @IsOptional()
   mae30day?: number | null;
 
-  @ApiProperty({ enum: ['converging', 'stable', 'diverging', 'insufficient_data'], description: 'Model convergence status' })
+  @ApiProperty({
+    enum: ['converging', 'stable', 'diverging', 'insufficient_data'],
+    description: 'Model convergence status',
+  })
   @IsString()
   convergenceStatus: ConvergenceStatus;
 
@@ -901,7 +1159,10 @@ export class LthrEstimateDTO {
   @IsNumber()
   confidence: number;
 
-  @ApiProperty({ enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'], description: 'Estimation method used' })
+  @ApiProperty({
+    enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'],
+    description: 'Estimation method used',
+  })
   @IsString()
   method: LthrMethod;
 
@@ -941,7 +1202,10 @@ export class LthrHistoryPointDTO {
   @IsNumber()
   confidence: number;
 
-  @ApiProperty({ enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'], description: 'Estimation method used' })
+  @ApiProperty({
+    enum: ['peak_rolling', 'hrmc', 'tt_segment', 'race_effort', 'manual'],
+    description: 'Estimation method used',
+  })
   @IsString()
   method: LthrMethod;
 

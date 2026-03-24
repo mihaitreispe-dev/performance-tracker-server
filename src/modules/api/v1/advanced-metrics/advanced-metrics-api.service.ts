@@ -9,13 +9,20 @@ import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.re
 import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
 import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
 import { UserSettingsRepository } from 'src/repositories/user-settings.repository';
-import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 
-import { CorrelationQuery, FitnessFatiguePredictionBody, ManualLthrBody, ManualVo2MaxBody, ThresholdOverrideBody } from './request.dto';
+import {
+  CorrelationQuery,
+  FitnessFatiguePredictionBody,
+  ManualLthrBody,
+  ManualVo2MaxBody,
+  ThresholdOverrideBody,
+} from './request.dto';
 import {
   BayesianDiagnosticsResponse,
   DailyReadinessResponse,
+  EnhancedDailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
   HrvBaselineHistoryResponse,
@@ -39,13 +46,13 @@ import {
   WellnessCorrelationDTO,
   WellnessPerformanceCorrelationResponse,
 } from './response.dto';
-import { Vo2MaxSport as Vo2MaxSportType } from './services/vo2max.service';
 import { BayesianParameterService } from './services/bayesian-parameter.service';
 import { FitnessFatigueService } from './services/fitness-fatigue.service';
 import { LthrEstimationService } from './services/lthr-estimation.service';
 import { MultiStreamLoadService } from './services/multi-stream-load.service';
 import { ReadinessService } from './services/readiness.service';
 import { TrainingStressService } from './services/training-stress.service';
+import { Vo2MaxSport as Vo2MaxSportType } from './services/vo2max.service';
 import { Vo2MaxService } from './services/vo2max.service';
 
 @Injectable()
@@ -120,12 +127,14 @@ export class AdvancedMetricsApiService {
         percentileRank,
         sport: result.sport || null,
         confidenceInterval: result.confidenceInterval || null,
-        metadata: result.metadata ? {
-          rSquared: result.metadata.rSquared,
-          segmentsUsed: result.metadata.segmentsUsed,
-          lookbackDays: result.metadata.lookbackDays,
-          ewmaApplied: result.metadata.ewmaApplied,
-        } : undefined,
+        metadata: result.metadata
+          ? {
+              rSquared: result.metadata.rSquared,
+              segmentsUsed: result.metadata.segmentsUsed,
+              lookbackDays: result.metadata.lookbackDays,
+              ewmaApplied: result.metadata.ewmaApplied,
+            }
+          : undefined,
       },
     });
   }
@@ -133,7 +142,11 @@ export class AdvancedMetricsApiService {
   /**
    * Get VO2 max history
    */
-  async getVo2MaxHistory(req: Request & { user: AuthUser }, days: number = 90, sport?: Vo2MaxSport): Promise<Vo2MaxHistoryResponse> {
+  async getVo2MaxHistory(
+    req: Request & { user: AuthUser },
+    days: number = 90,
+    sport?: Vo2MaxSport,
+  ): Promise<Vo2MaxHistoryResponse> {
     const userId = req.user.id;
     const history = await this.vo2MaxService.getVo2MaxHistory(userId, days, sport as Vo2MaxSportType | undefined);
 
@@ -216,12 +229,14 @@ export class AdvancedMetricsApiService {
         percentileRank,
         sport: result.sport || null,
         confidenceInterval: result.confidenceInterval || null,
-        metadata: result.metadata ? {
-          rSquared: result.metadata.rSquared,
-          segmentsUsed: result.metadata.segmentsUsed,
-          lookbackDays: result.metadata.lookbackDays,
-          ewmaApplied: result.metadata.ewmaApplied,
-        } : undefined,
+        metadata: result.metadata
+          ? {
+              rSquared: result.metadata.rSquared,
+              segmentsUsed: result.metadata.segmentsUsed,
+              lookbackDays: result.metadata.lookbackDays,
+              ewmaApplied: result.metadata.ewmaApplied,
+            }
+          : undefined,
       },
     });
   }
@@ -516,12 +531,14 @@ export class AdvancedMetricsApiService {
         percentileRank,
         sport: result.sport || null,
         confidenceInterval: result.confidenceInterval || null,
-        metadata: result.metadata ? {
-          rSquared: result.metadata.rSquared,
-          segmentsUsed: result.metadata.segmentsUsed,
-          lookbackDays: result.metadata.lookbackDays,
-          ewmaApplied: result.metadata.ewmaApplied,
-        } : undefined,
+        metadata: result.metadata
+          ? {
+              rSquared: result.metadata.rSquared,
+              segmentsUsed: result.metadata.segmentsUsed,
+              lookbackDays: result.metadata.lookbackDays,
+              ewmaApplied: result.metadata.ewmaApplied,
+            }
+          : undefined,
       },
     });
   }
@@ -529,7 +546,11 @@ export class AdvancedMetricsApiService {
   /**
    * Get VO2 max history for a specific user (coach access)
    */
-  async getVo2MaxHistoryForUser(userId: string, days: number = 90, sport?: Vo2MaxSport): Promise<Vo2MaxHistoryResponse> {
+  async getVo2MaxHistoryForUser(
+    userId: string,
+    days: number = 90,
+    sport?: Vo2MaxSport,
+  ): Promise<Vo2MaxHistoryResponse> {
     const history = await this.vo2MaxService.getVo2MaxHistory(userId, days, sport as Vo2MaxSportType | undefined);
 
     const historyPoints = history.map((h) => ({
@@ -596,32 +617,33 @@ export class AdvancedMetricsApiService {
 
   /**
    * Get multi-stream load history for a specific user (coach access)
+   * Uses service method that fills gaps and extends to today with decay
    */
   async getMultiStreamLoadHistoryForUser(userId: string, days: number = 30): Promise<MultiStreamLoadHistoryResponse> {
-    const loads = await this.multiStreamLoadRepository.getDateRange(userId, days);
+    const loads = await this.multiStreamLoadService.getHistory(userId, days);
 
     const data = loads.map((load) => ({
-      date: formatDateToYMD(load.date),
+      date: load.date,
       aerobic: {
-        ctl: Number(load.aerobic_ctl) || 0,
-        atl: Number(load.aerobic_atl) || 0,
-        tsb: Number(load.aerobic_tsb) || 0,
-        dailyLoad: Number(load.aerobic_daily_load) || 0,
+        ctl: load.aerobic.ctl,
+        atl: load.aerobic.atl,
+        tsb: load.aerobic.tsb,
+        dailyLoad: load.aerobic.dailyLoad,
       },
       msk: {
-        ctl: Number(load.msk_ctl) || 0,
-        atl: Number(load.msk_atl) || 0,
-        tsb: Number(load.msk_tsb) || 0,
-        dailyLoad: Number(load.msk_daily_load) || 0,
+        ctl: load.msk.ctl,
+        atl: load.msk.atl,
+        tsb: load.msk.tsb,
+        dailyLoad: load.msk.dailyLoad,
       },
       neural: {
-        ctl: Number(load.neural_ctl) || 0,
-        atl: Number(load.neural_atl) || 0,
-        tsb: Number(load.neural_tsb) || 0,
-        dailyLoad: Number(load.neural_daily_load) || 0,
+        ctl: load.neural.ctl,
+        atl: load.neural.atl,
+        tsb: load.neural.tsb,
+        dailyLoad: load.neural.dailyLoad,
       },
-      readinessScore: load.readiness_score ? Number(load.readiness_score) : null,
-      readinessOverrideReason: load.readiness_override_reason,
+      readinessScore: null, // Readiness score not available from DailyStreamMetrics
+      readinessOverrideReason: null,
     }));
 
     return new MultiStreamLoadHistoryResponse({
@@ -733,36 +755,37 @@ export class AdvancedMetricsApiService {
 
   /**
    * Get multi-stream load history
+   * Uses service method that fills gaps and extends to today with decay
    */
   async getMultiStreamLoadHistory(
     req: Request & { user: AuthUser },
     days: number = 30,
   ): Promise<MultiStreamLoadHistoryResponse> {
     const userId = req.user.id;
-    const loads = await this.multiStreamLoadRepository.getDateRange(userId, days);
+    const loads = await this.multiStreamLoadService.getHistory(userId, days);
 
     const data = loads.map((load) => ({
-      date: formatDateToYMD(load.date),
+      date: load.date,
       aerobic: {
-        ctl: Number(load.aerobic_ctl) || 0,
-        atl: Number(load.aerobic_atl) || 0,
-        tsb: Number(load.aerobic_tsb) || 0,
-        dailyLoad: Number(load.aerobic_daily_load) || 0,
+        ctl: load.aerobic.ctl,
+        atl: load.aerobic.atl,
+        tsb: load.aerobic.tsb,
+        dailyLoad: load.aerobic.dailyLoad,
       },
       msk: {
-        ctl: Number(load.msk_ctl) || 0,
-        atl: Number(load.msk_atl) || 0,
-        tsb: Number(load.msk_tsb) || 0,
-        dailyLoad: Number(load.msk_daily_load) || 0,
+        ctl: load.msk.ctl,
+        atl: load.msk.atl,
+        tsb: load.msk.tsb,
+        dailyLoad: load.msk.dailyLoad,
       },
       neural: {
-        ctl: Number(load.neural_ctl) || 0,
-        atl: Number(load.neural_atl) || 0,
-        tsb: Number(load.neural_tsb) || 0,
-        dailyLoad: Number(load.neural_daily_load) || 0,
+        ctl: load.neural.ctl,
+        atl: load.neural.atl,
+        tsb: load.neural.tsb,
+        dailyLoad: load.neural.dailyLoad,
       },
-      readinessScore: load.readiness_score ? Number(load.readiness_score) : null,
-      readinessOverrideReason: load.readiness_override_reason,
+      readinessScore: null, // Readiness score not available from DailyStreamMetrics
+      readinessOverrideReason: null,
     }));
 
     return new MultiStreamLoadHistoryResponse({
@@ -904,6 +927,64 @@ export class AdvancedMetricsApiService {
         data: trends.data,
         divergence: trends.divergence,
         period: trends.period,
+      },
+    });
+  }
+
+  /**
+   * Get enhanced daily readiness (v2) with 4-block structure and confidence scores
+   */
+  async getEnhancedDailyReadiness(
+    req: Request & { user: AuthUser },
+    date?: string,
+  ): Promise<EnhancedDailyReadinessResponse> {
+    const userId = req.user.id;
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+
+    const readiness = await this.readinessService.calculateEnhancedReadiness(userId, targetDate);
+
+    return new EnhancedDailyReadinessResponse({
+      data: {
+        date: readiness.date,
+        readinessScore: readiness.readinessScore,
+        limitingFactor: readiness.limitingFactor,
+        limitingStream: readiness.limitingStream,
+        isHrvSuppressed: readiness.isHrvSuppressed,
+        overrideReason: readiness.overrideReason,
+        components: readiness.components,
+        recommendation: readiness.recommendation,
+        confidence: readiness.confidence,
+        componentScores: readiness.componentScores,
+        dataQuality: readiness.dataQuality,
+        version: readiness.version,
+      },
+    });
+  }
+
+  /**
+   * Get enhanced daily readiness (v2) for a specific user (coach access)
+   */
+  async getEnhancedDailyReadinessForUser(userId: string, date?: string): Promise<EnhancedDailyReadinessResponse> {
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+
+    const readiness = await this.readinessService.calculateEnhancedReadiness(userId, targetDate);
+
+    return new EnhancedDailyReadinessResponse({
+      data: {
+        date: readiness.date,
+        readinessScore: readiness.readinessScore,
+        limitingFactor: readiness.limitingFactor,
+        limitingStream: readiness.limitingStream,
+        isHrvSuppressed: readiness.isHrvSuppressed,
+        overrideReason: readiness.overrideReason,
+        components: readiness.components,
+        recommendation: readiness.recommendation,
+        confidence: readiness.confidence,
+        componentScores: readiness.componentScores,
+        dataQuality: readiness.dataQuality,
+        version: readiness.version,
       },
     });
   }
@@ -1440,13 +1521,9 @@ export class AdvancedMetricsApiService {
     // Get max HR if available for % calculation
     const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
     const userSettings = await this.userSettingsRepository.findByUserId(userId);
-    const maxHR = maxHRMetric
-      ? Number.parseFloat(maxHRMetric.value)
-      : userSettings?.hr_zones?.maxHr ?? null;
+    const maxHR = maxHRMetric ? Number.parseFloat(maxHRMetric.value) : (userSettings?.hr_zones?.maxHr ?? null);
 
-    const percentOfMaxHR = maxHR && estimate.value > 0
-      ? Math.round((estimate.value / maxHR) * 100)
-      : null;
+    const percentOfMaxHR = maxHR && estimate.value > 0 ? Math.round((estimate.value / maxHR) * 100) : null;
 
     return new LthrResponse({
       data: {
@@ -1472,11 +1549,7 @@ export class AdvancedMetricsApiService {
   /**
    * Get LTHR history
    */
-  async getLTHRHistory(
-    req: Request & { user: AuthUser },
-    days = 90,
-    sport?: LthrSport,
-  ): Promise<LthrHistoryResponse> {
+  async getLTHRHistory(req: Request & { user: AuthUser }, days = 90, sport?: LthrSport): Promise<LthrHistoryResponse> {
     const userId = req.user.id;
     const history = await this.lthrEstimationService.getLTHRHistory(userId, days, sport);
 
@@ -1561,13 +1634,9 @@ export class AdvancedMetricsApiService {
     // Get max HR for % calculation
     const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
     const userSettings = await this.userSettingsRepository.findByUserId(userId);
-    const maxHR = maxHRMetric
-      ? Number.parseFloat(maxHRMetric.value)
-      : userSettings?.hr_zones?.maxHr ?? null;
+    const maxHR = maxHRMetric ? Number.parseFloat(maxHRMetric.value) : (userSettings?.hr_zones?.maxHr ?? null);
 
-    const percentOfMaxHR = maxHR && estimate.value > 0
-      ? Math.round((estimate.value / maxHR) * 100)
-      : null;
+    const percentOfMaxHR = maxHR && estimate.value > 0 ? Math.round((estimate.value / maxHR) * 100) : null;
 
     return new LthrResponse({
       data: {
@@ -1596,23 +1665,14 @@ export class AdvancedMetricsApiService {
   async setManualLTHR(req: Request & { user: AuthUser }, body: ManualLthrBody): Promise<LthrResponse> {
     const userId = req.user.id;
 
-    const estimate = await this.lthrEstimationService.setManualLTHR(
-      userId,
-      body.value,
-      body.sport,
-      body.notes,
-    );
+    const estimate = await this.lthrEstimationService.setManualLTHR(userId, body.value, body.sport, body.notes);
 
     // Get max HR for % calculation
     const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
     const userSettings = await this.userSettingsRepository.findByUserId(userId);
-    const maxHR = maxHRMetric
-      ? Number.parseFloat(maxHRMetric.value)
-      : userSettings?.hr_zones?.maxHr ?? null;
+    const maxHR = maxHRMetric ? Number.parseFloat(maxHRMetric.value) : (userSettings?.hr_zones?.maxHr ?? null);
 
-    const percentOfMaxHR = maxHR && estimate.value > 0
-      ? Math.round((estimate.value / maxHR) * 100)
-      : null;
+    const percentOfMaxHR = maxHR && estimate.value > 0 ? Math.round((estimate.value / maxHR) * 100) : null;
 
     return new LthrResponse({
       data: {
@@ -1647,13 +1707,9 @@ export class AdvancedMetricsApiService {
 
     const maxHRMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.MAX_HR);
     const userSettings = await this.userSettingsRepository.findByUserId(userId);
-    const maxHR = maxHRMetric
-      ? Number.parseFloat(maxHRMetric.value)
-      : userSettings?.hr_zones?.maxHr ?? null;
+    const maxHR = maxHRMetric ? Number.parseFloat(maxHRMetric.value) : (userSettings?.hr_zones?.maxHr ?? null);
 
-    const percentOfMaxHR = maxHR && estimate.value > 0
-      ? Math.round((estimate.value / maxHR) * 100)
-      : null;
+    const percentOfMaxHR = maxHR && estimate.value > 0 ? Math.round((estimate.value / maxHR) * 100) : null;
 
     return new LthrResponse({
       data: {

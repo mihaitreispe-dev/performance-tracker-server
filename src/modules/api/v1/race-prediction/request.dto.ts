@@ -1,5 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import {
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsIn,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class GeneratePredictionBody {
   @ApiPropertyOptional({ description: 'Override sport type' })
@@ -128,6 +138,7 @@ export class PredictionHistoryQuery {
   sport?: string;
 
   @ApiPropertyOptional({ description: 'Limit number of results' })
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   @Min(1)
@@ -136,7 +147,68 @@ export class PredictionHistoryQuery {
 
 export class TaperPlanQuery {
   @ApiPropertyOptional({ description: 'Target TSB for race day (default: 15)' })
+  @Type(() => Number)
   @IsNumber()
   @IsOptional()
   target_tsb?: number;
+}
+
+export class CourseBasedPredictionBody {
+  @ApiProperty({ enum: ['run'], description: 'Sport type (currently only running supported)' })
+  @IsString()
+  @IsIn(['run'])
+  sport: 'run';
+
+  @ApiPropertyOptional({ description: 'Override total distance in meters (if different from GPX)' })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  @Min(100)
+  distance_meters?: number;
+
+  @ApiPropertyOptional({
+    description: 'Segment distance in meters for split calculation (default: 1000)',
+    default: 1000,
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  @Min(100)
+  @Max(10000)
+  segment_distance_meters?: number;
+
+  @ApiPropertyOptional({
+    description: 'Apply fade factor for longer races (default: false)',
+    default: false,
+  })
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  @IsOptional()
+  apply_fade_factor?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Maximum downhill speed in m/s (default: 4.17 = ~4:00/km pace)',
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  @Min(3)
+  @Max(7)
+  downhill_speed_cap_mps?: number;
+
+  @ApiPropertyOptional({
+    description: 'Elevation smoothing window in meters (default: 100)',
+    default: 100,
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  @Min(10)
+  @Max(500)
+  smoothing_window_meters?: number;
+
+  @ApiPropertyOptional({ description: 'Target race date for TSB projection' })
+  @IsDateString()
+  @IsOptional()
+  race_date?: string;
 }

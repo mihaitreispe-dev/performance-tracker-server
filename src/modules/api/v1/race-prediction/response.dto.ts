@@ -272,3 +272,111 @@ export class PredictionAccuracyStatsDTO {
   @ApiProperty({ description: 'Average prediction error in seconds' })
   average_error_seconds: number;
 }
+
+// ==========================================================================
+// Course-Based Prediction DTOs
+// ==========================================================================
+
+export class CourseSegmentDTO {
+  @ApiProperty({ description: 'Segment number (1-indexed)' })
+  segment_number: number;
+
+  @ApiProperty({ description: 'Start distance in meters' })
+  start_distance_meters: number;
+
+  @ApiProperty({ description: 'End distance in meters' })
+  end_distance_meters: number;
+
+  @ApiProperty({ description: 'Average grade percentage for this segment' })
+  average_grade_percent: number;
+
+  @ApiProperty({ description: 'Elevation gain in this segment (meters)' })
+  elevation_gain: number;
+
+  @ApiProperty({ description: 'Elevation loss in this segment (meters)' })
+  elevation_loss: number;
+
+  @ApiProperty({ description: 'Adjusted pace in seconds per km' })
+  adjusted_pace_seconds_per_km: number;
+
+  @ApiProperty({ description: 'Adjusted pace formatted (MM:SS)' })
+  adjusted_pace_formatted: string;
+
+  @ApiProperty({ description: 'Time for this segment in seconds' })
+  segment_time_seconds: number;
+
+  @ApiProperty({ description: 'Cumulative time at end of segment in seconds' })
+  cumulative_time_seconds: number;
+
+  @ApiProperty({ description: 'Cumulative time formatted (HH:MM:SS or MM:SS)' })
+  cumulative_time_formatted: string;
+}
+
+export class ElevationProfilePointDTO {
+  @ApiProperty({ description: 'Distance from start in meters' })
+  distance: number;
+
+  @ApiProperty({ description: 'Elevation in meters' })
+  elevation: number;
+
+  @ApiProperty({ description: 'Pace at this point in seconds per km' })
+  pace: number;
+}
+
+export class CourseSummaryDTO {
+  @ApiProperty({ description: 'Total elevation gain in meters' })
+  total_elevation_gain: number;
+
+  @ApiProperty({ description: 'Total elevation loss in meters' })
+  total_elevation_loss: number;
+
+  @ApiProperty({ description: 'Steepest climb percentage' })
+  steepest_climb_percent: number;
+
+  @ApiProperty({ description: 'Steepest descent percentage' })
+  steepest_descent_percent: number;
+
+  @ApiProperty({ description: 'Average grade percentage' })
+  average_grade_percent: number;
+}
+
+export class CourseBasedPredictionDTO {
+  @ApiProperty({ description: 'Predicted finish time in seconds' })
+  predicted_time_seconds: number;
+
+  @ApiProperty({ description: 'Predicted time formatted (HH:MM:SS)' })
+  predicted_time_formatted: string;
+
+  @ApiProperty({ description: 'Equivalent flat terrain time in seconds' })
+  flat_equivalent_time_seconds: number;
+
+  @ApiProperty({ description: 'Flat equivalent time formatted' })
+  flat_equivalent_time_formatted: string;
+
+  @ApiProperty({ description: 'Time adjustment due to elevation (seconds)' })
+  elevation_adjustment_seconds: number;
+
+  @ApiProperty({ description: 'Course distance in meters' })
+  distance_meters: number;
+
+  @ApiProperty({ description: 'Confidence score (0-1)' })
+  confidence_score: number;
+
+  @ApiProperty({ type: [CourseSegmentDTO], description: 'Per-segment split predictions' })
+  segments: CourseSegmentDTO[];
+
+  @ApiProperty({
+    type: [ElevationProfilePointDTO],
+    description: 'Elevation profile with pace overlay',
+  })
+  elevation_profile: ElevationProfilePointDTO[];
+
+  @ApiProperty({ type: CourseSummaryDTO, description: 'Course elevation summary' })
+  summary: CourseSummaryDTO;
+
+  @ApiProperty({ type: [String], description: 'Algorithms used for prediction' })
+  algorithms_used: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Any warnings about the course data' })
+  warnings?: string[];
+}

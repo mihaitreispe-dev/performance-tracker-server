@@ -17,6 +17,44 @@ export interface ElevationSegment {
   gradePercent: number;
 }
 
+export interface ElevationPoint {
+  distance: number;
+  elevation: number;
+}
+
+export interface CourseProfile {
+  points: ElevationPoint[];
+  totalDistanceMeters: number;
+  totalElevationGain: number;
+  totalElevationLoss: number;
+}
+
+export interface CourseSegmentPrediction {
+  segmentNumber: number;
+  startDistanceMeters: number;
+  endDistanceMeters: number;
+  averageGradePercent: number;
+  elevationGain: number;
+  elevationLoss: number;
+  adjustedPaceSecondsPerKm: number;
+  segmentTimeSeconds: number;
+  cumulativeTimeSeconds: number;
+}
+
+export interface CourseBasedPredictionResult {
+  predictedTimeSeconds: number;
+  flatEquivalentTimeSeconds: number;
+  segments: CourseSegmentPrediction[];
+  elevationProfile: { distance: number; elevation: number; pace: number }[];
+  summary: {
+    totalElevationGain: number;
+    totalElevationLoss: number;
+    steepestClimbPercent: number;
+    steepestDescentPercent: number;
+    averageGradePercent: number;
+  };
+}
+
 export interface CourseAdjustment {
   elevationTimeFactor: number;
   elevationTimeAdjustmentSeconds: number;
@@ -41,9 +79,304 @@ export class CourseAnalysisService {
   private readonly RUN_GAIN_SECONDS_PER_100M = 12;
   private readonly RUN_LOSS_SECONDS_PER_100M = 8;
 
+  // Minetti model constants
+  // Reference: Minetti et al. (2002) - Energy cost of walking and running at extreme uphill and downhill slopes
+  // Cr(i) = 155.4i^5 - 30.4i^4 - 43.3i^3 + 46.3i^2 + 19.5i + 3.6
+  // Where i = grade as decimal (0.05 = 5%)
+  private readonly MINETTI_FLAT_COST = 3.6; // Cr at 0% grade (J/kg/m)
+
+  // Grade limits for the model (beyond these, clip the values)
+  private readonly MAX_GRADE = 0.20; // 20%
+  private readonly MIN_GRADE = -0.20; // -20%
+
+  // Minimum pace cap for downhill (prevent unrealistic speeds)
+  // Default: ~4:00/km = 240 sec/km = 4.17 m/s
+  private readonly DEFAULT_DOWNHILL_SPEED_CAP_MPS = 4.17;
+
   // Cycling grade impact
   // Each 1% average grade adds ~5% to time
   private readonly BIKE_GRADE_FACTOR = 0.05;
+
+  // ==========================================================================
+  // Minetti Grade Cost Model
+  // ==========================================================================
+
+  /**
+   * Calculate the metabolic cost of running at a given grade using the Minetti model.
+   * Formula: Cr(i) = 155.4i^5 - 30.4i^4 - 43.3i^3 + 46.3i^2 + 19.5i + 3.6
+   *
+   * @param gradeDecimal - Grade as decimal (e.g., 0.05 = 5% grade)
+   * @returns Cost in J/kg/m
+   */
+  calculateMinettiCost(gradeDecimal: number): number {
+    // Clip grade to model limits
+    const i = Math.max(this.MIN_GRADE, Math.min(this.MAX_GRADE, gradeDecimal));
+
+    // Minetti polynomial
+    const cost =
+      155.4 * Math.pow(i, 5) -
+      30.4 * Math.pow(i, 4) -
+      43.3 * Math.pow(i, 3) +
+      46.3 * Math.pow(i, 2) +
+      19.5 * i +
+      3.6;
+
+    // Ensure cost is never below a minimum threshold (very steep downhill can go negative)
+    return Math.max(cost, 1.5);
+  }
+
+  /**
+   * Calculate grade-adjusted velocity based on Minetti cost model.
+   * Assumes constant power output, so velocity inversely scales with cost.
+   *
+   * v_grade = v_flat * (Cr_flat / Cr_grade)
+   *
+   * @param flatVelocityMps - Flat terrain velocity in m/s
+   * @param gradeDecimal - Grade as decimal
+   * @param downhillSpeedCapMps - Maximum speed for downhill (default ~4:00/km)
+   * @returns Adjusted velocity in m/s
+   */
+  calculateGradeAdjustedVelocity(
+    flatVelocityMps: number,
+    gradeDecimal: number,
+    downhillSpeedCapMps: number = this.DEFAULT_DOWNHILL_SPEED_CAP_MPS,
+  ): number {
+    const flatCost = this.MINETTI_FLAT_COST;
+    const gradeCost = this.calculateMinettiCost(gradeDecimal);
+
+    // Velocity inversely proportional to cost (constant power assumption)
+    let adjustedVelocity = flatVelocityMps * (flatCost / gradeCost);
+
+    // Cap downhill speed to prevent unrealistic paces
+    if (gradeDecimal < 0) {
+      adjustedVelocity = Math.min(adjustedVelocity, downhillSpeedCapMps);
+    }
+
+    return adjustedVelocity;
+  }
+
+  /**
+   * Smooth elevation profile using a rolling window average.
+   * Helps reduce GPS noise in elevation data.
+   *
+   * @param points - Raw elevation points
+   * @param windowMeters - Window size in meters (default 100m)
+   * @returns Smoothed elevation points
+   */
+  smoothElevationProfile(
+    points: ElevationPoint[],
+    windowMeters: number = 100,
+  ): ElevationPoint[] {
+    if (points.length < 3) return points;
+
+    const smoothed: ElevationPoint[] = [];
+
+    for (let i = 0; i < points.length; i++) {
+      const currentDistance = points[i].distance;
+      const windowStart = currentDistance - windowMeters / 2;
+      const windowEnd = currentDistance + windowMeters / 2;
+
+      // Find all points within the window
+      const windowPoints = points.filter(
+        (p) => p.distance >= windowStart && p.distance <= windowEnd,
+      );
+
+      // Average elevation within window
+      const avgElevation =
+        windowPoints.reduce((sum, p) => sum + p.elevation, 0) / windowPoints.length;
+
+      smoothed.push({
+        distance: currentDistance,
+        elevation: avgElevation,
+      });
+    }
+
+    return smoothed;
+  }
+
+  /**
+   * Calculate course-based prediction using the Minetti model.
+   * Provides segment-by-segment pacing with grade adjustments.
+   *
+   * @param flatPredictionSeconds - Predicted flat terrain time in seconds
+   * @param courseProfile - Course elevation profile
+   * @param options - Configuration options
+   * @returns Full course prediction with segments
+   */
+  calculateCourseBasedPrediction(
+    flatPredictionSeconds: number,
+    courseProfile: CourseProfile,
+    options: {
+      segmentDistanceMeters?: number;
+      applyFadeFactor?: boolean;
+      downhillSpeedCapMps?: number;
+      smoothingWindowMeters?: number;
+    } = {},
+  ): CourseBasedPredictionResult {
+    const {
+      segmentDistanceMeters = 1000,
+      applyFadeFactor = false,
+      downhillSpeedCapMps = this.DEFAULT_DOWNHILL_SPEED_CAP_MPS,
+      smoothingWindowMeters = 100,
+    } = options;
+
+    // Smooth the elevation data
+    const smoothedPoints = this.smoothElevationProfile(
+      courseProfile.points,
+      smoothingWindowMeters,
+    );
+
+    // Calculate flat velocity
+    const flatVelocityMps = courseProfile.totalDistanceMeters / flatPredictionSeconds;
+
+    // Build segments
+    const segments: CourseSegmentPrediction[] = [];
+    const elevationProfile: { distance: number; elevation: number; pace: number }[] = [];
+
+    let cumulativeTime = 0;
+    let segmentNumber = 1;
+    let currentSegmentStart = 0;
+
+    // Track elevation stats
+    let totalGain = 0;
+    let totalLoss = 0;
+    let steepestClimb = 0;
+    let steepestDescent = 0;
+
+    // Process each point to build segments
+    let segmentGain = 0;
+    let segmentLoss = 0;
+    let segmentGrades: number[] = [];
+    let segmentTimes: number[] = [];
+
+    for (let i = 1; i < smoothedPoints.length; i++) {
+      const prevPoint = smoothedPoints[i - 1];
+      const currPoint = smoothedPoints[i];
+      const distanceDelta = currPoint.distance - prevPoint.distance;
+
+      if (distanceDelta <= 0) continue;
+
+      const elevationDelta = currPoint.elevation - prevPoint.elevation;
+      const grade = elevationDelta / distanceDelta;
+
+      // Track elevation changes
+      if (elevationDelta > 0) {
+        segmentGain += elevationDelta;
+        totalGain += elevationDelta;
+      } else {
+        segmentLoss += Math.abs(elevationDelta);
+        totalLoss += Math.abs(elevationDelta);
+      }
+
+      // Track steepest sections
+      const gradePercent = grade * 100;
+      if (gradePercent > steepestClimb) steepestClimb = gradePercent;
+      if (gradePercent < steepestDescent) steepestDescent = gradePercent;
+
+      // Calculate adjusted velocity for this micro-segment
+      const adjustedVelocity = this.calculateGradeAdjustedVelocity(
+        flatVelocityMps,
+        grade,
+        downhillSpeedCapMps,
+      );
+
+      // Time for this micro-segment
+      const microTime = distanceDelta / adjustedVelocity;
+      cumulativeTime += microTime;
+      segmentTimes.push(microTime);
+      segmentGrades.push(grade);
+
+      // Add to elevation profile
+      const paceSecondsPerKm = 1000 / adjustedVelocity;
+      elevationProfile.push({
+        distance: currPoint.distance,
+        elevation: currPoint.elevation,
+        pace: paceSecondsPerKm,
+      });
+
+      // Check if we've completed a segment
+      if (currPoint.distance - currentSegmentStart >= segmentDistanceMeters) {
+        const segmentDistance = currPoint.distance - currentSegmentStart;
+        const avgGrade = segmentGrades.length > 0
+          ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length
+          : 0;
+        const segmentTime = segmentTimes.reduce((a, b) => a + b, 0);
+        const avgPace = (segmentTime / segmentDistance) * 1000;
+
+        segments.push({
+          segmentNumber,
+          startDistanceMeters: currentSegmentStart,
+          endDistanceMeters: currPoint.distance,
+          averageGradePercent: Math.round(avgGrade * 10000) / 100,
+          elevationGain: Math.round(segmentGain * 10) / 10,
+          elevationLoss: Math.round(segmentLoss * 10) / 10,
+          adjustedPaceSecondsPerKm: Math.round(avgPace * 10) / 10,
+          segmentTimeSeconds: Math.round(segmentTime),
+          cumulativeTimeSeconds: Math.round(cumulativeTime),
+        });
+
+        segmentNumber++;
+        currentSegmentStart = currPoint.distance;
+        segmentGain = 0;
+        segmentLoss = 0;
+        segmentGrades = [];
+        segmentTimes = [];
+      }
+    }
+
+    // Handle final partial segment
+    if (segmentTimes.length > 0) {
+      const lastPoint = smoothedPoints[smoothedPoints.length - 1];
+      const segmentDistance = lastPoint.distance - currentSegmentStart;
+      const avgGrade = segmentGrades.length > 0
+        ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length
+        : 0;
+      const segmentTime = segmentTimes.reduce((a, b) => a + b, 0);
+      const avgPace = segmentDistance > 0 ? (segmentTime / segmentDistance) * 1000 : 0;
+
+      segments.push({
+        segmentNumber,
+        startDistanceMeters: currentSegmentStart,
+        endDistanceMeters: lastPoint.distance,
+        averageGradePercent: Math.round(avgGrade * 10000) / 100,
+        elevationGain: Math.round(segmentGain * 10) / 10,
+        elevationLoss: Math.round(segmentLoss * 10) / 10,
+        adjustedPaceSecondsPerKm: Math.round(avgPace * 10) / 10,
+        segmentTimeSeconds: Math.round(segmentTime),
+        cumulativeTimeSeconds: Math.round(cumulativeTime),
+      });
+    }
+
+    // Apply optional fade factor (for longer races, expect some slowdown)
+    let predictedTime = cumulativeTime;
+    if (applyFadeFactor && courseProfile.totalDistanceMeters > 10000) {
+      // Apply 1-3% fade for longer races
+      const distanceKm = courseProfile.totalDistanceMeters / 1000;
+      const fadeFactor = 1 + Math.min(0.03, (distanceKm - 10) * 0.001);
+      predictedTime *= fadeFactor;
+    }
+
+    return {
+      predictedTimeSeconds: Math.round(predictedTime),
+      flatEquivalentTimeSeconds: flatPredictionSeconds,
+      segments,
+      elevationProfile,
+      summary: {
+        totalElevationGain: Math.round(totalGain),
+        totalElevationLoss: Math.round(totalLoss),
+        steepestClimbPercent: Math.round(steepestClimb * 100) / 100,
+        steepestDescentPercent: Math.round(Math.abs(steepestDescent) * 100) / 100,
+        averageGradePercent:
+          Math.round(
+            ((totalGain - totalLoss) / courseProfile.totalDistanceMeters) * 10000,
+          ) / 100,
+      },
+    };
+  }
+
+  // ==========================================================================
+  // Legacy Elevation Adjustment Methods (kept for compatibility)
+  // ==========================================================================
 
   /**
    * Calculate running course time adjustment based on elevation

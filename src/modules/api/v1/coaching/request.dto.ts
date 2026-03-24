@@ -38,6 +38,16 @@ export class AthleteIdParam {
   athleteId: string;
 }
 
+export class AthleteRaceIdParam {
+  @ApiProperty({ description: 'Athlete ID' })
+  @IsUUID()
+  athleteId: string;
+
+  @ApiProperty({ description: 'Race ID' })
+  @IsUUID()
+  raceId: string;
+}
+
 export class AssignWorkoutBody {
   @ApiProperty({ description: 'Workout ID to assign' })
   @IsUUID()

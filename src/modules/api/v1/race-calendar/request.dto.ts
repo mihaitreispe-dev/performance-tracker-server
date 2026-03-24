@@ -207,3 +207,19 @@ export class UpdatePeriodizationBody {
   @IsEnum(['suggested', 'accepted', 'custom'])
   status?: 'suggested' | 'accepted' | 'custom';
 }
+
+// Upload Course File
+export class UploadCourseBody {
+  @ApiPropertyOptional({ description: 'Generate prediction after upload', default: true })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  generate_prediction?: boolean = true;
+
+  @ApiPropertyOptional({ description: 'Segment distance for prediction in meters', default: 1000 })
+  @IsOptional()
+  @Transform(({ value }) => Number.parseInt(value, 10))
+  @IsInt()
+  @Min(100)
+  @Max(5000)
+  segment_distance_meters?: number = 1000;
+}

@@ -41,6 +41,9 @@ import {
   WellnessPerformanceCorrelationResponse,
 } from '../advanced-metrics/response.dto';
 import { AnalyticsApiService } from '../analytics/analytics-api.service';
+import { RaceCalendarApiService } from '../race-calendar/race-calendar-api.service';
+import { UploadCourseBody } from '../race-calendar/request.dto';
+import { AthleteRaceDTO, CourseBasedPredictionDTO, CourseUploadResponseDTO } from '../race-calendar/response.dto';
 import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
 import {
   CurrentTrainingLoadResponse,
@@ -145,6 +148,7 @@ export class CoachingApiService {
     private readonly workoutPlansService: WorkoutPlansApiService,
     private readonly analyticsService: AnalyticsApiService,
     private readonly advancedMetricsService: AdvancedMetricsApiService,
+    private readonly raceCalendarService: RaceCalendarApiService,
   ) {}
 
   // Become Coach
@@ -447,6 +451,50 @@ export class CoachingApiService {
         shareWellnessCheckins: settings.share_wellness_checkins,
       },
     };
+  }
+
+  // ==================== ATHLETE RACES (Coach viewing) ====================
+
+  async getAthleteRaces(athleteId: string): Promise<AthleteRaceDTO[]> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_calendar) {
+      throw new ForbiddenException('Athlete has not shared their calendar with you');
+    }
+    // Create a mock request object to call the race calendar service
+    const mockReq = { user: { id: athleteId } } as Request & { user: AuthUser };
+    return this.raceCalendarService.listAthleteRaces(mockReq);
+  }
+
+  async getAthleteCoursePrediction(athleteId: string, raceId: string): Promise<CourseBasedPredictionDTO> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_calendar) {
+      throw new ForbiddenException('Athlete has not shared their calendar with you');
+    }
+    const mockReq = { user: { id: athleteId } } as Request & { user: AuthUser };
+    return this.raceCalendarService.getCoursePrediction(mockReq, raceId);
+  }
+
+  async uploadAthleteCourseFilee(
+    athleteId: string,
+    raceId: string,
+    file: Express.Multer.File,
+    body: UploadCourseBody,
+  ): Promise<CourseUploadResponseDTO> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_calendar) {
+      throw new ForbiddenException('Athlete has not shared their calendar with you');
+    }
+    const mockReq = { user: { id: athleteId } } as Request & { user: AuthUser };
+    return this.raceCalendarService.uploadCourseFile(mockReq, raceId, file, body);
+  }
+
+  async deleteAthleteCourseFilee(athleteId: string, raceId: string): Promise<void> {
+    const settings = await this.privacySettingsRepo.findByUserId(athleteId);
+    if (!settings?.share_calendar) {
+      throw new ForbiddenException('Athlete has not shared their calendar with you');
+    }
+    const mockReq = { user: { id: athleteId } } as Request & { user: AuthUser };
+    return this.raceCalendarService.deleteCourseFile(mockReq, raceId);
   }
 
   // ==================== ATHLETE ANALYTICS (Coach viewing) ====================

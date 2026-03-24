@@ -10,10 +10,13 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   Version,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { UserRole } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
@@ -40,6 +43,8 @@ import {
   TrackedExercisesResponse,
   TrainingLoadHistoryResponse,
 } from '../analytics/response.dto';
+import { UploadCourseBody } from '../race-calendar/request.dto';
+import { AthleteRaceDTO, CourseBasedPredictionDTO, CourseUploadResponseDTO } from '../race-calendar/response.dto';
 import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
 import { WorkoutResponse } from '../workouts/response.dto';
 import { CoachingApiService } from './coaching-api.service';
@@ -48,6 +53,7 @@ import {
   AssignedWorkoutIdParam,
   AssignWorkoutBody,
   AthleteIdParam,
+  AthleteRaceIdParam,
   ComplianceQuery,
   CorrelationQuery,
   CreateAthleteLabelBody,
@@ -361,6 +367,82 @@ export class CoachingApiController {
     @Param() params: AthleteIdParam,
   ): Promise<PrivacySettingsResponse> {
     return this.service.getAthletePrivacySettings(req, params.athleteId);
+  }
+
+  // ==================== ATHLETE RACES (Coach viewing) ====================
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's scheduled races (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: [AthleteRaceDTO] })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/races')
+  async getAthleteRaces(@Param() params: AthleteIdParam): Promise<AthleteRaceDTO[]> {
+    return this.service.getAthleteRaces(params.athleteId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Get athlete's course-based prediction (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: CourseBasedPredictionDTO })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'No course prediction found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/races/:raceId/course-prediction')
+  async getAthleteCoursePrediction(@Param() params: AthleteRaceIdParam): Promise<CourseBasedPredictionDTO> {
+    return this.service.getAthleteCoursePrediction(params.athleteId, params.raceId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Upload course file for athlete's race (COACH only)" })
+  @ApiResponse({ status: HttpStatus.CREATED, type: CourseUploadResponseDTO })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Race not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @Post('athletes/:athleteId/races/:raceId/course')
+  async uploadAthleteCourseFilee(
+    @Param() params: AthleteRaceIdParam,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: UploadCourseBody,
+  ): Promise<CourseUploadResponseDTO> {
+    return this.service.uploadAthleteCourseFilee(params.athleteId, params.raceId, file, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "Delete course file from athlete's race (COACH only)" })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    type: ErrorResponse,
+    description: 'Not authorized or privacy restricted',
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Race or course not found' })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('athletes/:athleteId/races/:raceId/course')
+  async deleteAthleteCourseFilee(@Param() params: AthleteRaceIdParam): Promise<void> {
+    return this.service.deleteAthleteCourseFilee(params.athleteId, params.raceId);
   }
 
   // ==================== ATHLETE ANALYTICS (Coach viewing) ====================

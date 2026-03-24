@@ -22,6 +22,7 @@ import {
 import {
   BayesianDiagnosticsResponse,
   DailyReadinessResponse,
+  EnhancedDailyReadinessResponse,
   FitnessFatiguePredictionResponse,
   FitnessFatigueResponse,
   HrvBaselineHistoryResponse,
@@ -53,10 +54,7 @@ export class AdvancedMetricsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: Vo2MaxResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('vo2max')
-  async getVo2Max(
-    @Req() req: Request & { user: AuthUser },
-    @Query() query: Vo2MaxSportQuery,
-  ): Promise<Vo2MaxResponse> {
+  async getVo2Max(@Req() req: Request & { user: AuthUser }, @Query() query: Vo2MaxSportQuery): Promise<Vo2MaxResponse> {
     return this.service.getVo2Max(req, query.sport);
   }
 
@@ -291,6 +289,22 @@ export class AdvancedMetricsApiController {
     return this.service.getReadinessTrends(req, query.days ?? 14);
   }
 
+  @Version('1')
+  @ApiOperation({
+    summary: 'Get enhanced readiness score (v2) with 4-block structure and confidence scores',
+    description:
+      'Enhanced readiness calculation using research-backed 4-block structure: Recovery (45-55%), Load (25-35%), Subjective (10-20%), Illness/Behavior (5-15%). Includes monotony/strain integration, illness override, explicit alcohol penalty, and confidence output.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: EnhancedDailyReadinessResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get('readiness/enhanced')
+  async getEnhancedDailyReadiness(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: DateQuery,
+  ): Promise<EnhancedDailyReadinessResponse> {
+    return this.service.getEnhancedDailyReadiness(req, query.date);
+  }
+
   // ==========================================
   // Subjective-Load Correlation endpoints
   // ==========================================
@@ -341,10 +355,7 @@ export class AdvancedMetricsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Get('lthr')
-  async getLTHR(
-    @Req() req: Request & { user: AuthUser },
-    @Query() query: LthrSportQuery,
-  ): Promise<LthrResponse> {
+  async getLTHR(@Req() req: Request & { user: AuthUser }, @Query() query: LthrSportQuery): Promise<LthrResponse> {
     return this.service.getLTHR(req, query.sport);
   }
 
@@ -377,10 +388,7 @@ export class AdvancedMetricsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post('lthr/estimate')
-  async estimateLTHR(
-    @Req() req: Request & { user: AuthUser },
-    @Query() query: LthrSportQuery,
-  ): Promise<LthrResponse> {
+  async estimateLTHR(@Req() req: Request & { user: AuthUser }, @Query() query: LthrSportQuery): Promise<LthrResponse> {
     return this.service.estimateLTHR(req, query.sport);
   }
 
@@ -389,10 +397,7 @@ export class AdvancedMetricsApiController {
   @ApiResponse({ status: HttpStatus.OK, type: LthrResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @Post('lthr/manual')
-  async setManualLTHR(
-    @Req() req: Request & { user: AuthUser },
-    @Body() body: ManualLthrBody,
-  ): Promise<LthrResponse> {
+  async setManualLTHR(@Req() req: Request & { user: AuthUser }, @Body() body: ManualLthrBody): Promise<LthrResponse> {
     return this.service.setManualLTHR(req, body);
   }
 }

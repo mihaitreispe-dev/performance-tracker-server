@@ -16,6 +16,7 @@ import { PersonalRecordRepository } from 'src/repositories/personal-record.repos
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
 
 import {
+  CourseBasedPredictionBody,
   GeneratePredictionBody,
   PredictionHistoryQuery,
   QuickPredictionBody,
@@ -25,12 +26,15 @@ import {
 } from './request.dto';
 import {
   AthleteProfileMetricsDTO,
+  CourseBasedPredictionDTO,
+  CourseSegmentDTO,
   HistoricalRaceResultDTO,
   PredictionAccuracyStatsDTO,
   RacePredictionDTO,
   TaperPlanDTO,
 } from './response.dto';
 import { CourseAnalysisService } from './services/course-analysis.service';
+import { CourseFileProcessorService } from './services/course-file-processor.service';
 import { CyclingPredictionResult, CyclingPredictionService } from './services/cycling-prediction.service';
 import { RunningPredictionResult, RunningPredictionService } from './services/running-prediction.service';
 import { TaperOptimizationService } from './services/taper-optimization.service';
@@ -54,6 +58,7 @@ export class RacePredictionApiService {
     private readonly cyclingPredictionService: CyclingPredictionService,
     private readonly taperOptimizationService: TaperOptimizationService,
     private readonly courseAnalysisService: CourseAnalysisService,
+    private readonly courseFileProcessorService: CourseFileProcessorService,
   ) {}
 
   /**
@@ -302,6 +307,128 @@ export class RacePredictionApiService {
     });
 
     return this.formatPredictionDTO(stored, algorithmsUsed);
+  }
+
+  /**
+   * Course-based prediction using uploaded GPX/FIT file
+   */
+  async courseBasedPrediction(
+    req: Request & { user: AuthUser },
+    file: Express.Multer.File,
+    body: CourseBasedPredictionBody,
+  ): Promise<CourseBasedPredictionDTO> {
+    const userId = req.user.id;
+
+    // Determine file format from extension
+    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    const format = ext === '.fit' ? 'fit' : 'gpx';
+
+    // Parse the course file
+    const courseProfile = await this.courseFileProcessorService.parseCourseFile(
+      file.buffer,
+      format as 'gpx' | 'fit',
+    );
+
+    // Use provided distance or file distance
+    const distanceMeters = body.distance_meters || courseProfile.totalDistanceMeters;
+
+    // Get athlete profile and fitness data for base prediction
+    const profile = await this.athleteProfileMetricsRepository.findByUserId(userId);
+    const vo2maxMetric = await this.fitnessMetricsRepository.getLatestByType(
+      userId,
+      FitnessMetricType.VO2_MAX,
+    );
+    const vo2max = vo2maxMetric ? Number.parseFloat(vo2maxMetric.value) : undefined;
+    const vo2maxConfidence = vo2maxMetric
+      ? Number.parseFloat(vo2maxMetric.confidence || '0.5')
+      : undefined;
+
+    // Generate flat terrain base prediction
+    const basePrediction = await this.runningPredictionService.predictRaceTime(userId, {
+      targetDistanceMeters: distanceMeters,
+      vo2max,
+      vo2maxConfidence,
+      yearsTraining: profile?.years_training || undefined,
+    });
+
+    // Apply taper adjustment if race date provided
+    let taperFactor = 1.0;
+    if (body.race_date) {
+      const projectedTsb = await this.taperOptimizationService.projectTsbForDate(
+        userId,
+        new Date(body.race_date),
+      );
+      const assessment = this.taperOptimizationService.calculateFormAdjustment(projectedTsb);
+      taperFactor = assessment.timeFactor;
+    }
+
+    const adjustedFlatTime = Math.round(basePrediction.predictedTimeSeconds * taperFactor);
+
+    // Scale course profile if distance override was provided
+    let scaledProfile = courseProfile;
+    if (body.distance_meters && body.distance_meters !== courseProfile.totalDistanceMeters) {
+      const scaleFactor = body.distance_meters / courseProfile.totalDistanceMeters;
+      scaledProfile = {
+        ...courseProfile,
+        totalDistanceMeters: body.distance_meters,
+        points: courseProfile.points.map((p) => ({
+          distance: p.distance * scaleFactor,
+          elevation: p.elevation,
+        })),
+      };
+    }
+
+    // Calculate course-based prediction with Minetti model
+    const coursePrediction = this.courseAnalysisService.calculateCourseBasedPrediction(
+      adjustedFlatTime,
+      scaledProfile,
+      {
+        segmentDistanceMeters: body.segment_distance_meters || 1000,
+        applyFadeFactor: body.apply_fade_factor || false,
+        downhillSpeedCapMps: body.downhill_speed_cap_mps,
+        smoothingWindowMeters: body.smoothing_window_meters || 100,
+      },
+    );
+
+    // Validate and get warnings
+    const validation = this.courseFileProcessorService.validateCourseForPrediction(scaledProfile);
+
+    // Format segments for response
+    const segments: CourseSegmentDTO[] = coursePrediction.segments.map((seg) => ({
+      segment_number: seg.segmentNumber,
+      start_distance_meters: seg.startDistanceMeters,
+      end_distance_meters: seg.endDistanceMeters,
+      average_grade_percent: seg.averageGradePercent,
+      elevation_gain: seg.elevationGain,
+      elevation_loss: seg.elevationLoss,
+      adjusted_pace_seconds_per_km: seg.adjustedPaceSecondsPerKm,
+      adjusted_pace_formatted: this.formatPace(seg.adjustedPaceSecondsPerKm),
+      segment_time_seconds: seg.segmentTimeSeconds,
+      cumulative_time_seconds: seg.cumulativeTimeSeconds,
+      cumulative_time_formatted: this.formatTime(seg.cumulativeTimeSeconds),
+    }));
+
+    return {
+      predicted_time_seconds: coursePrediction.predictedTimeSeconds,
+      predicted_time_formatted: this.formatTime(coursePrediction.predictedTimeSeconds),
+      flat_equivalent_time_seconds: coursePrediction.flatEquivalentTimeSeconds,
+      flat_equivalent_time_formatted: this.formatTime(coursePrediction.flatEquivalentTimeSeconds),
+      elevation_adjustment_seconds:
+        coursePrediction.predictedTimeSeconds - coursePrediction.flatEquivalentTimeSeconds,
+      distance_meters: distanceMeters,
+      confidence_score: basePrediction.confidenceScore,
+      segments,
+      elevation_profile: coursePrediction.elevationProfile,
+      summary: {
+        total_elevation_gain: coursePrediction.summary.totalElevationGain,
+        total_elevation_loss: coursePrediction.summary.totalElevationLoss,
+        steepest_climb_percent: coursePrediction.summary.steepestClimbPercent,
+        steepest_descent_percent: coursePrediction.summary.steepestDescentPercent,
+        average_grade_percent: coursePrediction.summary.averageGradePercent,
+      },
+      algorithms_used: ['minetti_grade_cost', ...basePrediction.methods.map((m) => m.name)],
+      warnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+    };
   }
 
   /**
@@ -559,11 +686,17 @@ export class RacePredictionApiService {
   private formatTime(totalSeconds: number): string {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const seconds = Math.round(totalSeconds % 60);
 
     if (hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  private formatPace(secondsPerKm: number): string {
+    const minutes = Math.floor(secondsPerKm / 60);
+    const seconds = Math.round(secondsPerKm % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 

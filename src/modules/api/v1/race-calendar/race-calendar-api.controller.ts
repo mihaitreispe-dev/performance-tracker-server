@@ -10,9 +10,12 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
   Version,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
@@ -23,8 +26,15 @@ import {
   SearchRacesQuery,
   UpdateAthleteRaceBody,
   UpdatePeriodizationBody,
+  UploadCourseBody,
 } from './request.dto';
-import { AthleteRaceDTO, PeriodizationPlanDTO, RaceEventDTO } from './response.dto';
+import {
+  AthleteRaceDTO,
+  CourseBasedPredictionDTO,
+  CourseUploadResponseDTO,
+  PeriodizationPlanDTO,
+  RaceEventDTO,
+} from './response.dto';
 
 @ApiTags('Race Calendar')
 @ApiBearerAuth('JWT')
@@ -119,6 +129,51 @@ export class RaceCalendarApiController {
     @Param('raceId') raceId: string,
   ): Promise<void> {
     return this.service.deleteAthleteRace(req, raceId);
+  }
+
+  // ==========================================================================
+  // Course File Management
+  // ==========================================================================
+
+  @Version('1')
+  @Post('users/:userId/races/:raceId/course')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload course file (GPX/FIT) for a race' })
+  @ApiResponse({ status: 201, type: CourseUploadResponseDTO })
+  async uploadCourseFile(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: UploadCourseBody,
+  ): Promise<CourseUploadResponseDTO> {
+    return this.service.uploadCourseFile(req, raceId, file, body);
+  }
+
+  @Version('1')
+  @Get('users/:userId/races/:raceId/course-prediction')
+  @ApiOperation({ summary: 'Get course-based prediction for a race' })
+  @ApiResponse({ status: 200, type: CourseBasedPredictionDTO })
+  async getCoursePrediction(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+  ): Promise<CourseBasedPredictionDTO> {
+    return this.service.getCoursePrediction(req, raceId);
+  }
+
+  @Version('1')
+  @Delete('users/:userId/races/:raceId/course')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete course file from a race' })
+  @ApiResponse({ status: 204 })
+  async deleteCourseFile(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+  ): Promise<void> {
+    return this.service.deleteCourseFile(req, raceId);
   }
 
   // ==========================================================================

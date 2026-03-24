@@ -1,13 +1,20 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { NewAthleteRace } from 'src/database/interfaces/athlete-races-table.interface';
 import type { PeriodizationPhase } from 'src/database/interfaces/periodization-plans-table.interface';
-import { PredictionStatus, RacePrediction } from 'src/database/interfaces';
+import { FitnessMetricType, PredictionStatus, RacePrediction, RaceSport } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { S3Service } from 'src/modules/s3/s3.service';
 import { AthleteRaceRepository, AthleteRaceWithEvent } from 'src/repositories/athlete-race.repository';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { PeriodizationPlanRepository } from 'src/repositories/periodization-plan.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
+import { CourseAnalysisService, CourseBasedPredictionResult } from '../race-prediction/services/course-analysis.service';
+import { CourseFileProcessorService } from '../race-prediction/services/course-file-processor.service';
+import { RunningPredictionService } from '../race-prediction/services/running-prediction.service';
 
 import {
   ActiveNetworkService,
@@ -23,9 +30,18 @@ import {
   SearchRacesQuery,
   UpdateAthleteRaceBody,
   UpdatePeriodizationBody,
+  UploadCourseBody,
 } from './request.dto';
-import { AthleteRaceDTO, PeriodizationPlanDTO, RaceEventDTO, RacePredictionSummaryDTO } from './response.dto';
-import { AthleteLevel } from './types';
+import {
+  AthleteRaceDTO,
+  CourseBasedPredictionDTO,
+  CoursePredictionSummaryDTO,
+  CourseUploadResponseDTO,
+  PeriodizationPlanDTO,
+  RaceEventDTO,
+  RacePredictionSummaryDTO,
+} from './response.dto';
+import { AthleteLevel, CourseMetrics } from './types';
 
 @Injectable()
 export class RaceCalendarApiService {
@@ -40,6 +56,12 @@ export class RaceCalendarApiService {
     private readonly runSignUpService: RunSignUpService,
     private readonly worldTriathlonService: WorldTriathlonService,
     private readonly openTrackService: OpenTrackService,
+    private readonly s3Service: S3Service,
+    private readonly courseFileProcessorService: CourseFileProcessorService,
+    private readonly courseAnalysisService: CourseAnalysisService,
+    private readonly runningPredictionService: RunningPredictionService,
+    private readonly athleteProfileMetricsRepo: AthleteProfileMetricsRepository,
+    private readonly fitnessMetricsRepo: FitnessMetricsRepository,
   ) {}
 
   // ==========================================================================
@@ -285,6 +307,292 @@ export class RaceCalendarApiService {
     }
 
     await this.athleteRaceRepo.deleteById(raceId);
+  }
+
+  // ==========================================================================
+  // Course File Management
+  // ==========================================================================
+
+  async uploadCourseFile(
+    req: Request & { user: AuthUser },
+    raceId: string,
+    file: Express.Multer.File,
+    body: UploadCourseBody,
+  ): Promise<CourseUploadResponseDTO> {
+    const userId = req.user.id;
+
+    // Get the race
+    const race = await this.athleteRaceRepo.findByIdWithEvent(raceId);
+    if (!race || race.user_id !== userId) {
+      throw new NotFoundException('Race not found');
+    }
+
+    // Validate file
+    if (!file || !file.buffer) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf('.'));
+    if (ext !== '.gpx' && ext !== '.fit') {
+      throw new BadRequestException('Invalid file type. Only GPX and FIT files are supported.');
+    }
+
+    const fileType = ext === '.fit' ? 'fit' : 'gpx';
+
+    // Parse the course file
+    const courseProfile = await this.courseFileProcessorService.parseCourseFile(
+      file.buffer,
+      fileType as 'gpx' | 'fit',
+    );
+
+    // Upload to S3
+    const fileUuid = uuidv4();
+    const s3Key = `courses/${userId}/${raceId}/${fileUuid}${ext}`;
+
+    await this.s3Service.uploadFile({
+      bucket: this.s3Service.contentBucket,
+      key: s3Key,
+      data: file.buffer,
+      additionalParams: {
+        ContentType: fileType === 'fit' ? 'application/octet-stream' : 'application/gpx+xml',
+      },
+    });
+
+    // Delete old course file if exists
+    if (race.course_file_path) {
+      try {
+        await this.s3Service.deleteObject({
+          bucket: this.s3Service.contentBucket,
+          key: race.course_file_path,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to delete old course file: ${err}`);
+      }
+    }
+
+    // Update athlete race with course file path
+    await this.athleteRaceRepo.updateById(raceId, {
+      course_file_path: s3Key,
+    });
+
+    // Calculate course metrics
+    const maxElevation = Math.max(...courseProfile.points.map((p) => p.elevation));
+    const minElevation = Math.min(...courseProfile.points.map((p) => p.elevation));
+
+    // Calculate steepest grade
+    let steepestGrade: number | null = null;
+    for (let i = 1; i < courseProfile.points.length; i++) {
+      const distDelta = courseProfile.points[i].distance - courseProfile.points[i - 1].distance;
+      if (distDelta > 0) {
+        const elevDelta = courseProfile.points[i].elevation - courseProfile.points[i - 1].elevation;
+        const grade = Math.abs((elevDelta / distDelta) * 100);
+        if (steepestGrade === null || grade > steepestGrade) {
+          steepestGrade = grade;
+        }
+      }
+    }
+
+    const metrics: CourseMetrics = {
+      total_distance_meters: Math.round(courseProfile.totalDistanceMeters),
+      elevation_gain_meters: Math.round(courseProfile.totalElevationGain),
+      elevation_loss_meters: Math.round(courseProfile.totalElevationLoss),
+      max_elevation_meters: Math.round(maxElevation),
+      min_elevation_meters: Math.round(minElevation),
+      steepest_grade_percent: steepestGrade ? Math.round(steepestGrade * 100) / 100 : null,
+      num_points: courseProfile.points.length,
+    };
+
+    const response: CourseUploadResponseDTO = {
+      file_path: s3Key,
+      file_type: fileType,
+      metrics,
+    };
+
+    // Generate prediction if requested
+    if (body.generate_prediction !== false) {
+      const prediction = await this.generateAndStoreCoursePrediction(
+        userId,
+        raceId,
+        race,
+        courseProfile,
+        body.segment_distance_meters || 1000,
+      );
+      response.prediction = prediction;
+    }
+
+    return response;
+  }
+
+  async getCoursePrediction(
+    req: Request & { user: AuthUser },
+    raceId: string,
+  ): Promise<CourseBasedPredictionDTO> {
+    const userId = req.user.id;
+
+    // Get the race
+    const race = await this.athleteRaceRepo.findByIdWithEvent(raceId);
+    if (!race || race.user_id !== userId) {
+      throw new NotFoundException('Race not found');
+    }
+
+    if (!race.course_file_path) {
+      throw new NotFoundException('No course file uploaded for this race');
+    }
+
+    // Get the current prediction
+    const prediction = await this.racePredictionRepo.findCurrentForRace(userId, raceId);
+    if (!prediction || !prediction.metadata?.course_prediction) {
+      throw new NotFoundException('No course prediction found. Please re-upload the course file.');
+    }
+
+    const coursePrediction = prediction.metadata.course_prediction as CourseBasedPredictionResult;
+
+    return this.formatCoursePredictionDTO(prediction, coursePrediction);
+  }
+
+  async deleteCourseFile(req: Request & { user: AuthUser }, raceId: string): Promise<void> {
+    const userId = req.user.id;
+
+    // Get the race
+    const race = await this.athleteRaceRepo.findById(raceId);
+    if (!race || race.user_id !== userId) {
+      throw new NotFoundException('Race not found');
+    }
+
+    if (!race.course_file_path) {
+      throw new NotFoundException('No course file to delete');
+    }
+
+    // Delete from S3
+    try {
+      await this.s3Service.deleteObject({
+        bucket: this.s3Service.contentBucket,
+        key: race.course_file_path,
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to delete course file from S3: ${err}`);
+    }
+
+    // Supersede course-based prediction
+    await this.racePredictionRepo.supersedePreviousPredictions(userId, raceId);
+
+    // Update race to remove course file path
+    await this.athleteRaceRepo.updateById(raceId, {
+      course_file_path: null,
+    });
+  }
+
+  private async generateAndStoreCoursePrediction(
+    userId: string,
+    raceId: string,
+    race: AthleteRaceWithEvent,
+    courseProfile: { points: { distance: number; elevation: number }[]; totalDistanceMeters: number; totalElevationGain: number; totalElevationLoss: number },
+    segmentDistanceMeters: number,
+  ): Promise<CourseBasedPredictionDTO> {
+    // Get athlete profile and fitness data for base prediction
+    const profile = await this.athleteProfileMetricsRepo.findByUserId(userId);
+    const vo2maxMetric = await this.fitnessMetricsRepo.getLatestByType(userId, FitnessMetricType.VO2_MAX);
+    const vo2max = vo2maxMetric ? Number.parseFloat(vo2maxMetric.value) : undefined;
+    const vo2maxConfidence = vo2maxMetric ? Number.parseFloat(vo2maxMetric.confidence || '0.5') : undefined;
+
+    const distanceMeters = courseProfile.totalDistanceMeters;
+
+    // Generate flat terrain base prediction
+    const basePrediction = await this.runningPredictionService.predictRaceTime(userId, {
+      targetDistanceMeters: distanceMeters,
+      vo2max,
+      vo2maxConfidence,
+      yearsTraining: profile?.years_training || undefined,
+    });
+
+    // Calculate course-based prediction with Minetti model
+    const coursePrediction = this.courseAnalysisService.calculateCourseBasedPrediction(
+      basePrediction.predictedTimeSeconds,
+      courseProfile,
+      {
+        segmentDistanceMeters,
+        applyFadeFactor: distanceMeters > 10000,
+        smoothingWindowMeters: 100,
+      },
+    );
+
+    // Supersede previous predictions
+    await this.racePredictionRepo.supersedePreviousPredictions(userId, raceId);
+
+    // Store prediction in race_predictions table
+    const raceDate = race.race_event?.date || race.manual_date;
+    const sport = (race.race_event?.event_type || race.manual_event_type || 'run') as RaceSport;
+
+    const stored = await this.racePredictionRepo.create({
+      user_id: userId,
+      athlete_race_id: raceId,
+      sport,
+      distance_meters: distanceMeters,
+      race_date: raceDate ? new Date(raceDate).toISOString().split('T')[0] : null,
+      predicted_time_seconds: coursePrediction.predictedTimeSeconds,
+      confidence_lower_seconds: Math.round(basePrediction.confidenceLowerSeconds * (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds)),
+      confidence_upper_seconds: Math.round(basePrediction.confidenceUpperSeconds * (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds)),
+      confidence_score: basePrediction.confidenceScore,
+      target_pace_per_km: basePrediction.targetPacePerKm,
+      target_power_watts: null,
+      segment_targets: coursePrediction.segments.map((seg) => ({
+        segment: seg.segmentNumber,
+        distance_meters: seg.endDistanceMeters - seg.startDistanceMeters,
+        target_pace_per_km: seg.adjustedPaceSecondsPerKm,
+        target_time_seconds: seg.segmentTimeSeconds,
+      })),
+      risk_score: null,
+      risk_factors: null,
+      goal_time_seconds: race.goal_time_seconds,
+      goal_achievability: null,
+      status: PredictionStatus.CURRENT,
+      metadata: {
+        algorithms_used: ['minetti_grade_model', ...basePrediction.methods.map((m) => m.name)],
+        input_metrics: {
+          vo2max,
+          vo2max_confidence: vo2maxConfidence,
+        },
+        course_prediction: coursePrediction,
+        generated_by: 'course_upload',
+      },
+    });
+
+    return this.formatCoursePredictionDTO(stored, coursePrediction);
+  }
+
+  private formatCoursePredictionDTO(
+    prediction: RacePrediction,
+    coursePrediction: CourseBasedPredictionResult,
+  ): CourseBasedPredictionDTO {
+    return {
+      predicted_time_seconds: coursePrediction.predictedTimeSeconds,
+      predicted_time_formatted: this.formatTimeToString(coursePrediction.predictedTimeSeconds),
+      flat_equivalent_time_seconds: coursePrediction.flatEquivalentTimeSeconds,
+      confidence_score: Number.parseFloat(prediction.confidence_score),
+      segments: coursePrediction.segments.map((seg) => ({
+        segment_number: seg.segmentNumber,
+        start_distance_meters: seg.startDistanceMeters,
+        end_distance_meters: seg.endDistanceMeters,
+        average_grade_percent: seg.averageGradePercent,
+        elevation_gain: seg.elevationGain,
+        elevation_loss: seg.elevationLoss,
+        adjusted_pace_seconds_per_km: seg.adjustedPaceSecondsPerKm,
+        segment_time_seconds: seg.segmentTimeSeconds,
+        cumulative_time_seconds: seg.cumulativeTimeSeconds,
+      })),
+      elevation_profile: coursePrediction.elevationProfile.map((p) => ({
+        distance: p.distance,
+        elevation: p.elevation,
+        pace: p.pace,
+      })),
+      summary: {
+        total_elevation_gain: coursePrediction.summary.totalElevationGain,
+        total_elevation_loss: coursePrediction.summary.totalElevationLoss,
+        steepest_climb_percent: coursePrediction.summary.steepestClimbPercent,
+        steepest_descent_percent: coursePrediction.summary.steepestDescentPercent,
+        average_grade_percent: coursePrediction.summary.averageGradePercent,
+      },
+    };
   }
 
   // ==========================================================================

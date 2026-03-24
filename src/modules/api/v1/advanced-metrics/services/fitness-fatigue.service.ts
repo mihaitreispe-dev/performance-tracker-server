@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   ACWRRiskLevel,
   NewFitnessFatigueDaily,
@@ -9,6 +9,7 @@ import { formatDateToYMD } from 'src/lib/util';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
+
 import { TrainingStressService } from './training-stress.service';
 
 export interface FitnessFatigueResult {
@@ -240,6 +241,7 @@ export class FitnessFatigueService {
 
   /**
    * Get PMC chart data for a date range
+   * Fills gaps and extends to today with proper exponential decay
    */
   async getPMCChartData(userId: string, days: number = 90): Promise<PMCChartData> {
     const records = await this.fitnessFatigueRepository.getDateRange(userId, days);
@@ -258,31 +260,96 @@ export class FitnessFatigueService {
       };
     }
 
-    const data: FitnessFatigueResult[] = records.map((r) => ({
-      date: formatDateToYMD(r.date),
-      ctl: Number.parseFloat(r.ctl),
-      atl: Number.parseFloat(r.atl),
-      tsb: Number.parseFloat(r.tsb),
-      dailyTss: Number.parseFloat(r.daily_tss),
-      rampRate: r.ramp_rate ? Number.parseFloat(r.ramp_rate) : null,
-      recommendation: this.getRecommendation(Number.parseFloat(r.tsb)),
-      acwr: r.acwr ? Number.parseFloat(r.acwr) : null,
-      acwrRiskLevel: (r.acwr_risk_level as ACWRRiskLevel) || null,
-      monotony: r.monotony ? Number.parseFloat(r.monotony) : null,
-      strain: r.strain ? Number.parseFloat(r.strain) : null,
-      overtrainingRisk: (r.overtraining_risk as OvertrainingRiskLevel) || null,
-    }));
+    // Create a map of existing records by date
+    const recordMap = new Map<string, (typeof records)[0]>();
+    for (const r of records) {
+      recordMap.set(formatDateToYMD(r.date), r);
+    }
 
-    // Get current (latest) values
-    const latest = records[records.length - 1];
-    const currentTsb = Number.parseFloat(latest.tsb);
+    // Generate all dates from (today - days) to today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - days + 1);
+
+    const data: FitnessFatigueResult[] = [];
+
+    // Decay factors per day with no training (TSS = 0)
+    const ctlDecayFactor = 1 - 1 / this.CTL_DECAY; // 41/42 ≈ 0.976
+    const atlDecayFactor = 1 - 1 / this.ATL_DECAY; // 6/7 ≈ 0.857
+
+    let lastCTL = 0;
+    let lastATL = 0;
+
+    const currentDate = new Date(startDate);
+    while (currentDate <= today) {
+      const dateStr = formatDateToYMD(currentDate);
+      const existingRecord = recordMap.get(dateStr);
+
+      if (existingRecord) {
+        // Use actual data
+        lastCTL = Number.parseFloat(existingRecord.ctl);
+        lastATL = Number.parseFloat(existingRecord.atl);
+        const tsb = Number.parseFloat(existingRecord.tsb);
+
+        data.push({
+          date: dateStr,
+          ctl: lastCTL,
+          atl: lastATL,
+          tsb,
+          dailyTss: Number.parseFloat(existingRecord.daily_tss),
+          rampRate: existingRecord.ramp_rate ? Number.parseFloat(existingRecord.ramp_rate) : null,
+          recommendation: this.getRecommendation(tsb),
+          acwr: existingRecord.acwr ? Number.parseFloat(existingRecord.acwr) : null,
+          acwrRiskLevel: (existingRecord.acwr_risk_level as ACWRRiskLevel) || null,
+          monotony: existingRecord.monotony ? Number.parseFloat(existingRecord.monotony) : null,
+          strain: existingRecord.strain ? Number.parseFloat(existingRecord.strain) : null,
+          overtrainingRisk: (existingRecord.overtraining_risk as OvertrainingRiskLevel) || null,
+        });
+      } else if (lastCTL > 0 || lastATL > 0) {
+        // No data for this day but we have previous values - apply decay
+        lastCTL = Math.round(lastCTL * ctlDecayFactor * 100) / 100;
+        lastATL = Math.round(lastATL * atlDecayFactor * 100) / 100;
+
+        // CTL/ATL decay very slowly - floor at 0.1 to avoid floating point noise
+        if (lastCTL < 0.1) lastCTL = 0;
+        if (lastATL < 0.1) lastATL = 0;
+
+        const tsb = Math.round((lastCTL - lastATL) * 100) / 100;
+
+        // Calculate ACWR
+        const acwr = lastCTL > 0 ? Math.round((lastATL / lastCTL) * 100) / 100 : null;
+
+        data.push({
+          date: dateStr,
+          ctl: lastCTL,
+          atl: lastATL,
+          tsb,
+          dailyTss: 0,
+          rampRate: null,
+          recommendation: this.getRecommendation(tsb),
+          acwr,
+          acwrRiskLevel: acwr ? this.getACWRRiskLevel(acwr) : null,
+          monotony: null,
+          strain: null,
+          overtrainingRisk: null,
+        });
+      }
+      // If lastCTL and lastATL are both 0, skip this date (no data yet)
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Get current form from the last data point
+    const latestData = data[data.length - 1];
+    const currentTsb = latestData?.tsb ?? 0;
     const recommendation = this.getRecommendation(currentTsb);
 
     return {
       data,
       currentForm: {
-        ctl: Number.parseFloat(latest.ctl),
-        atl: Number.parseFloat(latest.atl),
+        ctl: latestData?.ctl ?? 0,
+        atl: latestData?.atl ?? 0,
         tsb: currentTsb,
         recommendation,
         recommendationText: this.getRecommendationText(recommendation, currentTsb),
