@@ -380,3 +380,220 @@ export class CourseBasedPredictionDTO {
   @ApiPropertyOptional({ type: [String], description: 'Any warnings about the course data' })
   warnings?: string[];
 }
+
+// ==========================================================================
+// Race Plan DTOs
+// ==========================================================================
+
+export class EffortZoneDTO {
+  @ApiProperty({ description: 'Segment number' })
+  segment_number: number;
+
+  @ApiProperty({ description: 'Zone name (e.g., Warmup, Race Pace, Tempo, Threshold)' })
+  zone_name: string;
+
+  @ApiPropertyOptional({ description: 'Target heart rate minimum (bpm)' })
+  target_hr_min?: number;
+
+  @ApiPropertyOptional({ description: 'Target heart rate maximum (bpm)' })
+  target_hr_max?: number;
+
+  @ApiProperty({ description: 'Target pace minimum (seconds per km)' })
+  target_pace_min_seconds_per_km: number;
+
+  @ApiProperty({ description: 'Target pace maximum (seconds per km)' })
+  target_pace_max_seconds_per_km: number;
+
+  @ApiProperty({ description: 'RPE scale (1-10)' })
+  rpe_scale: number;
+
+  @ApiProperty({ description: 'Description of effort for this zone' })
+  description: string;
+}
+
+export class NutritionTimingDTO {
+  @ApiProperty({ description: 'Time elapsed in minutes' })
+  time_elapsed_minutes: number;
+
+  @ApiProperty({ description: 'Distance covered in km' })
+  distance_km: number;
+
+  @ApiProperty({ description: 'Carbohydrates to consume (grams)' })
+  carbs_grams: number;
+
+  @ApiProperty({ description: 'Hydration to consume (ml)' })
+  hydration_ml: number;
+
+  @ApiPropertyOptional({ description: 'Notes for this nutrition point' })
+  notes?: string;
+}
+
+export class CaffeineStrategyDTO {
+  @ApiProperty({ description: 'Pre-race caffeine dose (mg)' })
+  pre_race_mg: number;
+
+  @ApiProperty({ description: 'Timing before race start (minutes)' })
+  pre_race_timing_minutes: number;
+
+  @ApiPropertyOptional({ description: 'On-course caffeine dose (mg)' })
+  on_course_mg?: number;
+
+  @ApiPropertyOptional({ description: 'Timing after race start (minutes)' })
+  on_course_timing_minutes?: number;
+}
+
+export class EnergyManagementPlanDTO {
+  @ApiProperty({ description: 'Days before race to start carb loading' })
+  carb_loading_days_before: number;
+
+  @ApiProperty({ description: 'Race morning carbohydrate intake (grams)' })
+  race_morning_carbs_grams: number;
+
+  @ApiProperty({ description: 'Hours before race to eat breakfast' })
+  race_morning_timing_hours_before: number;
+
+  @ApiProperty({ type: [NutritionTimingDTO], description: 'On-course nutrition timeline' })
+  on_course_nutrition: NutritionTimingDTO[];
+
+  @ApiProperty({ description: 'Total carbs per hour target' })
+  total_carbs_per_hour: number;
+
+  @ApiProperty({ description: 'Total hydration per hour target (ml)' })
+  total_hydration_ml_per_hour: number;
+
+  @ApiPropertyOptional({ type: CaffeineStrategyDTO, description: 'Caffeine strategy if applicable' })
+  caffeine_strategy?: CaffeineStrategyDTO;
+}
+
+export class MentalCheckpointDTO {
+  @ApiProperty({ description: 'Distance in km' })
+  distance_km: number;
+
+  @ApiProperty({ description: 'Percentage of race complete' })
+  percentage_complete: number;
+
+  @ApiProperty({ description: 'Message for this checkpoint' })
+  message: string;
+
+  @ApiProperty({ description: 'Advice for this checkpoint' })
+  advice: string;
+}
+
+export class FatigueModelDTO {
+  @ApiProperty({ description: 'Baseline fade factor (e.g., 1.03 = 3% expected slowdown)' })
+  baseline_fade_factor: number;
+
+  @ApiProperty({ description: 'Critical fatigue point distance (km)' })
+  critical_fatigue_point_km: number;
+
+  @ApiProperty({ type: [MentalCheckpointDTO], description: 'Mental checkpoints throughout race' })
+  mental_checkpoints: MentalCheckpointDTO[];
+
+  @ApiProperty({ description: 'Overall pacing guidance' })
+  pacing_guidance: string;
+}
+
+export class WeatherAdjustmentsDTO {
+  @ApiProperty({ description: 'Time impact from temperature (seconds)' })
+  temperature_impact_seconds: number;
+
+  @ApiProperty({ description: 'Time impact from humidity (seconds)' })
+  humidity_impact_seconds: number;
+
+  @ApiProperty({ description: 'Time impact from wind (seconds)' })
+  wind_impact_seconds: number;
+
+  @ApiProperty({ description: 'Total time impact (seconds)' })
+  total_impact_seconds: number;
+
+  @ApiProperty({ description: 'Total impact as percentage' })
+  total_impact_percent: number;
+
+  @ApiProperty({ enum: ['none', 'low', 'moderate', 'high', 'extreme'], description: 'Heat stress level' })
+  heat_stress_level: string;
+
+  @ApiProperty({ description: 'Hydration needs multiplier' })
+  hydration_multiplier: number;
+
+  @ApiProperty({ description: 'Pacing advice based on weather' })
+  pacing_advice: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Risk warnings' })
+  risk_warnings?: string[];
+}
+
+export class WeatherSummaryDTO {
+  @ApiProperty({ description: 'Temperature in Celsius' })
+  temperature_celsius: number;
+
+  @ApiProperty({ description: 'Humidity percentage' })
+  humidity_percent: number;
+
+  @ApiProperty({ description: 'Wind speed in km/h' })
+  wind_speed_kmh: number;
+
+  @ApiProperty({ description: 'Weather conditions description' })
+  conditions: string;
+
+  @ApiPropertyOptional({ type: WeatherAdjustmentsDTO, description: 'Performance adjustments' })
+  adjustments?: WeatherAdjustmentsDTO;
+}
+
+export class RacePlanDTO {
+  @ApiProperty({ description: 'Race plan ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Athlete race ID' })
+  athlete_race_id: string;
+
+  @ApiPropertyOptional({ description: 'Associated prediction ID' })
+  race_prediction_id?: string;
+
+  @ApiProperty({ description: 'Predicted finish time in seconds' })
+  predicted_finish_time_seconds: number;
+
+  @ApiPropertyOptional({ description: 'Target finish time in seconds' })
+  target_finish_time_seconds?: number;
+
+  @ApiProperty({ enum: ['even', 'negative_split', 'conservative', 'progressive'], description: 'Pacing strategy' })
+  pacing_strategy: string;
+
+  @ApiPropertyOptional({ description: 'Negative split ratio if applicable' })
+  negative_split_ratio?: number;
+
+  @ApiProperty({ type: [CourseSegmentDTO], description: 'Segment-by-segment splits' })
+  segment_splits: CourseSegmentDTO[];
+
+  @ApiProperty({ type: [EffortZoneDTO], description: 'Effort zones for each segment' })
+  effort_zones: EffortZoneDTO[];
+
+  @ApiProperty({ type: EnergyManagementPlanDTO, description: 'Nutrition and hydration plan' })
+  energy_management: EnergyManagementPlanDTO;
+
+  @ApiProperty({ type: FatigueModelDTO, description: 'Fatigue model and mental checkpoints' })
+  fatigue_model: FatigueModelDTO;
+
+  @ApiPropertyOptional({ type: WeatherSummaryDTO, description: 'Weather forecast and impacts' })
+  weather?: WeatherSummaryDTO;
+
+  @ApiProperty({ description: 'Warmup protocol' })
+  warmup_protocol: string;
+
+  @ApiProperty({ type: [String], description: 'Race day checklist' })
+  race_day_checklist: string[];
+
+  @ApiProperty({ type: [String], description: 'Key advice for race day' })
+  key_advice: string[];
+
+  @ApiProperty({ enum: ['active', 'superseded', 'archived'], description: 'Plan status' })
+  status: string;
+
+  @ApiProperty({ description: 'Plan version number' })
+  plan_version: number;
+
+  @ApiProperty()
+  created_at: string;
+
+  @ApiProperty()
+  updated_at: string;
+}

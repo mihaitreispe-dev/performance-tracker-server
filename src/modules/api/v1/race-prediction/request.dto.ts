@@ -212,3 +212,24 @@ export class CourseBasedPredictionBody {
   @IsOptional()
   race_date?: string;
 }
+
+export class GenerateRacePlanBody {
+  @ApiPropertyOptional({
+    enum: ['even', 'negative_split', 'conservative', 'progressive'],
+    description: 'Pacing strategy to apply',
+    default: 'even',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['even', 'negative_split', 'conservative', 'progressive'])
+  pacing_strategy?: 'even' | 'negative_split' | 'conservative' | 'progressive';
+
+  @ApiPropertyOptional({
+    description: 'Force refresh weather forecast even if cached',
+    default: false,
+  })
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  @IsOptional()
+  force_refresh?: boolean;
+}

@@ -60,8 +60,9 @@ export interface RacePredictionMetadata {
   };
   ensemble_weights?: Record<string, number>;
   prediction_variance?: number;
-  generated_by?: 'daily_cron' | 'backfill' | 'manual' | 'quick';
+  generated_by?: 'daily_cron' | 'backfill' | 'manual' | 'quick' | 'course_upload';
   prediction_date?: string;
+  course_prediction?: any; // Course-based prediction data
 }
 
 export interface RacePredictionsTable {

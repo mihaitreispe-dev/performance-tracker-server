@@ -30,6 +30,7 @@ import { RacePredictionApiService } from './race-prediction-api.service';
 import {
   CourseBasedPredictionBody,
   GeneratePredictionBody,
+  GenerateRacePlanBody,
   PredictionHistoryQuery,
   QuickPredictionBody,
   RecordRaceResultBody,
@@ -41,6 +42,7 @@ import {
   CourseBasedPredictionDTO,
   HistoricalRaceResultDTO,
   PredictionAccuracyStatsDTO,
+  RacePlanDTO,
   RacePredictionDTO,
   TaperPlanDTO,
 } from './response.dto';
@@ -291,5 +293,46 @@ export class RacePredictionApiController {
     @Param('userId') _userId: string,
   ): Promise<PredictionAccuracyStatsDTO> {
     return this.service.getAccuracyStats(req);
+  }
+
+  // ==========================================================================
+  // Race Plans
+  // ==========================================================================
+
+  @Version('1')
+  @Post('users/:userId/races/:raceId/plan')
+  @ApiOperation({ summary: 'Generate comprehensive race execution plan' })
+  @ApiResponse({ status: 201, type: RacePlanDTO })
+  async generateRacePlan(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+    @Body() body: GenerateRacePlanBody,
+  ): Promise<RacePlanDTO> {
+    return this.service.generateRacePlan(req, raceId, body);
+  }
+
+  @Version('1')
+  @Get('users/:userId/races/:raceId/plan')
+  @ApiOperation({ summary: 'Get active race execution plan' })
+  @ApiResponse({ status: 200, type: RacePlanDTO })
+  async getRacePlan(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+  ): Promise<RacePlanDTO> {
+    return this.service.getRacePlan(req, raceId);
+  }
+
+  @Version('1')
+  @Patch('users/:userId/races/:raceId/plan/refresh-weather')
+  @ApiOperation({ summary: 'Refresh weather forecast and regenerate plan' })
+  @ApiResponse({ status: 200, type: RacePlanDTO })
+  async refreshWeather(
+    @Req() req: Request & { user: AuthUser },
+    @Param('userId') _userId: string,
+    @Param('raceId') raceId: string,
+  ): Promise<RacePlanDTO> {
+    return this.service.refreshWeather(req, raceId);
   }
 }

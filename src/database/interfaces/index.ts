@@ -62,3 +62,5 @@ export * from './illness-logs-table.interface';
 export * from './athlete-profile-metrics-table.interface';
 export * from './race-predictions-table.interface';
 export * from './historical-race-results-table.interface';
+export * from './race-plans-table.interface';
+export * from './weather-forecasts-table.interface';

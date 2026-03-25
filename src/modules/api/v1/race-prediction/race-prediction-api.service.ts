@@ -14,10 +14,12 @@ import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repos
 import { HistoricalRaceResultsRepository } from 'src/repositories/historical-race-results.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
+import { RacePlanRepository } from 'src/repositories/race-plan.repository';
 
 import {
   CourseBasedPredictionBody,
   GeneratePredictionBody,
+  GenerateRacePlanBody,
   PredictionHistoryQuery,
   QuickPredictionBody,
   RecordRaceResultBody,
@@ -30,6 +32,7 @@ import {
   CourseSegmentDTO,
   HistoricalRaceResultDTO,
   PredictionAccuracyStatsDTO,
+  RacePlanDTO,
   RacePredictionDTO,
   TaperPlanDTO,
 } from './response.dto';
@@ -38,6 +41,7 @@ import { CourseFileProcessorService } from './services/course-file-processor.ser
 import { CyclingPredictionResult, CyclingPredictionService } from './services/cycling-prediction.service';
 import { RunningPredictionResult, RunningPredictionService } from './services/running-prediction.service';
 import { TaperOptimizationService } from './services/taper-optimization.service';
+import { RacePlanGeneratorService } from './services/race-plan-generator.service';
 
 type PredictionResult = RunningPredictionResult | CyclingPredictionResult;
 
@@ -49,6 +53,7 @@ function isRunningPrediction(result: PredictionResult): result is RunningPredict
 export class RacePredictionApiService {
   constructor(
     private readonly racePredictionRepository: RacePredictionRepository,
+    private readonly racePlanRepository: RacePlanRepository,
     private readonly athleteProfileMetricsRepository: AthleteProfileMetricsRepository,
     private readonly historicalRaceResultsRepository: HistoricalRaceResultsRepository,
     private readonly athleteRaceRepository: AthleteRaceRepository,
@@ -59,6 +64,7 @@ export class RacePredictionApiService {
     private readonly taperOptimizationService: TaperOptimizationService,
     private readonly courseAnalysisService: CourseAnalysisService,
     private readonly courseFileProcessorService: CourseFileProcessorService,
+    private readonly racePlanGeneratorService: RacePlanGeneratorService,
   ) {}
 
   /**
@@ -190,7 +196,7 @@ export class RacePredictionApiService {
       confidence_score: prediction.confidenceScore,
       target_pace_per_km: targetPacePerKm,
       target_power_watts: targetPowerWatts,
-      segment_targets: segmentTargets,
+      segment_targets: null, // Temporarily disabled - race plan generator creates own segments
       risk_score: riskScore,
       risk_factors: riskFactors,
       goal_time_seconds: athleteRace.goal_time_seconds,
@@ -798,6 +804,107 @@ export class RacePredictionApiService {
     return {
       riskScore: Math.min(100, riskScore),
       riskFactors,
+    };
+  }
+
+  // ==========================================================================
+  // Race Plan Methods
+  // ==========================================================================
+
+  /**
+   * Generate comprehensive race execution plan
+   */
+  async generateRacePlan(
+    req: Request & { user: AuthUser },
+    raceId: string,
+    body: GenerateRacePlanBody,
+  ): Promise<RacePlanDTO> {
+    const userId = req.user.id;
+
+    const racePlan = await this.racePlanGeneratorService.generateRacePlan(userId, raceId, {
+      pacingStrategy: body.pacing_strategy,
+      forceRefresh: body.force_refresh,
+      createdBy: 'athlete',
+      creatorId: userId,
+    });
+
+    return this.toRacePlanDTO(racePlan);
+  }
+
+  /**
+   * Get active race execution plan
+   */
+  async getRacePlan(req: Request & { user: AuthUser }, raceId: string): Promise<RacePlanDTO> {
+    const userId = req.user.id;
+
+    const racePlan = await this.racePlanRepository.findActiveByRace(userId, raceId);
+    if (!racePlan) {
+      throw new NotFoundException('No active race plan found. Generate a plan first.');
+    }
+
+    return this.toRacePlanDTO(racePlan);
+  }
+
+  /**
+   * Refresh weather forecast and regenerate plan
+   */
+  async refreshWeather(req: Request & { user: AuthUser }, raceId: string): Promise<RacePlanDTO> {
+    const userId = req.user.id;
+
+    // Get existing plan
+    const existingPlan = await this.racePlanRepository.findActiveByRace(userId, raceId);
+    if (!existingPlan) {
+      throw new NotFoundException('No active race plan found');
+    }
+
+    // Regenerate with force refresh
+    const racePlan = await this.racePlanGeneratorService.generateRacePlan(userId, raceId, {
+      pacingStrategy: existingPlan.pacing_strategy as any,
+      forceRefresh: true,
+      createdBy: 'athlete',
+      creatorId: userId,
+    });
+
+    return this.toRacePlanDTO(racePlan);
+  }
+
+  /**
+   * Convert race plan to DTO
+   */
+  private toRacePlanDTO(plan: any): RacePlanDTO {
+    return {
+      id: plan.id,
+      athlete_race_id: plan.athlete_race_id,
+      race_prediction_id: plan.race_prediction_id,
+      predicted_finish_time_seconds: plan.predicted_finish_time_seconds,
+      target_finish_time_seconds: plan.target_finish_time_seconds,
+      pacing_strategy: plan.pacing_strategy,
+      negative_split_ratio: plan.negative_split_ratio ? parseFloat(plan.negative_split_ratio) : undefined,
+      segment_splits: plan.segment_splits,
+      effort_zones: plan.effort_zones,
+      energy_management: plan.energy_management,
+      fatigue_model: plan.fatigue_model,
+      weather: plan.forecast_temperature_celsius
+        ? {
+            temperature_celsius: parseFloat(plan.forecast_temperature_celsius),
+            humidity_percent: plan.forecast_humidity_percent,
+            wind_speed_kmh: parseFloat(plan.forecast_wind_speed_kmh || '0'),
+            conditions: 'N/A',
+            adjustments: plan.weather_adjustments
+              ? {
+                  ...plan.weather_adjustments,
+                  heat_stress_level: plan.weather_adjustments.heat_stress_level,
+                }
+              : undefined,
+          }
+        : undefined,
+      warmup_protocol: plan.warmup_protocol,
+      race_day_checklist: plan.race_day_checklist,
+      key_advice: plan.key_advice,
+      status: plan.status,
+      plan_version: plan.plan_version,
+      created_at: plan.created_at.toISOString(),
+      updated_at: plan.updated_at.toISOString(),
     };
   }
 }

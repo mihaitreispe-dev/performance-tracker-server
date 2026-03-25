@@ -236,6 +236,12 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   OPENTRACK_API_KEY?: string;
 
+  // OpenWeather API (Race Weather Forecasts)
+
+  @IsString()
+  @IsOptional()
+  OPENWEATHER_API_KEY?: string;
+
   static validate(config: Record<string, unknown>) {
     const validatedConfig = plainToInstance(Env, config, {
       enableImplicitConversion: true,

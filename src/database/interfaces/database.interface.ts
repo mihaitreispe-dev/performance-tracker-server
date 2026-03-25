@@ -5,6 +5,8 @@ import { HistoricalRaceResultsTable } from './historical-race-results-table.inte
 import { PeriodizationPlansTable } from './periodization-plans-table.interface';
 import { RaceEventsTable } from './race-events-table.interface';
 import { RacePredictionsTable } from './race-predictions-table.interface';
+import { RacePlansTable } from './race-plans-table.interface';
+import { WeatherForecastsTable } from './weather-forecasts-table.interface';
 import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
 import { SleepBaselinesTable } from './sleep-baselines-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
@@ -138,6 +140,8 @@ export interface Database {
   athlete_profile_metrics: AthleteProfileMetricsTable;
   race_predictions: RacePredictionsTable;
   historical_race_results: HistoricalRaceResultsTable;
+  race_plans: RacePlansTable;
+  weather_forecasts: WeatherForecastsTable;
 
   // Sleep baselines for enhanced sleep scoring
   sleep_baselines: SleepBaselinesTable;
