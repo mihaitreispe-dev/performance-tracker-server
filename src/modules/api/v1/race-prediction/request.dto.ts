@@ -129,6 +129,34 @@ export class UpdateProfileMetricsBody {
   @IsOptional()
   @Min(0)
   weekly_volume_hours?: number;
+
+  // Nutrition preferences
+  @ApiPropertyOptional({ description: 'Measured sweat rate in ml per hour (200-3000)' })
+  @IsNumber()
+  @IsOptional()
+  @Min(200)
+  @Max(3000)
+  sweat_rate_ml_per_hour?: number;
+
+  @ApiPropertyOptional({ enum: ['low', 'moderate', 'high'], description: 'GI sensitivity level' })
+  @IsString()
+  @IsOptional()
+  @IsIn(['low', 'moderate', 'high'])
+  gi_sensitivity?: 'low' | 'moderate' | 'high';
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Preferred carb sources',
+    example: ['gels', 'drinks', 'chews', 'real_food'],
+  })
+  @IsOptional()
+  preferred_carb_sources?: ('gels' | 'drinks' | 'chews' | 'real_food')[];
+
+  @ApiPropertyOptional({ enum: ['none', 'low', 'moderate', 'high'], description: 'Caffeine tolerance level' })
+  @IsString()
+  @IsOptional()
+  @IsIn(['none', 'low', 'moderate', 'high'])
+  caffeine_tolerance?: 'none' | 'low' | 'moderate' | 'high';
 }
 
 export class PredictionHistoryQuery {

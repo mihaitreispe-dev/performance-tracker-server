@@ -1,9 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   CourseSegment,
-  EnergyManagementPlan,
   NewRacePlan,
-  NutritionTiming,
   PacingStrategy as PacingStrategyType,
   RacePlan,
   RacePlanStatus,
@@ -13,10 +11,13 @@ import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePlanRepository } from 'src/repositories/race-plan.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { WeatherForecastService } from './weather-forecast.service';
 import { WeatherAdjustmentService } from './weather-adjustment.service';
 import { PacingStrategyService } from './pacing-strategy.service';
 import { CourseAnalysisService } from './course-analysis.service';
+import { NutritionPlanService } from './nutrition-plan.service';
+import { CaffeineTolerance, GiSensitivity, CarbSource } from 'src/database/interfaces/athlete-profile-metrics-table.interface';
 
 interface GenerateRacePlanOptions {
   pacingStrategy?: PacingStrategyType;
@@ -35,10 +36,12 @@ export class RacePlanGeneratorService {
     private readonly raceEventRepository: RaceEventRepository,
     private readonly racePredictionRepository: RacePredictionRepository,
     private readonly fitnessMetricsRepository: FitnessMetricsRepository,
+    private readonly athleteProfileMetricsRepository: AthleteProfileMetricsRepository,
     private readonly weatherForecastService: WeatherForecastService,
     private readonly weatherAdjustmentService: WeatherAdjustmentService,
     private readonly pacingStrategyService: PacingStrategyService,
     private readonly courseAnalysisService: CourseAnalysisService,
+    private readonly nutritionPlanService: NutritionPlanService,
   ) {}
 
   /**
@@ -130,11 +133,29 @@ export class RacePlanGeneratorService {
     const lthrBpm = lthrMetric ? parseFloat(lthrMetric.value) : undefined;
     const effortZones = this.pacingStrategyService.calculateEffortZones(strategyAdjustedSegments, lthrBpm);
 
-    // 8. Generate energy management plan
-    const energyPlan = this.generateEnergyManagementPlan(
+    // 8. Generate energy management plan using personalized nutrition service
+    const athleteProfile = await this.athleteProfileMetricsRepository.findByUserId(userId);
+    const athleteWeightKg = athleteProfile?.weight_kg ? parseFloat(athleteProfile.weight_kg.toString()) : 70;
+    const temperature = weatherForecast
+      ? parseFloat(weatherForecast.race_hour_temperature_celsius || '15')
+      : 15;
+    const humidity = weatherForecast?.race_hour_humidity_percent || 50;
+
+    const energyPlan = this.nutritionPlanService.generateNutritionPlan(
       distanceMeters,
       strategyAdjustedSegments[strategyAdjustedSegments.length - 1].cumulative_time_seconds,
+      athleteWeightKg,
+      temperature,
+      humidity,
       weatherAdjustments?.hydration_multiplier || 1.0,
+      {
+        sweatRateMlPerHour: athleteProfile?.sweat_rate_ml_per_hour
+          ? parseFloat(athleteProfile.sweat_rate_ml_per_hour.toString())
+          : undefined,
+        giSensitivity: (athleteProfile?.gi_sensitivity as GiSensitivity) || 'moderate',
+        preferredCarbSources: (athleteProfile?.preferred_carb_sources as CarbSource[]) || [],
+        caffeineTolerance: (athleteProfile?.caffeine_tolerance as CaffeineTolerance) || 'moderate',
+      },
     );
 
     // 9. Build fatigue model
@@ -240,78 +261,6 @@ export class RacePlanGeneratorService {
     }
 
     return segments;
-  }
-
-  /**
-   * Generate energy management plan with nutrition timing
-   */
-  private generateEnergyManagementPlan(
-    distanceMeters: number,
-    estimatedTimeSeconds: number,
-    hydrationMultiplier: number,
-  ): EnergyManagementPlan {
-    const distanceKm = distanceMeters / 1000;
-    const estimatedHours = estimatedTimeSeconds / 3600;
-
-    // Carb loading days
-    let carbLoadingDays = 0;
-    if (distanceKm >= 42) {
-      carbLoadingDays = 2;
-    } else if (distanceKm >= 21) {
-      carbLoadingDays = 1;
-    }
-
-    // Race morning carbs
-    let raceMorningCarbs = 30;
-    if (distanceKm >= 42) {
-      raceMorningCarbs = 80;
-    } else if (distanceKm >= 21) {
-      raceMorningCarbs = 50;
-    }
-
-    // On-course nutrition (every 30-45 min for races > 1 hour)
-    const onCourseNutrition: NutritionTiming[] = [];
-    if (estimatedHours > 1) {
-      const carbsPerHour = distanceKm >= 21 ? 60 : 40;
-      const hydrationMlPerHour = 500 * hydrationMultiplier;
-      const intervalMinutes = 30;
-
-      let timeElapsed = intervalMinutes;
-      while (timeElapsed < estimatedTimeSeconds / 60) {
-        const distanceCovered = (timeElapsed / 60) * (distanceKm / estimatedHours);
-
-        onCourseNutrition.push({
-          time_elapsed_minutes: timeElapsed,
-          distance_km: parseFloat(distanceCovered.toFixed(1)),
-          carbs_grams: Math.round((carbsPerHour * intervalMinutes) / 60),
-          hydration_ml: Math.round((hydrationMlPerHour * intervalMinutes) / 60),
-          notes: timeElapsed === intervalMinutes ? 'Start nutrition early' : undefined,
-        });
-
-        timeElapsed += intervalMinutes;
-      }
-    }
-
-    // Caffeine strategy for longer races
-    let caffeineStrategy = undefined;
-    if (distanceKm >= 20) {
-      caffeineStrategy = {
-        pre_race_mg: 200,
-        pre_race_timing_minutes: 45,
-        on_course_mg: estimatedHours > 2.5 ? 100 : undefined,
-        on_course_timing_minutes: estimatedHours > 2.5 ? Math.round(estimatedTimeSeconds / 60 / 2) : undefined,
-      };
-    }
-
-    return {
-      carb_loading_days_before: carbLoadingDays,
-      race_morning_carbs_grams: raceMorningCarbs,
-      race_morning_timing_hours_before: 3,
-      on_course_nutrition: onCourseNutrition,
-      total_carbs_per_hour: estimatedHours > 1 ? (distanceKm >= 21 ? 60 : 40) : 0,
-      total_hydration_ml_per_hour: estimatedHours > 1 ? Math.round(500 * hydrationMultiplier) : 0,
-      caffeine_strategy: caffeineStrategy,
-    };
   }
 
   /**

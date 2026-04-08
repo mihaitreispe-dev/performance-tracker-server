@@ -26,6 +26,10 @@ export const NotificationType = {
   COACH_ALERT_NEW_INJURY: 'coach_alert_new_injury',
   COACH_ALERT_NEW_ILLNESS: 'coach_alert_new_illness',
   COACH_ALERT_ONGOING_CONCERN: 'coach_alert_ongoing_concern',
+  // Questionnaire notification types
+  QUESTIONNAIRE_SENT: 'questionnaire_sent',
+  QUESTIONNAIRE_COMPLETED: 'questionnaire_completed',
+  QUESTIONNAIRE_REMINDER: 'questionnaire_reminder',
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -59,6 +63,10 @@ export interface NotificationData {
   daysSinceStart?: number;
   expectedRecoveryDays?: number;
   concernType?: 'injury' | 'illness';
+  // Questionnaire data
+  questionnaireId?: string;
+  questionnaireInstanceId?: string;
+  questionnaireName?: string;
 }
 
 export interface NotificationsTable {

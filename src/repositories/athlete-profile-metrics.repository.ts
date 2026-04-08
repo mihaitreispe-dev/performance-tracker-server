@@ -49,6 +49,10 @@ export class AthleteProfileMetricsRepository {
           vdot_calculated_at: data.vdot_calculated_at,
           years_training: data.years_training,
           weekly_volume_hours: data.weekly_volume_hours,
+          sweat_rate_ml_per_hour: data.sweat_rate_ml_per_hour,
+          gi_sensitivity: data.gi_sensitivity,
+          preferred_carb_sources: data.preferred_carb_sources,
+          caffeine_tolerance: data.caffeine_tolerance,
           updated_at: sql`now()`,
         }),
       )

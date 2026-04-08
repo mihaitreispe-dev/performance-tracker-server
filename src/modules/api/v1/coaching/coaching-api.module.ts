@@ -24,6 +24,7 @@ import { WorkoutsApiModule } from '../workouts/workouts-api.module';
 import { CoachingApiController } from './coaching-api.controller';
 import { CoachingApiService } from './coaching-api.service';
 import { CoachAthleteRelationshipGuard } from './guards/coach-athlete-relationship.guard';
+import { QuestionnairesModule } from './questionnaires/questionnaires.module';
 import { ScheduledPromptsModule } from './scheduled-prompts/scheduled-prompts.module';
 
 @Module({})
@@ -39,6 +40,7 @@ export class CoachingApiModule {
           AnalyticsApiModule.register(),
           AdvancedMetricsApiModule.register(),
           ScheduledPromptsModule.register(),
+          QuestionnairesModule.register(),
           RaceCalendarApiModule.register(),
         ],
         providers: [

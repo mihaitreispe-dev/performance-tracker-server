@@ -199,6 +199,19 @@ export class AthleteProfileMetricsDTO {
   @ApiPropertyOptional({ description: 'Average weekly volume in hours' })
   weekly_volume_hours?: number;
 
+  // Nutrition preferences
+  @ApiPropertyOptional({ description: 'Measured sweat rate in ml per hour' })
+  sweat_rate_ml_per_hour?: number;
+
+  @ApiPropertyOptional({ enum: ['low', 'moderate', 'high'], description: 'GI sensitivity level' })
+  gi_sensitivity?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Preferred carb sources' })
+  preferred_carb_sources?: string[];
+
+  @ApiPropertyOptional({ enum: ['none', 'low', 'moderate', 'high'], description: 'Caffeine tolerance' })
+  caffeine_tolerance?: string;
+
   @ApiProperty()
   created_at: string;
 
@@ -424,6 +437,18 @@ export class NutritionTimingDTO {
   @ApiProperty({ description: 'Hydration to consume (ml)' })
   hydration_ml: number;
 
+  @ApiProperty({ description: 'Sodium to consume (mg)' })
+  sodium_mg: number;
+
+  @ApiProperty({
+    enum: ['gel', 'sports_drink', 'chews', 'real_food', 'water_only'],
+    description: 'Recommended product type',
+  })
+  product_type: string;
+
+  @ApiProperty({ enum: ['early', 'middle', 'late'], description: 'Race intensity phase' })
+  intensity_phase: string;
+
   @ApiPropertyOptional({ description: 'Notes for this nutrition point' })
   notes?: string;
 }
@@ -440,6 +465,34 @@ export class CaffeineStrategyDTO {
 
   @ApiPropertyOptional({ description: 'Timing after race start (minutes)' })
   on_course_timing_minutes?: number;
+}
+
+export class ElectrolyteStrategyDTO {
+  @ApiProperty({ description: 'Pre-race sodium loading (mg)' })
+  pre_race_sodium_mg: number;
+
+  @ApiProperty({ description: 'Sodium per hour target (mg)' })
+  per_hour_sodium_mg: number;
+
+  @ApiProperty({ enum: ['estimated', 'measured'], description: 'Basis for sweat rate calculation' })
+  sweat_rate_basis: string;
+}
+
+export class ProductRecommendationDTO {
+  @ApiProperty({
+    enum: ['gel', 'sports_drink', 'chews', 'real_food', 'water_only'],
+    description: 'Product type',
+  })
+  product_type: string;
+
+  @ApiProperty({ description: 'When to use this product type' })
+  timing_description: string;
+
+  @ApiProperty({ description: 'Why this product type is recommended' })
+  rationale: string;
+
+  @ApiProperty({ type: [String], description: 'Example product names' })
+  examples: string[];
 }
 
 export class EnergyManagementPlanDTO {
@@ -460,6 +513,18 @@ export class EnergyManagementPlanDTO {
 
   @ApiProperty({ description: 'Total hydration per hour target (ml)' })
   total_hydration_ml_per_hour: number;
+
+  @ApiProperty({ description: 'Total sodium per hour target (mg)' })
+  total_sodium_mg_per_hour: number;
+
+  @ApiProperty({ type: ElectrolyteStrategyDTO, description: 'Electrolyte/sodium strategy' })
+  electrolyte_strategy: ElectrolyteStrategyDTO;
+
+  @ApiProperty({ type: [ProductRecommendationDTO], description: 'Product type recommendations' })
+  product_recommendations: ProductRecommendationDTO[];
+
+  @ApiPropertyOptional({ description: 'GI pacing notes for sensitive athletes' })
+  gi_pacing_notes?: string;
 
   @ApiPropertyOptional({ type: CaffeineStrategyDTO, description: 'Caffeine strategy if applicable' })
   caffeine_strategy?: CaffeineStrategyDTO;

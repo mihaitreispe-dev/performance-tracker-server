@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { BackfillPRsModule } from './backfill-prs/backfill-prs.module';
 import { BackfillWeatherModule } from './backfill-weather/backfill-weather.module';
+import { ImportFoodsModule } from './import-foods/import-foods.module';
 import { MigrateScheduleDatesModule } from './migrate-schedule-dates/migrate-schedule-dates.module';
 import { PopulateExercisesModule } from './populate-exercises/populate-exercises.module';
 import { SetDefaultSharingModule } from './set-default-sharing/set-default-sharing.module';
@@ -13,6 +14,7 @@ import { SetDefaultSharingModule } from './set-default-sharing/set-default-shari
     PopulateExercisesModule.register(),
     MigrateScheduleDatesModule.register(),
     SetDefaultSharingModule.register(),
+    ImportFoodsModule.register(),
   ],
 })
 export class CliModule {}

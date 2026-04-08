@@ -11,6 +11,7 @@ export interface CoachingMessagesTable {
   is_workout_note: Generated<boolean>;
   attached_workout_id: string | null;
   attached_plan_id: string | null;
+  attached_questionnaire_id: string | null;
   read_at: Timestamp | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;

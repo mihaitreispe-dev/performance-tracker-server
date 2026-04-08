@@ -37,6 +37,7 @@ import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules
 import { WorkoutsApiModule } from './workouts/workouts-api.module';
 import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
 import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
+import { NutritionApiModule } from './nutrition/nutrition-api.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { RacePredictionApiModule } from './race-prediction/race-prediction-api.m
     WellnessModule.register(),
     RaceCalendarApiModule.register(),
     RacePredictionApiModule.register(),
+    NutritionApiModule.register(),
   ],
   providers: [
     {

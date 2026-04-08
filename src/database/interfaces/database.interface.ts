@@ -1,4 +1,8 @@
 import { AthleteIntakeTable } from './athlete-intake-table.interface';
+import { QuestionnaireInstancesTable } from './questionnaire-instances-table.interface';
+import { QuestionnaireQuestionsTable } from './questionnaire-questions-table.interface';
+import { QuestionnaireResponsesTable } from './questionnaire-responses-table.interface';
+import { QuestionnaireTemplatesTable } from './questionnaire-templates-table.interface';
 import { AthleteProfileMetricsTable } from './athlete-profile-metrics-table.interface';
 import { AthleteRacesTable } from './athlete-races-table.interface';
 import { HistoricalRaceResultsTable } from './historical-race-results-table.interface';
@@ -9,6 +13,11 @@ import { RacePlansTable } from './race-plans-table.interface';
 import { WeatherForecastsTable } from './weather-forecasts-table.interface';
 import { AthletePrivacySettingsTable } from './athlete-privacy-settings-table.interface';
 import { SleepBaselinesTable } from './sleep-baselines-table.interface';
+import { FoodsTable } from './foods-table.interface';
+import { FoodLogEntriesTable } from './food-log-entries-table.interface';
+import { DailyNutritionSummariesTable } from './daily-nutrition-summaries-table.interface';
+import { UserNutritionGoalsTable } from './user-nutrition-goals-table.interface';
+import { UserFrequentFoodsTable } from './user-frequent-foods-table.interface';
 import { CardioCategoriesTable } from './cardio-categories-table.interface';
 import { CardioMetricsTable } from './cardio-metrics-table.interface';
 import { CardioStepGroupItemsTable } from './cardio-step-group-items-table.interface';
@@ -145,4 +154,17 @@ export interface Database {
 
   // Sleep baselines for enhanced sleep scoring
   sleep_baselines: SleepBaselinesTable;
+
+  // Nutrition tracking
+  foods: FoodsTable;
+  food_log_entries: FoodLogEntriesTable;
+  daily_nutrition_summaries: DailyNutritionSummariesTable;
+  user_nutrition_goals: UserNutritionGoalsTable;
+  user_frequent_foods: UserFrequentFoodsTable;
+
+  // Questionnaires
+  questionnaire_templates: QuestionnaireTemplatesTable;
+  questionnaire_questions: QuestionnaireQuestionsTable;
+  questionnaire_instances: QuestionnaireInstancesTable;
+  questionnaire_responses: QuestionnaireResponsesTable;
 }

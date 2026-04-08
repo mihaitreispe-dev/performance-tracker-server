@@ -24,6 +24,7 @@ import { WeatherForecastService } from './services/weather-forecast.service';
 import { WeatherAdjustmentService } from './services/weather-adjustment.service';
 import { PacingStrategyService } from './services/pacing-strategy.service';
 import { RacePlanGeneratorService } from './services/race-plan-generator.service';
+import { NutritionPlanService } from './services/nutrition-plan.service';
 
 @Module({})
 export class RacePredictionApiModule {
@@ -50,6 +51,7 @@ export class RacePredictionApiModule {
           CourseFileProcessorService,
           // Race plan services
           RacePlanGeneratorService,
+          NutritionPlanService,
           WeatherForecastService,
           WeatherAdjustmentService,
           PacingStrategyService,

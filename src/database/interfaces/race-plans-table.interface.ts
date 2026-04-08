@@ -27,6 +27,31 @@ export const HeatStressLevel = {
 
 export type HeatStressLevel = (typeof HeatStressLevel)[keyof typeof HeatStressLevel];
 
+export const NutritionProductType = {
+  GEL: 'gel',
+  SPORTS_DRINK: 'sports_drink',
+  CHEWS: 'chews',
+  REAL_FOOD: 'real_food',
+  WATER_ONLY: 'water_only',
+} as const;
+
+export type NutritionProductType = (typeof NutritionProductType)[keyof typeof NutritionProductType];
+
+export const IntensityPhase = {
+  EARLY: 'early',
+  MIDDLE: 'middle',
+  LATE: 'late',
+} as const;
+
+export type IntensityPhase = (typeof IntensityPhase)[keyof typeof IntensityPhase];
+
+export const SweatRateBasis = {
+  ESTIMATED: 'estimated',
+  MEASURED: 'measured',
+} as const;
+
+export type SweatRateBasis = (typeof SweatRateBasis)[keyof typeof SweatRateBasis];
+
 export interface CourseSegment {
   segment_number: number;
   start_distance_meters: number;
@@ -61,6 +86,9 @@ export interface NutritionTiming {
   distance_km: number;
   carbs_grams: number;
   hydration_ml: number;
+  sodium_mg: number;
+  product_type: NutritionProductType;
+  intensity_phase: IntensityPhase;
   notes?: string;
 }
 
@@ -71,6 +99,19 @@ export interface CaffeineStrategy {
   on_course_timing_minutes?: number; // after start
 }
 
+export interface ElectrolyteStrategy {
+  pre_race_sodium_mg: number;
+  per_hour_sodium_mg: number;
+  sweat_rate_basis: SweatRateBasis;
+}
+
+export interface ProductRecommendation {
+  product_type: NutritionProductType;
+  timing_description: string;
+  rationale: string;
+  examples: string[];
+}
+
 export interface EnergyManagementPlan {
   carb_loading_days_before: number;
   race_morning_carbs_grams: number;
@@ -78,6 +119,10 @@ export interface EnergyManagementPlan {
   on_course_nutrition: NutritionTiming[];
   total_carbs_per_hour: number;
   total_hydration_ml_per_hour: number;
+  total_sodium_mg_per_hour: number;
+  electrolyte_strategy: ElectrolyteStrategy;
+  product_recommendations: ProductRecommendation[];
+  gi_pacing_notes?: string;
   caffeine_strategy?: CaffeineStrategy;
 }
 
