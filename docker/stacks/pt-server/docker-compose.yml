@@ -1,11 +1,7 @@
-version: "3.8"
-
 services:
   api:
-    image: ${IMAGE_NAME:-pt-server:latest}
-    build:
-      context: ../../..
-      dockerfile: Dockerfile
+    image: ${API_IMAGE}
+    restart: unless-stopped
     ports:
       - "5100:5100"
     environment:
@@ -62,19 +58,112 @@ services:
       - GARMIN_CONSUMER_KEY=${GARMIN_CONSUMER_KEY:-}
       - GARMIN_CONSUMER_SECRET=${GARMIN_CONSUMER_SECRET:-}
       - GARMIN_REDIRECT_URI=${GARMIN_REDIRECT_URI:-}
-    deploy:
-      replicas: 1
-      update_config:
-        parallelism: 1
-        delay: 10s
-        order: start-first
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+      # OpenAI
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-turbo}
+      # OpenWearables
+      - OPENWEARABLES_API_URL=http://openwearables:8000/api/v1
+      - OPENWEARABLES_API_KEY=${OPENWEARABLES_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pt-server
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:5100/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - pt-server
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  openwearables:
+    image: ${OPENWEARABLES_IMAGE}
+    restart: unless-stopped
+    command: scripts/start/app.sh
+    env_file:
+      - ./openwearables.env
+    environment:
+      - DB_HOST=${OW_DB_HOST:-${DB_HOST}}
+      - DB_PORT=${OW_DB_PORT:-${DB_PORT}}
+      - DB_NAME=${OW_DB_NAME}
+      - DB_USER=${OW_DB_USER:-${DB_USER}}
+      - DB_PASSWORD=${OW_DB_PASSWORD:-${DB_PASSWORD}}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pt-server
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  openwearables-worker:
+    image: ${OPENWEARABLES_IMAGE}
+    restart: unless-stopped
+    command: scripts/start/worker.sh
+    env_file:
+      - ./openwearables.env
+    environment:
+      - DB_HOST=${OW_DB_HOST:-${DB_HOST}}
+      - DB_PORT=${OW_DB_PORT:-${DB_PORT}}
+      - DB_NAME=${OW_DB_NAME}
+      - DB_USER=${OW_DB_USER:-${DB_USER}}
+      - DB_PASSWORD=${OW_DB_PASSWORD:-${DB_PASSWORD}}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      openwearables:
+        condition: service_started
+    networks:
+      - pt-server
+
+  openwearables-beat:
+    image: ${OPENWEARABLES_IMAGE}
+    restart: unless-stopped
+    command: scripts/start/beat.sh
+    env_file:
+      - ./openwearables.env
+    environment:
+      - DB_HOST=${OW_DB_HOST:-${DB_HOST}}
+      - DB_PORT=${OW_DB_PORT:-${DB_PORT}}
+      - DB_NAME=${OW_DB_NAME}
+      - DB_USER=${OW_DB_USER:-${DB_USER}}
+      - DB_PASSWORD=${OW_DB_PASSWORD:-${DB_PASSWORD}}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      openwearables:
+        condition: service_started
+    networks:
+      - pt-server
+
+volumes:
+  redis_data:
+
+networks:
+  pt-server:
+    driver: bridge

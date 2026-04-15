@@ -1,143 +1,124 @@
 # Deployment Guide
 
-This document describes how to set up GitHub Actions for automated deployment.
+Automated deployment via GitHub Actions. Two environments:
 
-## Prerequisites
+- **Staging** -- push to `deploy-staging` triggers `.github/workflows/deploy-staging.yml`
+- **Production** -- push to `deploy-prod` triggers `.github/workflows/deploy-prod.yml`
 
-1. A server with Docker and Docker Compose installed
-2. SSH access to the server
-3. GitHub Container Registry access
+Both workflows run on GitHub-hosted runners, build Docker images, push them to GitHub Container Registry (GHCR), then SSH into the target server and run `docker compose up -d`.
 
-## GitHub Secrets (Repository Settings → Secrets and variables → Actions → Secrets)
+## Architecture
 
-These are sensitive values that should never be exposed:
+```
+GitHub Actions (ubuntu-latest)
+  ├── Build & push API image         → ghcr.io/<owner>/pt-server:<sha>
+  ├── Build & push OpenWearables img → ghcr.io/<owner>/pt-openwearables:<sha>
+  └── SSH to deploy host
+        ├── scp docker-compose.yml, .env, openwearables.env → /opt/pt-server
+        ├── docker login ghcr.io
+        ├── docker compose pull
+        ├── docker compose up -d --remove-orphans
+        └── docker compose exec api yarn migrate:latest
+```
 
-| Secret | Description |
-|--------|-------------|
-| `SSH_HOST` | Server hostname or IP address |
-| `SSH_USERNAME` | SSH username for deployment |
-| `SSH_PRIVATE_KEY` | SSH private key for authentication |
-| `SSH_PORT` | (Optional) SSH port, defaults to 22 |
-| `JWT_ACCESS_TOKEN_SECRET` | Secret for signing JWT access tokens |
-| `JWT_REFRESH_TOKEN_SECRET` | Secret for signing JWT refresh tokens |
-| `DB_USER` | Database username |
-| `DB_PASSWORD` | Database password |
-| `AWS_ACCESS_KEY` | AWS access key ID |
-| `AWS_SECRET_KEY` | AWS secret access key |
-| `CLOUDFRONT_KEY_PAIR_ID` | CloudFront key pair ID (if using signed URLs) |
-| `CLOUDFRONT_PRIVATE_KEY` | CloudFront private key (if using signed URLs) |
-| `FIREBASE_CLIENT_EMAIL` | Firebase service account email |
-| `FIREBASE_PRIVATE_KEY` | Firebase service account private key |
-| `STRAVA_CLIENT_ID` | Strava OAuth client ID |
-| `STRAVA_CLIENT_SECRET` | Strava OAuth client secret |
-| `STRAVA_WEBHOOK_VERIFY_TOKEN` | Token for Strava webhook verification |
-| `GARMIN_CONSUMER_KEY` | Garmin OAuth consumer key |
-| `GARMIN_CONSUMER_SECRET` | Garmin OAuth consumer secret |
+Services in the deployed stack:
+- `api` -- NestJS API (port 5100)
+- `openwearables` -- Python backend (port 8000)
+- `openwearables-worker` -- Celery worker
+- `openwearables-beat` -- Celery beat scheduler
+- `redis` -- Redis 8 for Celery
 
-## GitHub Variables (Repository Settings → Secrets and variables → Actions → Variables)
+The database is external (RDS or self-hosted elsewhere), configured via `DB_HOST`.
 
-These are non-sensitive configuration values:
+## Server Prerequisites
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DEPLOY_PATH` | Path on server where the app is deployed | `/home/user/performance-tracker-server` |
-| `APP_URL` | Public URL of the application | `https://api.example.com` |
-| `API_V1_URL` | Full API URL | `https://api.example.com` |
-| `JWT_ACCESS_TOKEN_EXPIRY` | Access token expiry duration | `15m` |
-| `JWT_REFRESH_TOKEN_EXPIRY` | Refresh token expiry duration | `7d` |
-| `DB_HOST` | Database host | `db` (for docker) or hostname |
-| `DB_PORT` | Database port | `5432` |
-| `DB_NAME` | Database name | `performance_tracker` |
-| `DB_SSL` | Use SSL for database | `Y` or `N` |
-| `S3_ENDPOINT` | S3 endpoint (for S3-compatible storage) | Leave empty for AWS |
-| `S3_REGION` | S3 region | `us-east-1` |
-| `S3_UPLOAD_BUCKET` | S3 bucket for uploads | `uploads` |
-| `S3_CONTENT_BUCKET` | S3 bucket for content | `content` |
-| `CDN_URL` | CDN URL for assets | `https://cdn.example.com` |
-| `DISABLE_CDN` | Disable CDN | `N` |
-| `MEDIA_CONVERT_REGION` | AWS MediaConvert region | `us-east-1` |
-| `MEDIA_CONVERT_ROLE` | MediaConvert IAM role ARN | |
-| `MEDIA_CONVERT_QUEUE` | MediaConvert queue ARN | |
-| `DISABLE_MEDIA_CONVERT` | Disable MediaConvert | `N` |
-| `FIREBASE_PROJECT_ID` | Firebase project ID | `my-project` |
-| `STRAVA_REDIRECT_URI` | Strava OAuth callback URL | `https://api.example.com/v1/integrations/strava/callback` |
-| `GARMIN_REDIRECT_URI` | Garmin OAuth callback URL | `https://api.example.com/v1/integrations/garmin/callback` |
-
-## Server Setup
-
-1. **Install Docker and Docker Compose:**
+1. **Install Docker + Compose plugin:**
    ```bash
    curl -fsSL https://get.docker.com | sh
    sudo usermod -aG docker $USER
    ```
 
-2. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/performance-tracker-server.git
-   cd performance-tracker-server
-   ```
-
-3. **Create deployment user (optional but recommended):**
+2. **Create deploy user:**
    ```bash
    sudo useradd -m -s /bin/bash deploy
    sudo usermod -aG docker deploy
    ```
 
-4. **Set up SSH keys:**
+3. **Create deploy directory:**
    ```bash
-   # On your local machine
-   ssh-keygen -t ed25519 -C "deploy@performance-tracker"
-
-   # Copy public key to server
-   ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@your-server
-
-   # Add private key to GitHub Secrets as SSH_PRIVATE_KEY
+   sudo mkdir -p /opt/pt-server
+   sudo chown deploy:deploy /opt/pt-server
    ```
 
-## Manual Deployment
+4. **Generate SSH keypair** (on your local machine):
+   ```bash
+   ssh-keygen -t ed25519 -C "gh-actions-deploy" -f ./gh_deploy_key
+   ssh-copy-id -i ./gh_deploy_key.pub deploy@<server>
+   # Then add the contents of gh_deploy_key (private) to GitHub secrets as DEPLOY_SSH_KEY_STAGING / DEPLOY_SSH_KEY_PROD
+   ```
 
-If you need to deploy manually:
+## GitHub Secrets
+
+Per environment (suffix `_STAGING` or `_PROD`):
+
+| Secret | Description |
+|---|---|
+| `DEPLOY_SSH_KEY_*` | Private SSH key for connecting to the deploy host |
+| `DB_HOST_*` / `DB_PORT_*` / `DB_USER_*` / `DB_PASSWORD_*` / `DB_NAME_*` | App database credentials |
+| `JWT_ACCESS_TOKEN_SECRET_*` / `JWT_REFRESH_TOKEN_SECRET_*` | JWT secrets |
+| `SWAGGER_USERNAME_*` / `SWAGGER_PASSWORD_*` | Swagger basic auth |
+| `AWS_ACCESS_KEY_*` / `AWS_SECRET_KEY_*` | AWS credentials (S3, MediaConvert, CloudFront) |
+| `CLOUDFRONT_KEY_PAIR_ID_*` / `CLOUDFRONT_PRIVATE_KEY_*` | CloudFront signed-URL keypair |
+| `FIREBASE_CLIENT_EMAIL_*` / `FIREBASE_PRIVATE_KEY_*` | Firebase Admin credentials |
+| `MEDIA_CONVERT_ROLE_*` / `MEDIA_CONVERT_QUEUE_*` | MediaConvert role + queue ARNs |
+| `STRAVA_CLIENT_ID_*` / `STRAVA_CLIENT_SECRET_*` / `STRAVA_WEBHOOK_VERIFY_TOKEN_*` | Strava OAuth/webhook |
+| `GARMIN_CONSUMER_KEY_*` / `GARMIN_CONSUMER_SECRET_*` | Garmin OAuth |
+| `OPENAI_API_KEY_*` | OpenAI API key |
+| `OPENWEARABLES_API_KEY_*` | API key used by the NestJS app to call OpenWearables |
+| `OW_DB_HOST_*` / `OW_DB_PORT_*` / `OW_DB_NAME_*` / `OW_DB_USER_*` / `OW_DB_PASSWORD_*` | OpenWearables database credentials |
+| `OPENWEARABLES_ENV_*` | Full contents of the OpenWearables `.env` file (see `openwearables/backend/config/.env.example`) |
+
+## GitHub Variables
+
+Per environment (suffix `_STAGING` or `_PROD`):
+
+| Variable | Description |
+|---|---|
+| `DEPLOY_HOST_*` | Server hostname or IP |
+| `DEPLOY_SSH_USER_*` | SSH username (e.g. `deploy`) |
+| `API_V1_URL_*` | Public API URL |
+| `DB_SSL_*` | `Y` or `N` |
+| `JWT_ACCESS_TOKEN_EXPIRY_*` / `JWT_REFRESH_TOKEN_EXPIRY_*` | Token TTLs |
+| `S3_REGION_*` / `S3_UPLOAD_BUCKET_*` / `S3_CONTENT_BUCKET_*` | S3 config |
+| `CDN_URL_*` / `DISABLE_CDN_*` | CDN config |
+| `MEDIA_CONVERT_REGION_*` / `DISABLE_MEDIA_CONVERT_*` | MediaConvert config |
+| `FIREBASE_PROJECT_ID_*` | Firebase project ID |
+| `STRAVA_REDIRECT_URI_*` / `GARMIN_REDIRECT_URI_*` | OAuth redirect URIs |
+| `OPENAI_MODEL_*` | OpenAI model (e.g. `gpt-4-turbo`) |
+
+## Manual Operations
+
+Connect to the deploy host and run inside `/opt/pt-server`:
 
 ```bash
-# Pull latest code
-git pull origin main
+# Status
+docker compose ps
 
-# Create .env file with your values
-cp .env.example .env
-# Edit .env with your values
+# Logs
+docker compose logs -f api
+docker compose logs -f openwearables-worker
 
-# Run migrations
-docker-compose --profile migrate up migrate
+# Restart a service
+docker compose restart api
 
-# Deploy
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Run a one-off command
+docker compose exec api yarn migrate:latest
+docker compose exec api yarn repl
+
+# Health check
+curl http://localhost:5100/v1/health
 ```
 
-## Workflows
+## Rollback
 
-### CI (`ci.yml`)
-- Runs on: Push to `main`/`dev`, Pull requests
-- Steps: Lint, Type check, Test, Build
-
-### Deploy (`deploy.yml`)
-- Runs on: Push to `main`, Manual trigger
-- Steps: Build Docker image, Push to GHCR, Deploy via SSH, Run migrations
-
-### Release (`release.yml`)
-- Runs on: Tag push (`v*`)
-- Steps: Build versioned Docker image, Create GitHub Release
-
-## Monitoring
-
-After deployment, verify the service is running:
-
-```bash
-# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs -f api
-
-# Check health endpoint
-curl http://localhost:5100/health
-```
+Each deploy tags images with the git SHA. To roll back, edit `/opt/pt-server/.env` on the server and change `API_IMAGE` / `OPENWEARABLES_IMAGE` to the previous SHA's tag, then `docker compose up -d`.

@@ -9,7 +9,8 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { QuestionnaireStatus, ResponseValue } from 'src/database/interfaces';
+import { QuestionnaireStatus } from 'src/database/interfaces';
+import type { ResponseValue } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 
 import { QuestionDTO } from '../templates/response.dto';

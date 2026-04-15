@@ -5,124 +5,190 @@ on:
     branches: [deploy-prod]
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE_NAME: ${{ github.repository }}/pt-server
+  OPENWEARABLES_IMAGE_NAME: ${{ github.repository }}/pt-openwearables
+  DEPLOY_DIR: /opt/pt-server
 
 jobs:
-  deploy:
-    runs-on: [self-hosted, deploy]
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.meta.outputs.api_image }}
+      openwearables_image: ${{ steps.meta.outputs.openwearables_image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure environment
+      - name: Set image tags
+        id: meta
         run: |
-          # Don't quote variables, since docker compose leaves them as quoted values
-          cat <<EOF > .env
-            # Module enablement
-            API_V1_MODULE_ENABLED=Y
-            API_V1_PORT=5100
-            CRON_MODULE_ENABLED=N
-            # API URL
-            API_V1_URL=${{ vars.API_V1_URL_PROD }}
-            # Database
-            DB_HOST=${{ secrets.DB_HOST_PROD }}
-            DB_PORT=${{ secrets.DB_PORT_PROD }}
-            DB_USER=${{ secrets.DB_USER_PROD }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD_PROD }}
-            DB_NAME=${{ secrets.DB_NAME_PROD }}
-            DB_SSL=${{ vars.DB_SSL_PROD }}
-            # Auth
-            JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET_PROD }}
-            JWT_ACCESS_TOKEN_EXPIRY=${{ vars.JWT_ACCESS_TOKEN_EXPIRY_PROD }}
-            JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET_PROD }}
-            JWT_REFRESH_TOKEN_EXPIRY=${{ vars.JWT_REFRESH_TOKEN_EXPIRY_PROD }}
-            # Swagger
-            SWAGGER_USERNAME=${{ secrets.SWAGGER_USERNAME_PROD }}
-            SWAGGER_PASSWORD=${{ secrets.SWAGGER_PASSWORD_PROD }}
-            # AWS
-            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_PROD }}
-            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY_PROD }}
-            # S3
-            S3_REGION=${{ vars.S3_REGION_PROD }}
-            S3_UPLOAD_BUCKET=${{ vars.S3_UPLOAD_BUCKET_PROD }}
-            S3_CONTENT_BUCKET=${{ vars.S3_CONTENT_BUCKET_PROD }}
-            # CDN
-            CDN_URL=${{ vars.CDN_URL_PROD }}
-            DISABLE_CDN=${{ vars.DISABLE_CDN_PROD }}
-            # CloudFront
-            CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID_PROD }}
-            CLOUDFRONT_PRIVATE_KEY=${{ secrets.CLOUDFRONT_PRIVATE_KEY_PROD }}
-            # Firebase
-            FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID_PROD }}
-            FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL_PROD }}
-            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY_PROD }}
-            # MediaConvert
-            MEDIA_CONVERT_REGION=${{ vars.MEDIA_CONVERT_REGION_PROD }}
-            MEDIA_CONVERT_ROLE=${{ secrets.MEDIA_CONVERT_ROLE_PROD }}
-            MEDIA_CONVERT_QUEUE=${{ secrets.MEDIA_CONVERT_QUEUE_PROD }}
-            DISABLE_MEDIA_CONVERT=${{ vars.DISABLE_MEDIA_CONVERT_PROD }}
-            # Strava Integration
-            STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID_PROD }}
-            STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET_PROD }}
-            STRAVA_REDIRECT_URI=${{ vars.STRAVA_REDIRECT_URI_PROD }}
-            STRAVA_WEBHOOK_VERIFY_TOKEN=${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN_PROD }}
-            # Garmin Integration
-            GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY_PROD }}
-            GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET_PROD }}
-            GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI_PROD }}
+          API_IMAGE="${REGISTRY}/${API_IMAGE_NAME}:${{ github.sha }}"
+          OW_IMAGE="${REGISTRY}/${OPENWEARABLES_IMAGE_NAME}:${{ github.sha }}"
+          echo "api_image=${API_IMAGE,,}" >> $GITHUB_OUTPUT
+          echo "openwearables_image=${OW_IMAGE,,}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.api_image }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build & push OpenWearables image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./openwearables/backend
+          file: ./openwearables/backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.openwearables_image }}
+          cache-from: type=gha,scope=openwearables
+          cache-to: type=gha,mode=max,scope=openwearables
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write .env
+        run: |
+          cat <<'EOF' > .env
+          API_IMAGE=${{ needs.build-and-push.outputs.api_image }}
+          OPENWEARABLES_IMAGE=${{ needs.build-and-push.outputs.openwearables_image }}
+          # Module enablement
+          API_V1_MODULE_ENABLED=Y
+          API_V1_PORT=5100
+          CRON_MODULE_ENABLED=N
+          # API URL
+          API_V1_URL=${{ vars.API_V1_URL_PROD }}
+          # Database
+          DB_HOST=${{ secrets.DB_HOST_PROD }}
+          DB_PORT=${{ secrets.DB_PORT_PROD }}
+          DB_USER=${{ secrets.DB_USER_PROD }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD_PROD }}
+          DB_NAME=${{ secrets.DB_NAME_PROD }}
+          DB_SSL=${{ vars.DB_SSL_PROD }}
+          # Auth
+          JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET_PROD }}
+          JWT_ACCESS_TOKEN_EXPIRY=${{ vars.JWT_ACCESS_TOKEN_EXPIRY_PROD }}
+          JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET_PROD }}
+          JWT_REFRESH_TOKEN_EXPIRY=${{ vars.JWT_REFRESH_TOKEN_EXPIRY_PROD }}
+          # Swagger
+          SWAGGER_USERNAME=${{ secrets.SWAGGER_USERNAME_PROD }}
+          SWAGGER_PASSWORD=${{ secrets.SWAGGER_PASSWORD_PROD }}
+          # AWS
+          AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_PROD }}
+          AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY_PROD }}
+          # S3
+          S3_REGION=${{ vars.S3_REGION_PROD }}
+          S3_UPLOAD_BUCKET=${{ vars.S3_UPLOAD_BUCKET_PROD }}
+          S3_CONTENT_BUCKET=${{ vars.S3_CONTENT_BUCKET_PROD }}
+          # CDN
+          CDN_URL=${{ vars.CDN_URL_PROD }}
+          DISABLE_CDN=${{ vars.DISABLE_CDN_PROD }}
+          # CloudFront
+          CLOUDFRONT_KEY_PAIR_ID=${{ secrets.CLOUDFRONT_KEY_PAIR_ID_PROD }}
+          CLOUDFRONT_PRIVATE_KEY=${{ secrets.CLOUDFRONT_PRIVATE_KEY_PROD }}
+          # Firebase
+          FIREBASE_PROJECT_ID=${{ vars.FIREBASE_PROJECT_ID_PROD }}
+          FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL_PROD }}
+          FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY_PROD }}
+          # MediaConvert
+          MEDIA_CONVERT_REGION=${{ vars.MEDIA_CONVERT_REGION_PROD }}
+          MEDIA_CONVERT_ROLE=${{ secrets.MEDIA_CONVERT_ROLE_PROD }}
+          MEDIA_CONVERT_QUEUE=${{ secrets.MEDIA_CONVERT_QUEUE_PROD }}
+          DISABLE_MEDIA_CONVERT=${{ vars.DISABLE_MEDIA_CONVERT_PROD }}
+          # Strava Integration
+          STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID_PROD }}
+          STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET_PROD }}
+          STRAVA_REDIRECT_URI=${{ vars.STRAVA_REDIRECT_URI_PROD }}
+          STRAVA_WEBHOOK_VERIFY_TOKEN=${{ secrets.STRAVA_WEBHOOK_VERIFY_TOKEN_PROD }}
+          # Garmin Integration
+          GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY_PROD }}
+          GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET_PROD }}
+          GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI_PROD }}
+          # OpenAI
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY_PROD }}
+          OPENAI_MODEL=${{ vars.OPENAI_MODEL_PROD }}
+          # OpenWearables bridge
+          OPENWEARABLES_API_KEY=${{ secrets.OPENWEARABLES_API_KEY_PROD }}
+          OW_DB_HOST=${{ secrets.OW_DB_HOST_PROD }}
+          OW_DB_PORT=${{ secrets.OW_DB_PORT_PROD }}
+          OW_DB_NAME=${{ secrets.OW_DB_NAME_PROD }}
+          OW_DB_USER=${{ secrets.OW_DB_USER_PROD }}
+          OW_DB_PASSWORD=${{ secrets.OW_DB_PASSWORD_PROD }}
           EOF
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Write openwearables.env
+        run: |
+          cat <<'EOF' > openwearables.env
+          ${{ secrets.OPENWEARABLES_ENV_PROD }}
+          EOF
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          aws-access-key-id: ${{ secrets.AWS_GH_RUNNER_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_GH_RUNNER_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY_PROD }}
 
-      - name: Login to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build image
-        id: build-image
-        env:
-          IMAGE_NAME: ${{ steps.login-ecr.outputs.registry }}/pt-server:${{ github.sha }}
+      - name: Add deploy host to known_hosts
         run: |
-          docker compose \
-            -f docker/stacks/pt-server/docker-compose.yml \
-            --env-file .env \
-            build api
-          echo "image=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ vars.DEPLOY_HOST_PROD }}" >> ~/.ssh/known_hosts
 
-      - name: Push image to registry
+      - name: Ensure remote deploy directory exists
         run: |
-          docker push ${{ steps.build-image.outputs.image }}
+          ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
+            "mkdir -p ${{ env.DEPLOY_DIR }}"
 
-      - name: Deploy image to swarm
-        env:
-          IMAGE_NAME: ${{ steps.build-image.outputs.image }}
-          DOCKER_HOST: ssh://${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }}
+      - name: Copy compose file and env to server
         run: |
-          docker stack deploy \
-            --with-registry-auth --resolve-image=always \
-            --prune \
-            -c docker/stacks/pt-server/docker-compose.yml \
-            pt-server
+          scp docker/stacks/pt-server/docker-compose.yml \
+            ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }}:${{ env.DEPLOY_DIR }}/docker-compose.yml
+          scp .env \
+            ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }}:${{ env.DEPLOY_DIR }}/.env
+          scp openwearables.env \
+            ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }}:${{ env.DEPLOY_DIR }}/openwearables.env
+
+      - name: Login to GHCR on deploy host
+        run: |
+          ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
+            "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin"
+
+      - name: Pull & deploy
+        run: |
+          ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
+            "cd ${{ env.DEPLOY_DIR }} && docker compose --env-file .env pull && docker compose --env-file .env up -d --remove-orphans"
 
       - name: Run database migrations
-        env:
-          DOCKER_HOST: ssh://${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }}
         run: |
-          # Wait for service to be running
-          sleep 10
-          # Get the container ID of the running service
-          CONTAINER_ID=$(docker ps -q -f "name=pt-server_api")
-          if [ -n "$CONTAINER_ID" ]; then
-            docker exec $CONTAINER_ID yarn migrate:latest
-          fi
+          ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
+            "cd ${{ env.DEPLOY_DIR }} && docker compose --env-file .env exec -T api yarn migrate:latest"
 
-      - name: Cleanup
+      - name: Prune old images
+        run: |
+          ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
+            "docker image prune -f"
+
+      - name: Cleanup local env files
         if: always()
         run: |
-          rm -f .env
+          rm -f .env openwearables.env
