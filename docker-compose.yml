@@ -111,7 +111,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - DB_SSL=${DB_SSL:-N}
-    command: ["yarn", "migrate:latest"]
+    command: ["pnpm", "migrate:latest"]
     depends_on:
       db:
         condition: service_healthy

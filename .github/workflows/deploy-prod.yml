@@ -181,7 +181,7 @@ jobs:
       - name: Run database migrations
         run: |
           ssh ${{ vars.DEPLOY_SSH_USER_PROD }}@${{ vars.DEPLOY_HOST_PROD }} \
-            "cd ${{ env.DEPLOY_DIR }} && docker compose --env-file .env exec -T api yarn migrate:latest"
+            "cd ${{ env.DEPLOY_DIR }} && docker compose --env-file .env exec -T api pnpm migrate:latest"
 
       - name: Prune old images
         run: |

@@ -61,54 +61,54 @@ Backend API for the Performance Tracker fitness application, built with NestJS a
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - PostgreSQL 14+
-- Yarn
+- pnpm 10+ (enabled via Corepack: `corepack enable`)
 
 ### Installation
 
 ```bash
 # Install dependencies
-yarn install
+pnpm install
 
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your configuration
 
 # Run database migrations
-yarn migrate:latest
+pnpm migrate:latest
 
 # (Optional) Seed database
-yarn seed
+pnpm seed
 
 # Start development server
-yarn dev
+pnpm dev
 ```
 
 ### Available Scripts
 
 ```bash
-yarn dev              # Start with hot reload + debugging
-yarn build            # Build for production
-yarn start:build      # Run production build
+pnpm dev              # Start with hot reload + debugging
+pnpm build            # Build for production
+pnpm start:build      # Run production build
 
-yarn lint             # Run ESLint
-yarn format           # Fix lint issues
-yarn typecheck        # TypeScript type checking
+pnpm lint             # Run ESLint
+pnpm format           # Fix lint issues
+pnpm typecheck        # TypeScript type checking
 
-yarn test             # Run unit tests
-yarn test:watch       # Watch mode
-yarn test:cov         # Coverage report
-yarn test:e2e         # End-to-end tests
+pnpm test             # Run unit tests
+pnpm test:watch       # Watch mode
+pnpm test:cov         # Coverage report
+pnpm test:e2e         # End-to-end tests
 
-yarn migrate:latest   # Run all pending migrations
-yarn migrate:up       # Run next migration
-yarn migrate:down     # Rollback last migration
-yarn migrate:make     # Create new migration
-yarn migrate:list     # List migration status
+pnpm migrate:latest   # Run all pending migrations
+pnpm migrate:up       # Run next migration
+pnpm migrate:down     # Rollback last migration
+pnpm migrate:make     # Create new migration
+pnpm migrate:list     # List migration status
 
-yarn seed             # Run database seeds
-yarn cli              # Run CLI commands
+pnpm seed             # Run database seeds
+pnpm cli              # Run CLI commands
 ```
 
 ## Environment Variables

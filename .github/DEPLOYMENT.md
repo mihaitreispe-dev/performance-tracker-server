@@ -18,7 +18,7 @@ GitHub Actions (ubuntu-latest)
         ├── docker login ghcr.io
         ├── docker compose pull
         ├── docker compose up -d --remove-orphans
-        └── docker compose exec api yarn migrate:latest
+        └── docker compose exec api pnpm migrate:latest
 ```
 
 Services in the deployed stack:
@@ -112,8 +112,8 @@ docker compose logs -f openwearables-worker
 docker compose restart api
 
 # Run a one-off command
-docker compose exec api yarn migrate:latest
-docker compose exec api yarn repl
+docker compose exec api pnpm migrate:latest
+docker compose exec api pnpm repl
 
 # Health check
 curl http://localhost:5100/v1/health

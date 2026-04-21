@@ -10,7 +10,7 @@
     "build": "nest build && tsc-alias",
     "start:build": "NODE_OPTIONS='--enable-source-maps' node dist/main",
     "lint": "eslint '*/**/*.{js,cjs,mjs,ts,tsx}' --report-unused-disable-directives",
-    "format": "yarn lint --quiet --fix",
+    "format": "pnpm lint --quiet --fix",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "jest",
     "test:watch": "jest --watch",
