@@ -23,3 +23,52 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
+
+      # Regenerate the OpenAPI spec and fail the build if it drifts from what's
+      # committed. FirebaseService is stubbed inside extract-openapi.ts so only
+      # string-shaped env stubs are needed — no real credentials.
+      - name: Check OpenAPI spec is up to date
+        env:
+          API_V1_MODULE_ENABLED: Y
+          API_V1_PORT: '5100'
+          CRON_MODULE_ENABLED: N
+          API_V1_URL: http://localhost:5100
+          JWT_ACCESS_TOKEN_SECRET: ci-stub-access-secret-padding-for-length-32
+          JWT_ACCESS_TOKEN_EXPIRY: 5m
+          JWT_REFRESH_TOKEN_SECRET: ci-stub-refresh-secret-padding-for-length-32
+          JWT_REFRESH_TOKEN_EXPIRY: 30d
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: postgres
+          DB_SSL: N
+          AWS_ACCESS_KEY: stub
+          AWS_SECRET_KEY: stub
+          S3_REGION: us-east-1
+          S3_UPLOAD_BUCKET: stub
+          S3_CONTENT_BUCKET: stub
+          SWAGGER_USERNAME: stub
+          SWAGGER_PASSWORD: stub
+          CDN_URL: http://localhost
+          DISABLE_CDN: Y
+          CLOUDFRONT_KEY_PAIR_ID: stub
+          CLOUDFRONT_PRIVATE_KEY: stub
+          FIREBASE_PROJECT_ID: ci-stub
+          FIREBASE_CLIENT_EMAIL: ci@stub.test
+          FIREBASE_PRIVATE_KEY: stub
+          MEDIA_CONVERT_REGION: us-east-1
+          MEDIA_CONVERT_ROLE: stub
+          MEDIA_CONVERT_QUEUE: stub
+          DISABLE_MEDIA_CONVERT: Y
+          STRAVA_CLIENT_ID: stub
+          STRAVA_CLIENT_SECRET: stub
+          STRAVA_REDIRECT_URI: http://localhost
+          STRAVA_WEBHOOK_VERIFY_TOKEN: stub
+        run: |
+          pnpm openapi:extract
+          if ! git diff --exit-code -- openapi/openapi.json; then
+            echo "::error::openapi/openapi.json is out of date."
+            echo "::error::Run 'pnpm openapi:extract' locally, commit the result, and push again."
+            exit 1
+          fi
