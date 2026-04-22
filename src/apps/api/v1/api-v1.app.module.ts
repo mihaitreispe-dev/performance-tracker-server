@@ -3,8 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { MulterModule } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cors from 'cors';
-import { json, urlencoded } from 'express';
+import { json, urlencoded, type NextFunction, type Request, type Response } from 'express';
 import basicAuth from 'express-basic-auth';
+import helmet from 'helmet';
 import { uploadsDir } from 'src/lib/fs/dirs';
 import { RootLogger } from 'src/lib/log/RootLogger';
 import { ApiV1Module } from 'src/modules/api/v1/api-v1.module';
@@ -43,6 +44,17 @@ export async function bootstrap(opts?: { port: number }) {
       req.rawBody = buffer.toString(encoding || 'utf8');
     }
   };
+  // Security headers: X-Frame-Options, X-Content-Type-Options, HSTS, CSP, etc.
+  // Swagger UI pulls its own CDN assets, so loosen the CSP only for the docs
+  // route; everything else runs with helmet's restrictive defaults.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/docs/')) {
+      helmet({ contentSecurityPolicy: false })(req, res, next);
+    } else {
+      helmet()(req, res, next);
+    }
+  });
+
   app.use(urlencoded({ verify: rawBodyBuffer, limit: '50mb', extended: true }));
   app.use(json({ verify: rawBodyBuffer, limit: '50mb' }));
 
