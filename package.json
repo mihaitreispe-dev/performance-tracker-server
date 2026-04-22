@@ -25,7 +25,8 @@
     "migrate:make": "kysely migrate:make",
     "seed": "kysely seed",
     "seed:make": "kysely seed:make",
-    "cli": "ts-node -r tsconfig-paths/register src/cli.ts"
+    "cli": "ts-node -r tsconfig-paths/register src/cli.ts",
+    "openapi:extract": "ts-node -r tsconfig-paths/register src/extract-openapi.ts"
   },
   "dependencies": {
     "@aws-sdk/client-mediaconvert": "^3.981.0",
