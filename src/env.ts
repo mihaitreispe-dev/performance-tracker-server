@@ -252,6 +252,30 @@ export class Env extends BoostrapEnv {
     if (errors.length > 0) {
       throw new Error(errors.toString());
     }
+
+    // The JWT secrets default to their own variable name in .env.example, which
+    // means any env that forgot to override them would boot with forgeable
+    // tokens. Also bail if they're trivially short. Skip the check when the
+    // extract-openapi script or similar helper sets OPENAPI_EXTRACT=true —
+    // those only need the Env object to type-check.
+    if (process.env.OPENAPI_EXTRACT !== 'true') {
+      assertJwtSecretStrong('JWT_ACCESS_TOKEN_SECRET', validatedConfig.JWT_ACCESS_TOKEN_SECRET);
+      assertJwtSecretStrong('JWT_REFRESH_TOKEN_SECRET', validatedConfig.JWT_REFRESH_TOKEN_SECRET);
+    }
+
     return validatedConfig;
+  }
+}
+
+function assertJwtSecretStrong(name: string, value: string): void {
+  if (value === name) {
+    throw new Error(
+      `${name} is set to the placeholder value "${name}". Generate a real secret: openssl rand -base64 32 | tr -d /=+ | cut -c -32`,
+    );
+  }
+  if (value.length < 32) {
+    throw new Error(
+      `${name} is only ${value.length} chars; must be at least 32. Generate one with: openssl rand -base64 32 | tr -d /=+ | cut -c -32`,
+    );
   }
 }

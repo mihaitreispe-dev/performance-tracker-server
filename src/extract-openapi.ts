@@ -14,6 +14,10 @@ import 'reflect-metadata';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+// Tell Env.validate() to skip the JWT strength check — we ship stub values
+// for doc extraction, and the spec is the same regardless.
+process.env.OPENAPI_EXTRACT = 'true';
+
 import { VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
