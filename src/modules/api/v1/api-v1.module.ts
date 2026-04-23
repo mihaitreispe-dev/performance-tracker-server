@@ -23,21 +23,21 @@ import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
 import { NotificationsApiModule } from './notifications/notifications-api.module';
+import { NutritionApiModule } from './nutrition/nutrition-api.module';
 import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
+import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
+import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
 import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
-import { WellnessModule } from './wellness/wellness.module';
 import { VoiceApiModule } from './voice/voice.module';
 import { WearablesApiModule } from './wearables/wearables-api.module';
+import { WellnessModule } from './wellness/wellness.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
 import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file-imports-api.module';
 import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
 import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules-api.module';
 import { WorkoutsApiModule } from './workouts/workouts-api.module';
-import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
-import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
-import { NutritionApiModule } from './nutrition/nutrition-api.module';
 
 @Module({
   imports: [

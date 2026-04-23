@@ -1,10 +1,7 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { WorkoutFileFormat } from 'src/database/interfaces';
 
-import {
-  WorkoutFileParserService,
-  ParsedRoutePoint,
-} from '../../workout-file-imports/workout-file-parser.service';
+import { ParsedRoutePoint, WorkoutFileParserService } from '../../workout-file-imports/workout-file-parser.service';
 import { CourseProfile, ElevationPoint } from './course-analysis.service';
 
 export interface CourseValidationResult {
@@ -38,12 +35,8 @@ export class CourseFileProcessorService {
    * @param format - File format ('gpx' or 'fit')
    * @returns CourseProfile with elevation points
    */
-  async parseCourseFile(
-    buffer: Buffer,
-    format: 'gpx' | 'fit',
-  ): Promise<CourseProfile> {
-    const workoutFormat =
-      format === 'gpx' ? WorkoutFileFormat.GPX : WorkoutFileFormat.FIT;
+  async parseCourseFile(buffer: Buffer, format: 'gpx' | 'fit'): Promise<CourseProfile> {
+    const workoutFormat = format === 'gpx' ? WorkoutFileFormat.GPX : WorkoutFileFormat.FIT;
 
     this.logger.debug(`Parsing course file, format: ${format}`);
 
@@ -72,9 +65,7 @@ export class CourseFileProcessorService {
     // Validate the profile
     const validation = this.validateCourseForPrediction(profile);
     if (!validation.isValid) {
-      throw new BadRequestException(
-        `Invalid course file: ${validation.errors.join(', ')}`,
-      );
+      throw new BadRequestException(`Invalid course file: ${validation.errors.join(', ')}`);
     }
 
     // Log warnings if any
@@ -150,9 +141,7 @@ export class CourseFileProcessorService {
 
     // Check minimum points
     if (profile.points.length < this.MIN_POINTS) {
-      errors.push(
-        `Insufficient data points (${profile.points.length}). Need at least ${this.MIN_POINTS}.`,
-      );
+      errors.push(`Insufficient data points (${profile.points.length}). Need at least ${this.MIN_POINTS}.`);
     }
 
     // Check minimum distance
@@ -166,8 +155,7 @@ export class CourseFileProcessorService {
     // Check elevation data coverage
     const elevationCoverage =
       profile.points.length > 0
-        ? profile.points.filter((p) => p.elevation !== undefined).length /
-          profile.points.length
+        ? profile.points.filter((p) => p.elevation !== undefined).length / profile.points.length
         : 0;
 
     if (elevationCoverage < this.MIN_ELEVATION_COVERAGE) {
@@ -178,23 +166,17 @@ export class CourseFileProcessorService {
     }
 
     // Calculate average point spacing
-    const avgSpacing =
-      profile.points.length > 1
-        ? profile.totalDistanceMeters / (profile.points.length - 1)
-        : 0;
+    const avgSpacing = profile.points.length > 1 ? profile.totalDistanceMeters / (profile.points.length - 1) : 0;
 
     if (avgSpacing > this.MAX_POINT_SPACING_METERS) {
       warnings.push(
-        `Low resolution data (${avgSpacing.toFixed(0)}m average spacing). ` +
-          `Prediction accuracy may be reduced.`,
+        `Low resolution data (${avgSpacing.toFixed(0)}m average spacing). ` + 'Prediction accuracy may be reduced.',
       );
     }
 
     // Check for suspicious elevation data
     if (profile.totalElevationGain > profile.totalDistanceMeters * 0.5) {
-      warnings.push(
-        'Unusually high elevation gain detected. Please verify the course file.',
-      );
+      warnings.push('Unusually high elevation gain detected. Please verify the course file.');
     }
 
     return {
@@ -233,9 +215,7 @@ export class CourseFileProcessorService {
   /**
    * Calculate total elevation gain and loss from elevation points.
    */
-  private calculateElevationChanges(
-    points: ElevationPoint[],
-  ): { gain: number; loss: number } {
+  private calculateElevationChanges(points: ElevationPoint[]): { gain: number; loss: number } {
     let gain = 0;
     let loss = 0;
 
@@ -254,10 +234,7 @@ export class CourseFileProcessorService {
   /**
    * Interpolate missing elevation data from surrounding points.
    */
-  private interpolateElevation(
-    routePoints: ParsedRoutePoint[],
-    index: number,
-  ): number | null {
+  private interpolateElevation(routePoints: ParsedRoutePoint[], index: number): number | null {
     // Find nearest points with elevation before and after
     let beforeIdx = index - 1;
     let afterIdx = index + 1;
@@ -266,10 +243,7 @@ export class CourseFileProcessorService {
       beforeIdx--;
     }
 
-    while (
-      afterIdx < routePoints.length &&
-      routePoints[afterIdx].elevation === undefined
-    ) {
+    while (afterIdx < routePoints.length && routePoints[afterIdx].elevation === undefined) {
       afterIdx++;
     }
 
@@ -302,21 +276,13 @@ export class CourseFileProcessorService {
   /**
    * Calculate distance between two points using Haversine formula.
    */
-  private haversineDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
-  ): number {
+  private haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371000; // Earth radius in meters
     const dLat = this.toRad(lat2 - lat1);
     const dLon = this.toRad(lon2 - lon1);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) *
-        Math.cos(this.toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }

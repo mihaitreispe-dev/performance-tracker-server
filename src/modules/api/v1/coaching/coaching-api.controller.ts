@@ -23,6 +23,7 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
+import { DateQuery } from '../advanced-metrics/request.dto';
 import {
   DailyReadinessResponse,
   FitnessFatiguePredictionResponse,
@@ -34,7 +35,6 @@ import {
   Vo2MaxResponse,
   WellnessPerformanceCorrelationResponse,
 } from '../advanced-metrics/response.dto';
-import { DateQuery } from '../advanced-metrics/request.dto';
 import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
 import {
   CurrentTrainingLoadResponse,
@@ -778,9 +778,7 @@ export class CoachingApiController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not a coach' })
   @Roles(UserRole.COACH)
   @Get('wellness/overview')
-  async getTeamWellnessOverview(
-    @Req() req: Request & { user: AuthUser },
-  ): Promise<TeamWellnessOverviewResponse> {
+  async getTeamWellnessOverview(@Req() req: Request & { user: AuthUser }): Promise<TeamWellnessOverviewResponse> {
     return this.service.getTeamWellnessOverview(req);
   }
 
@@ -808,7 +806,9 @@ export class CoachingApiController {
   // ===== CORRELATION DASHBOARD =====
 
   @Version('1')
-  @ApiOperation({ summary: 'Get team correlation overview with alert levels and athletes needing attention (COACH only)' })
+  @ApiOperation({
+    summary: 'Get team correlation overview with alert levels and athletes needing attention (COACH only)',
+  })
   @ApiResponse({ status: HttpStatus.OK, type: TeamCorrelationOverviewResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not a coach' })

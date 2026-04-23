@@ -18,9 +18,9 @@ import { S3Service } from 'src/modules/s3/s3.service';
 import { WeatherService } from 'src/modules/weather/weather.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutFileImportRepository } from 'src/repositories/workout-file-import.repository';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 import { v4 as uuidv4 } from 'uuid';
@@ -211,20 +211,18 @@ export class WorkoutFileImportsApiService {
 
         // Fetch weather data asynchronously (fire and forget)
         const firstPoint = parsedData.routePoints[0];
-        this.weatherService.fetchAndStoreWeather({
-          workoutExecutionId: execution.id,
-          latitude: firstPoint.latitude,
-          longitude: firstPoint.longitude,
-          startedAt: parsedData.startTime,
-        }).catch((err) => this.logger.error(`Failed to fetch weather for imported workout: ${err.message}`));
+        this.weatherService
+          .fetchAndStoreWeather({
+            workoutExecutionId: execution.id,
+            latitude: firstPoint.latitude,
+            longitude: firstPoint.longitude,
+            startedAt: parsedData.startTime,
+          })
+          .catch((err) => this.logger.error(`Failed to fetch weather for imported workout: ${err.message}`));
 
         // Create route markers from laps (only for valid km or mile laps)
         if (parsedData.laps.length > 0) {
-          const markersToCreate = this.createMarkersFromLaps(
-            route.id,
-            parsedData.laps,
-            parsedData.routePoints[0],
-          );
+          const markersToCreate = this.createMarkersFromLaps(route.id, parsedData.laps, parsedData.routePoints[0]);
 
           if (markersToCreate.length > 0) {
             await this.workoutRouteRepository.createMarkers(markersToCreate);
@@ -314,10 +312,7 @@ export class WorkoutFileImportsApiService {
   /**
    * Parse uploaded file and return preview data without creating workout
    */
-  async getImportPreview(
-    req: Request & { user: AuthUser },
-    uploadId: string,
-  ): Promise<ImportPreviewResponse> {
+  async getImportPreview(req: Request & { user: AuthUser }, uploadId: string): Promise<ImportPreviewResponse> {
     const importRecord = await this.importRepository.findById(uploadId);
 
     if (!importRecord) {
@@ -376,18 +371,12 @@ export class WorkoutFileImportsApiService {
         sportName: parsedData.sportName,
         startTime: parsedData.startTime.toISOString(),
         endTime: parsedData.endTime?.toISOString(),
-        totalDurationSeconds: parsedData.totalDurationSeconds
-          ? Math.round(parsedData.totalDurationSeconds)
-          : undefined,
+        totalDurationSeconds: parsedData.totalDurationSeconds ? Math.round(parsedData.totalDurationSeconds) : undefined,
         elapsedDurationSeconds: parsedData.elapsedDurationSeconds
           ? Math.round(parsedData.elapsedDurationSeconds)
           : undefined,
-        totalDistanceMeters: parsedData.totalDistanceMeters
-          ? Math.round(parsedData.totalDistanceMeters)
-          : undefined,
-        elevationGainMeters: parsedData.elevationGainMeters
-          ? Math.round(parsedData.elevationGainMeters)
-          : undefined,
+        totalDistanceMeters: parsedData.totalDistanceMeters ? Math.round(parsedData.totalDistanceMeters) : undefined,
+        elevationGainMeters: parsedData.elevationGainMeters ? Math.round(parsedData.elevationGainMeters) : undefined,
         laps,
         metricsCount: parsedData.metrics.length,
         hasRouteData: parsedData.routePoints.length > 0,
@@ -500,20 +489,18 @@ export class WorkoutFileImportsApiService {
 
         // Fetch weather data asynchronously (fire and forget)
         const firstPointConfirm = parsedData.routePoints[0];
-        this.weatherService.fetchAndStoreWeather({
-          workoutExecutionId: execution.id,
-          latitude: firstPointConfirm.latitude,
-          longitude: firstPointConfirm.longitude,
-          startedAt: parsedData.startTime,
-        }).catch((err) => this.logger.error(`Failed to fetch weather for confirmed import: ${err.message}`));
+        this.weatherService
+          .fetchAndStoreWeather({
+            workoutExecutionId: execution.id,
+            latitude: firstPointConfirm.latitude,
+            longitude: firstPointConfirm.longitude,
+            startedAt: parsedData.startTime,
+          })
+          .catch((err) => this.logger.error(`Failed to fetch weather for confirmed import: ${err.message}`));
 
         // Create route markers from laps (only for valid km or mile laps)
         if (parsedData.laps.length > 0) {
-          const markersToCreate = this.createMarkersFromLaps(
-            route.id,
-            parsedData.laps,
-            parsedData.routePoints[0],
-          );
+          const markersToCreate = this.createMarkersFromLaps(route.id, parsedData.laps, parsedData.routePoints[0]);
 
           if (markersToCreate.length > 0) {
             await this.workoutRouteRepository.createMarkers(markersToCreate);
@@ -609,7 +596,7 @@ export class WorkoutFileImportsApiService {
     const workout = await this.workoutRepository.create({
       user_id: userId,
       name: workoutName,
-      description: description || `Imported activity.`,
+      description: description || 'Imported activity.',
       type: workoutType,
       difficulty: this.estimateDifficulty([], totalDurationSeconds),
       cardio_category_id: null,
@@ -810,15 +797,11 @@ export class WorkoutFileImportsApiService {
       day: 'numeric',
     });
     const sportLabel = this.getSportLabel(sportType, sportName);
-    const distanceStr = totalDistanceMeters
-      ? ` - ${(totalDistanceMeters / 1000).toFixed(1)}km`
-      : '';
+    const distanceStr = totalDistanceMeters ? ` - ${(totalDistanceMeters / 1000).toFixed(1)}km` : '';
     const workoutName = `${sportLabel} ${dateStr}${distanceStr}`;
 
     // Generate description
-    const durationStr = totalDurationSeconds
-      ? this.formatDuration(totalDurationSeconds)
-      : 'Unknown duration';
+    const durationStr = totalDurationSeconds ? this.formatDuration(totalDurationSeconds) : 'Unknown duration';
     const description = `Imported activity from ${fileName}. Duration: ${durationStr}.`;
 
     // Create the workout
@@ -1008,11 +991,7 @@ export class WorkoutFileImportsApiService {
   private mergeAdjacentLaps(laps: ParsedLapDTO[]): ParsedLapDTO[] {
     if (laps.length === 0) return [];
 
-    const mergeableIntensities = new Set<LapIntensity>([
-      LapIntensity.WARMUP,
-      LapIntensity.COOLDOWN,
-      LapIntensity.REST,
-    ]);
+    const mergeableIntensities = new Set<LapIntensity>([LapIntensity.WARMUP, LapIntensity.COOLDOWN, LapIntensity.REST]);
 
     const result: ParsedLapDTO[] = [];
     let currentMerged: ParsedLapDTO | null = null;
@@ -1286,7 +1265,9 @@ export class WorkoutFileImportsApiService {
     }
 
     const markerType = isKmLap ? 'km' : 'mile';
-    this.logger.log(`Creating ${markerType} markers from ${laps.length} laps (avg distance: ${Math.round(avgLapDistance)}m)`);
+    this.logger.log(
+      `Creating ${markerType} markers from ${laps.length} laps (avg distance: ${Math.round(avgLapDistance)}m)`,
+    );
 
     let cumulativeTime = 0;
     let markerNumber = 0;

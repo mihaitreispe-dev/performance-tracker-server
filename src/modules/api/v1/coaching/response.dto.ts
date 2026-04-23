@@ -1066,7 +1066,10 @@ export class AthleteCorrelationSummaryDTO {
   @IsString({ each: true })
   primaryRiskFactors: string[];
 
-  @ApiPropertyOptional({ enum: ['sleep', 'stress', 'soreness', 'energy'], description: 'Most impactful wellness factor' })
+  @ApiPropertyOptional({
+    enum: ['sleep', 'stress', 'soreness', 'energy'],
+    description: 'Most impactful wellness factor',
+  })
   @IsString()
   @IsOptional()
   dominantWellnessFactor?: 'sleep' | 'stress' | 'soreness' | 'energy' | null;

@@ -134,22 +134,22 @@ export class LoadModelParametersRepository {
 
     return {
       id: params.id,
-      aerobic_ctl_decay: parseFloat(params.aerobic_ctl_decay) || DefaultLoadModelParameters.aerobic_ctl_decay,
-      aerobic_atl_decay: parseFloat(params.aerobic_atl_decay) || DefaultLoadModelParameters.aerobic_atl_decay,
-      msk_ctl_decay: parseFloat(params.msk_ctl_decay) || DefaultLoadModelParameters.msk_ctl_decay,
-      msk_atl_decay: parseFloat(params.msk_atl_decay) || DefaultLoadModelParameters.msk_atl_decay,
-      neural_ctl_decay: parseFloat(params.neural_ctl_decay) || DefaultLoadModelParameters.neural_ctl_decay,
-      neural_atl_decay: parseFloat(params.neural_atl_decay) || DefaultLoadModelParameters.neural_atl_decay,
-      run_aerobic_coef: parseFloat(params.run_aerobic_coef) || DefaultLoadModelParameters.run_aerobic_coef,
-      bike_aerobic_coef: parseFloat(params.bike_aerobic_coef) || DefaultLoadModelParameters.bike_aerobic_coef,
-      swim_aerobic_coef: parseFloat(params.swim_aerobic_coef) || DefaultLoadModelParameters.swim_aerobic_coef,
+      aerobic_ctl_decay: Number.parseFloat(params.aerobic_ctl_decay) || DefaultLoadModelParameters.aerobic_ctl_decay,
+      aerobic_atl_decay: Number.parseFloat(params.aerobic_atl_decay) || DefaultLoadModelParameters.aerobic_atl_decay,
+      msk_ctl_decay: Number.parseFloat(params.msk_ctl_decay) || DefaultLoadModelParameters.msk_ctl_decay,
+      msk_atl_decay: Number.parseFloat(params.msk_atl_decay) || DefaultLoadModelParameters.msk_atl_decay,
+      neural_ctl_decay: Number.parseFloat(params.neural_ctl_decay) || DefaultLoadModelParameters.neural_ctl_decay,
+      neural_atl_decay: Number.parseFloat(params.neural_atl_decay) || DefaultLoadModelParameters.neural_atl_decay,
+      run_aerobic_coef: Number.parseFloat(params.run_aerobic_coef) || DefaultLoadModelParameters.run_aerobic_coef,
+      bike_aerobic_coef: Number.parseFloat(params.bike_aerobic_coef) || DefaultLoadModelParameters.bike_aerobic_coef,
+      swim_aerobic_coef: Number.parseFloat(params.swim_aerobic_coef) || DefaultLoadModelParameters.swim_aerobic_coef,
       strength_aerobic_coef:
-        parseFloat(params.strength_aerobic_coef) || DefaultLoadModelParameters.strength_aerobic_coef,
-      w_sleep: parseFloat(params.w_sleep) || DefaultLoadModelParameters.w_sleep,
-      w_alcohol: parseFloat(params.w_alcohol) || DefaultLoadModelParameters.w_alcohol,
-      w_stress: parseFloat(params.w_stress) || DefaultLoadModelParameters.w_stress,
+        Number.parseFloat(params.strength_aerobic_coef) || DefaultLoadModelParameters.strength_aerobic_coef,
+      w_sleep: Number.parseFloat(params.w_sleep) || DefaultLoadModelParameters.w_sleep,
+      w_alcohol: Number.parseFloat(params.w_alcohol) || DefaultLoadModelParameters.w_alcohol,
+      w_stress: Number.parseFloat(params.w_stress) || DefaultLoadModelParameters.w_stress,
       parameter_confidence:
-        parseFloat(params.parameter_confidence) || DefaultLoadModelParameters.parameter_confidence,
+        Number.parseFloat(params.parameter_confidence) || DefaultLoadModelParameters.parameter_confidence,
       data_points_used: params.data_points_used || DefaultLoadModelParameters.data_points_used,
     };
   }

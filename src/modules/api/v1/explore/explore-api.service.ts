@@ -3,14 +3,14 @@ import { type Request } from 'express';
 import { formatDateToYMD } from 'src/lib/util';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { FitnessFatigueRepository } from 'src/repositories/fitness-fatigue.repository';
+import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { HrvBaselineRepository } from 'src/repositories/hrv-baseline.repository';
 import { MultiStreamLoadRepository } from 'src/repositories/multi-stream-load.repository';
 import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
+import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
-import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
-import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 
 import { MetricHistoryQuery, PeriodComparisonQuery } from './request.dto';
 import {
@@ -76,9 +76,7 @@ const METRIC_CHAPTERS: MetricChapterDTO[] = [
 
 // Flat lookup for metric info
 const METRIC_INFO_MAP = new Map(
-  METRIC_CHAPTERS.flatMap((chapter) =>
-    chapter.metrics.map((m) => [m.id, { label: m.label, unit: m.unit }]),
-  ),
+  METRIC_CHAPTERS.flatMap((chapter) => chapter.metrics.map((m) => [m.id, { label: m.label, unit: m.unit }])),
 );
 
 @Injectable()
@@ -261,9 +259,7 @@ export class ExploreApiService {
     const valueMap = new Map<string, number | null>();
     for (const checkin of checkins) {
       const date =
-        checkin.checkin_date instanceof Date
-          ? formatDateToYMD(checkin.checkin_date)
-          : String(checkin.checkin_date);
+        checkin.checkin_date instanceof Date ? formatDateToYMD(checkin.checkin_date) : String(checkin.checkin_date);
 
       let value: number | null = null;
       switch (metricId) {
@@ -332,11 +328,7 @@ export class ExploreApiService {
   /**
    * Fetch readiness score from multi-stream load
    */
-  private async fetchReadinessMetric(
-    userId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<MetricDataPointDTO[]> {
+  private async fetchReadinessMetric(userId: string, startDate: Date, endDate: Date): Promise<MetricDataPointDTO[]> {
     const data = await this.multiStreamLoadRepository.findMany({
       filter: { userId, dateFrom: startDate, dateTo: endDate },
       sort: [{ field: 'date', direction: 'asc' }],
@@ -436,9 +428,10 @@ export class ExploreApiService {
     const dailyStats = new Map<string, { volume: number; sets: number; reps: number }>();
 
     for (const execution of executions) {
-      const date = execution.completed_at instanceof Date
-        ? formatDateToYMD(execution.completed_at)
-        : formatDateToYMD(new Date(execution.completed_at!));
+      const date =
+        execution.completed_at instanceof Date
+          ? formatDateToYMD(execution.completed_at)
+          : formatDateToYMD(new Date(execution.completed_at!));
 
       const existing = dailyStats.get(date) || { volume: 0, sets: 0, reps: 0 };
 
@@ -482,11 +475,7 @@ export class ExploreApiService {
   /**
    * Fetch VO2 max from fitness metrics
    */
-  private async fetchVo2MaxMetric(
-    userId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<MetricDataPointDTO[]> {
+  private async fetchVo2MaxMetric(userId: string, startDate: Date, endDate: Date): Promise<MetricDataPointDTO[]> {
     const data = await this.fitnessMetricsRepository.findMany({
       filter: {
         userId,
@@ -499,9 +488,10 @@ export class ExploreApiService {
 
     const valueMap = new Map<string, number | null>();
     for (const entry of data) {
-      const date = entry.calculated_at instanceof Date
-        ? formatDateToYMD(entry.calculated_at)
-        : formatDateToYMD(new Date(entry.calculated_at));
+      const date =
+        entry.calculated_at instanceof Date
+          ? formatDateToYMD(entry.calculated_at)
+          : formatDateToYMD(new Date(entry.calculated_at));
       valueMap.set(date, entry.value ? Number(entry.value) : null);
     }
 
@@ -529,9 +519,10 @@ export class ExploreApiService {
 
     const valueMap = new Map<string, number | null>();
     for (const entry of data) {
-      const date = entry.calculated_at instanceof Date
-        ? formatDateToYMD(entry.calculated_at)
-        : formatDateToYMD(new Date(entry.calculated_at));
+      const date =
+        entry.calculated_at instanceof Date
+          ? formatDateToYMD(entry.calculated_at)
+          : formatDateToYMD(new Date(entry.calculated_at));
       valueMap.set(date, entry.value ? Number(entry.value) : null);
     }
 

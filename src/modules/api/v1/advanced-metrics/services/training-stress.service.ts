@@ -216,12 +216,7 @@ export class TrainingStressService {
    * Using time-series integration is more accurate for interval/HIIT workouts
    * as it captures within-session HR fluctuations that mean-HR TRIMP misses.
    */
-  private calculateTRIMP(
-    hrMetrics: CardioMetric[],
-    maxHR: number,
-    restingHR: number,
-    gender: Gender | null,
-  ): number {
+  private calculateTRIMP(hrMetrics: CardioMetric[], maxHR: number, restingHR: number, gender: Gender | null): number {
     if (hrMetrics.length < 2) {
       return 0;
     }

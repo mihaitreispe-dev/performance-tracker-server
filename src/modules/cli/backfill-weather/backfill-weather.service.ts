@@ -47,12 +47,7 @@ export class BackfillWeatherService {
       },
     ],
   })
-  async backfillWeather(opts: {
-    dryRun?: boolean;
-    limit?: string;
-    userId?: string;
-    delay?: string;
-  }) {
+  async backfillWeather(opts: { dryRun?: boolean; limit?: string; userId?: string; delay?: string }) {
     const { dryRun, limit: limitStr, userId, delay: delayStr } = opts;
     const limit = Number.parseInt(limitStr || '0', 10);
     const delay = Number.parseInt(delayStr || '500', 10);
@@ -91,9 +86,7 @@ export class BackfillWeatherService {
       const exec = executions[i];
 
       try {
-        this.logger.log(
-          `[${i + 1}/${executions.length}] Processing execution ${exec.execution_id}...`,
-        );
+        this.logger.log(`[${i + 1}/${executions.length}] Processing execution ${exec.execution_id}...`);
 
         await this.weatherService.fetchAndStoreWeather({
           workoutExecutionId: exec.execution_id,
@@ -103,7 +96,7 @@ export class BackfillWeatherService {
         });
 
         success++;
-        this.logger.log(`  ✓ Weather fetched successfully`);
+        this.logger.log('  ✓ Weather fetched successfully');
 
         // Add delay between API calls to avoid rate limiting
         if (i < executions.length - 1 && delay > 0) {
@@ -120,10 +113,7 @@ export class BackfillWeatherService {
     this.logger.log(`Failed: ${failed}`);
   }
 
-  private async findExecutionsWithoutWeather(
-    limit: number,
-    userId?: string,
-  ): Promise<ExecutionWithRoute[]> {
+  private async findExecutionsWithoutWeather(limit: number, userId?: string): Promise<ExecutionWithRoute[]> {
     // Query to find executions that have routes but no weather data
     // Build query using Kysely's sql template tag
     const baseQuery = sql<{

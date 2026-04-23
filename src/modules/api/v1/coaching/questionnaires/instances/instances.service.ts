@@ -216,10 +216,12 @@ export class InstancesService {
       const coach = await this.userRepo.findById(coachId);
       const coachName = coach?.display_name || coach?.first_name || 'Your coach';
       const notifications = body.athleteIds
-        .filter((id) => results.instanceIds.some(async (instId) => {
-          const inst = await this.instanceRepo.findById(instId);
-          return inst?.athlete_id === id;
-        }))
+        .filter((id) =>
+          results.instanceIds.some(async (instId) => {
+            const inst = await this.instanceRepo.findById(instId);
+            return inst?.athlete_id === id;
+          }),
+        )
         .map((athleteId, index) => ({
           userId: athleteId,
           type: NotificationType.QUESTIONNAIRE_SENT as NotificationType,

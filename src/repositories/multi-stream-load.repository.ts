@@ -40,10 +40,7 @@ export class MultiStreamLoadRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<MultiStreamLoadDaily[]> {
-    let query = this.db
-      .selectFrom('multi_stream_load_daily')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('multi_stream_load_daily').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.dateFrom) {
       const dateFromStr = formatDateToYMD(options.filter.dateFrom);

@@ -29,11 +29,7 @@ import {
   UpdateQuestionBody,
   UpdateQuestionnaireTemplateBody,
 } from './request.dto';
-import {
-  QuestionnaireTemplateListResponse,
-  QuestionnaireTemplateResponse,
-  QuestionResponse,
-} from './response.dto';
+import { QuestionnaireTemplateListResponse, QuestionnaireTemplateResponse, QuestionResponse } from './response.dto';
 import { TemplatesService } from './templates.service';
 
 @ApiTags('coaching/questionnaires/templates')
@@ -173,10 +169,7 @@ export class TemplatesController {
   @Roles(UserRole.COACH)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete(':id/questions/:questionId')
-  async deleteQuestion(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: QuestionIdParam,
-  ): Promise<void> {
+  async deleteQuestion(@Req() req: Request & { user: AuthUser }, @Param() params: QuestionIdParam): Promise<void> {
     return this.service.deleteQuestion(req, params.id, params.questionId);
   }
 

@@ -1,4 +1,5 @@
 import type { ColumnType, Insertable, Selectable, Updateable } from 'kysely';
+
 import { WorkoutType } from './workouts-table.interface';
 
 export enum PersonalRecordType {

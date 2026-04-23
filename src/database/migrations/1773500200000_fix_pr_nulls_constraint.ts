@@ -23,7 +23,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   `.execute(db);
 
   // Drop the old unique constraint
-  await sql`ALTER TABLE personal_records DROP CONSTRAINT IF EXISTS personal_records_user_type_exercise_workout_unique`.execute(db);
+  await sql`ALTER TABLE personal_records DROP CONSTRAINT IF EXISTS personal_records_user_type_exercise_workout_unique`.execute(
+    db,
+  );
 
   // Create new unique constraint with NULLS NOT DISTINCT so that NULL values are treated as equal
   await sql`ALTER TABLE personal_records ADD CONSTRAINT personal_records_user_type_exercise_workout_unique
@@ -32,7 +34,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
 
 export async function down(db: Kysely<unknown>): Promise<void> {
   // Recreate without NULLS NOT DISTINCT
-  await sql`ALTER TABLE personal_records DROP CONSTRAINT IF EXISTS personal_records_user_type_exercise_workout_unique`.execute(db);
+  await sql`ALTER TABLE personal_records DROP CONSTRAINT IF EXISTS personal_records_user_type_exercise_workout_unique`.execute(
+    db,
+  );
   await sql`ALTER TABLE personal_records ADD CONSTRAINT personal_records_user_type_exercise_workout_unique
     UNIQUE (user_id, record_type, exercise_id, workout_type)`.execute(db);
 }

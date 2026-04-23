@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-
 import { Database } from 'src/database/interfaces/database.interface';
 import {
-  PeriodizationPlan,
-  PeriodizationPhase,
-  PeriodizationStatus,
   PeriodizationCreator,
+  PeriodizationPhase,
+  PeriodizationPlan,
+  PeriodizationStatus,
 } from 'src/database/interfaces/periodization-plans-table.interface';
 
 export interface CreatePeriodizationPlanInput {
@@ -27,11 +26,7 @@ export class PeriodizationPlanRepository {
   constructor(@InjectKysely() private readonly db: Kysely<Database>) {}
 
   async findById(id: string): Promise<PeriodizationPlan | undefined> {
-    return this.db
-      .selectFrom('periodization_plans')
-      .where('id', '=', id)
-      .selectAll()
-      .executeTakeFirst();
+    return this.db.selectFrom('periodization_plans').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
   async findByAthleteRaceId(athleteRaceId: string): Promise<PeriodizationPlan | undefined> {
@@ -92,9 +87,6 @@ export class PeriodizationPlanRepository {
   }
 
   async deleteByAthleteRaceId(athleteRaceId: string): Promise<void> {
-    await this.db
-      .deleteFrom('periodization_plans')
-      .where('athlete_race_id', '=', athleteRaceId)
-      .execute();
+    await this.db.deleteFrom('periodization_plans').where('athlete_race_id', '=', athleteRaceId).execute();
   }
 }

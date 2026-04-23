@@ -1,4 +1,5 @@
 import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+
 import { EventType } from './race-events-table.interface';
 
 export type RacePriority = 'A' | 'B' | 'C';

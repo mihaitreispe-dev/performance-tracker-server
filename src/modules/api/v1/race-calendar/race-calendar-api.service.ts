@@ -1,21 +1,24 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { FitnessMetricType, PredictionStatus, RacePrediction, RaceSport } from 'src/database/interfaces';
 import { NewAthleteRace } from 'src/database/interfaces/athlete-races-table.interface';
 import type { PeriodizationPhase } from 'src/database/interfaces/periodization-plans-table.interface';
-import { FitnessMetricType, PredictionStatus, RacePrediction, RaceSport } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
-import { AthleteRaceRepository, AthleteRaceWithEvent } from 'src/repositories/athlete-race.repository';
 import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { AthleteRaceRepository, AthleteRaceWithEvent } from 'src/repositories/athlete-race.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { PeriodizationPlanRepository } from 'src/repositories/periodization-plan.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
-import { CourseAnalysisService, CourseBasedPredictionResult } from '../race-prediction/services/course-analysis.service';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+  CourseAnalysisService,
+  CourseBasedPredictionResult,
+} from '../race-prediction/services/course-analysis.service';
 import { CourseFileProcessorService } from '../race-prediction/services/course-file-processor.service';
 import { RunningPredictionService } from '../race-prediction/services/running-prediction.service';
-
 import {
   ActiveNetworkService,
   ExternalRaceEvent,
@@ -340,10 +343,7 @@ export class RaceCalendarApiService {
     const fileType = ext === '.fit' ? 'fit' : 'gpx';
 
     // Parse the course file
-    const courseProfile = await this.courseFileProcessorService.parseCourseFile(
-      file.buffer,
-      fileType as 'gpx' | 'fit',
-    );
+    const courseProfile = await this.courseFileProcessorService.parseCourseFile(file.buffer, fileType as 'gpx' | 'fit');
 
     // Upload to S3
     const fileUuid = uuidv4();
@@ -423,10 +423,7 @@ export class RaceCalendarApiService {
     return response;
   }
 
-  async getCoursePrediction(
-    req: Request & { user: AuthUser },
-    raceId: string,
-  ): Promise<CourseBasedPredictionDTO> {
+  async getCoursePrediction(req: Request & { user: AuthUser }, raceId: string): Promise<CourseBasedPredictionDTO> {
     const userId = req.user.id;
 
     // Get the race
@@ -486,7 +483,12 @@ export class RaceCalendarApiService {
     userId: string,
     raceId: string,
     race: AthleteRaceWithEvent,
-    courseProfile: { points: { distance: number; elevation: number }[]; totalDistanceMeters: number; totalElevationGain: number; totalElevationLoss: number },
+    courseProfile: {
+      points: { distance: number; elevation: number }[];
+      totalDistanceMeters: number;
+      totalElevationGain: number;
+      totalElevationLoss: number;
+    },
     segmentDistanceMeters: number,
   ): Promise<CourseBasedPredictionDTO> {
     // Get athlete profile and fitness data for base prediction
@@ -530,8 +532,14 @@ export class RaceCalendarApiService {
       distance_meters: Math.round(distanceMeters),
       race_date: raceDate ? new Date(raceDate).toISOString().split('T')[0] : null,
       predicted_time_seconds: Math.round(coursePrediction.predictedTimeSeconds),
-      confidence_lower_seconds: Math.round(basePrediction.confidenceLowerSeconds * (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds)),
-      confidence_upper_seconds: Math.round(basePrediction.confidenceUpperSeconds * (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds)),
+      confidence_lower_seconds: Math.round(
+        basePrediction.confidenceLowerSeconds *
+          (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds),
+      ),
+      confidence_upper_seconds: Math.round(
+        basePrediction.confidenceUpperSeconds *
+          (coursePrediction.predictedTimeSeconds / basePrediction.predictedTimeSeconds),
+      ),
       confidence_score: basePrediction.confidenceScore,
       target_pace_per_km: basePrediction.targetPacePerKm,
       target_power_watts: null,
@@ -853,9 +861,7 @@ export class RaceCalendarApiService {
       predicted_time_seconds: prediction.predicted_time_seconds,
       predicted_time_formatted: this.formatTimeToString(prediction.predicted_time_seconds),
       confidence_score: Number.parseFloat(prediction.confidence_score),
-      target_pace_per_km: prediction.target_pace_per_km
-        ? Number.parseFloat(prediction.target_pace_per_km)
-        : undefined,
+      target_pace_per_km: prediction.target_pace_per_km ? Number.parseFloat(prediction.target_pace_per_km) : undefined,
       goal_achievability: prediction.goal_achievability || undefined,
     };
   }

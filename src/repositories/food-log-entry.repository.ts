@@ -1,14 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import {
-  Database,
-  FoodLogEntry,
-  MealType,
-  NewFoodLogEntry,
-  FoodLogEntryUpdate,
-  Food,
-} from 'src/database/interfaces';
+import { Database, Food, FoodLogEntry, FoodLogEntryUpdate, MealType, NewFoodLogEntry } from 'src/database/interfaces';
 
 export interface FoodLogEntryWithFood extends FoodLogEntry {
   food?: Food;
@@ -115,7 +108,11 @@ export class FoodLogEntryRepository {
         'foods.serving_size_description as food_serving_size_description',
       ])
       .where('food_log_entries.user_id', '=', userId)
-      .where('food_log_entries.log_date', '=', sql<Date>`${date instanceof Date ? date.toISOString().split('T')[0] : date}::date`);
+      .where(
+        'food_log_entries.log_date',
+        '=',
+        sql<Date>`${date instanceof Date ? date.toISOString().split('T')[0] : date}::date`,
+      );
 
     if (mealType) {
       query = query.where('food_log_entries.meal_type', '=', mealType);

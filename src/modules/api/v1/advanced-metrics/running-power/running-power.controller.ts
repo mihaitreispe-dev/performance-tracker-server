@@ -5,8 +5,8 @@ import { UserRole } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
-import { CoachAthleteRelationshipGuard } from '../../coaching/guards/coach-athlete-relationship.guard';
 
+import { CoachAthleteRelationshipGuard } from '../../coaching/guards/coach-athlete-relationship.guard';
 import {
   PowerPaceCorrelationResponse,
   RunningEffectivenessResponse,

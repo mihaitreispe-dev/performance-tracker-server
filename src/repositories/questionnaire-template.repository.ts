@@ -53,10 +53,7 @@ export class QuestionnaireTemplateRepository {
 
     if (filter.search) {
       query = query.where((eb) =>
-        eb.or([
-          eb('name', 'ilike', `%${filter.search}%`),
-          eb('description', 'ilike', `%${filter.search}%`),
-        ]),
+        eb.or([eb('name', 'ilike', `%${filter.search}%`), eb('description', 'ilike', `%${filter.search}%`)]),
       );
     }
 
@@ -74,9 +71,7 @@ export class QuestionnaireTemplateRepository {
   }
 
   async count(filter: QuestionnaireTemplateFilter = {}): Promise<number> {
-    let query = this.db
-      .selectFrom('questionnaire_templates')
-      .select((eb) => eb.fn.countAll<string>().as('count'));
+    let query = this.db.selectFrom('questionnaire_templates').select((eb) => eb.fn.countAll<string>().as('count'));
 
     if (filter.coachId) {
       query = query.where('coach_id', '=', filter.coachId);
@@ -96,10 +91,7 @@ export class QuestionnaireTemplateRepository {
 
     if (filter.search) {
       query = query.where((eb) =>
-        eb.or([
-          eb('name', 'ilike', `%${filter.search}%`),
-          eb('description', 'ilike', `%${filter.search}%`),
-        ]),
+        eb.or([eb('name', 'ilike', `%${filter.search}%`), eb('description', 'ilike', `%${filter.search}%`)]),
       );
     }
 

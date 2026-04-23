@@ -13,39 +13,34 @@ import {
   Req,
   Version,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { NutritionApiService } from './nutrition-api.service';
 import {
-  FoodSearchQuery,
   BarcodeQuery,
   CreateCustomFoodBody,
-  FoodLogQuery,
   CreateFoodLogBody,
-  UpdateFoodLogBody,
   DailySummaryQuery,
-  WeeklySummaryQuery,
+  FoodLogQuery,
+  FoodSearchQuery,
   MonthlySummaryQuery,
-  UpdateNutritionGoalsBody,
   SetFavoriteBody,
+  UpdateFoodLogBody,
+  UpdateNutritionGoalsBody,
+  WeeklySummaryQuery,
 } from './request.dto';
 import {
+  DailyMealsResponseDTO,
+  DailyNutritionSummaryDTO,
   FoodDTO,
   FoodListResponseDTO,
   FoodLogEntryDTO,
-  DailyNutritionSummaryDTO,
-  DailyMealsResponseDTO,
-  WeeklySummaryDTO,
+  FrequentFoodsResponseDTO,
   MonthlySummaryDTO,
   NutritionGoalsDTO,
-  FrequentFoodsResponseDTO,
+  WeeklySummaryDTO,
 } from './response.dto';
 
 @ApiTags('Nutrition')
@@ -92,10 +87,7 @@ export class NutritionApiController {
   @Get('nutrition/foods/:foodId')
   @ApiOperation({ summary: 'Get food by ID' })
   @ApiResponse({ status: 200, type: FoodDTO })
-  async getFood(
-    @Req() req: Request & { user: AuthUser },
-    @Param('foodId') foodId: string,
-  ): Promise<{ data: FoodDTO }> {
+  async getFood(@Req() req: Request & { user: AuthUser }, @Param('foodId') foodId: string): Promise<{ data: FoodDTO }> {
     return this.service.getFood(req, foodId);
   }
 
@@ -177,10 +169,7 @@ export class NutritionApiController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete food log entry' })
   @ApiResponse({ status: 204, description: 'Entry deleted' })
-  async deleteFoodLog(
-    @Req() req: Request & { user: AuthUser },
-    @Param('logId') logId: string,
-  ): Promise<void> {
+  async deleteFoodLog(@Req() req: Request & { user: AuthUser }, @Param('logId') logId: string): Promise<void> {
     return this.service.deleteFoodLog(req, logId);
   }
 

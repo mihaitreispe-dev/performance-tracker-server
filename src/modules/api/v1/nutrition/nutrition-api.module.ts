@@ -1,13 +1,12 @@
-import { DynamicModule, Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
+import { DynamicModule, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
 import { FoodRepository } from 'src/repositories/food.repository';
 import { FoodLogEntryRepository } from 'src/repositories/food-log-entry.repository';
-import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
-import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
 import { UserFrequentFoodRepository } from 'src/repositories/user-frequent-food.repository';
-import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
 
 import { NutritionApiController } from './nutrition-api.controller';
 import { NutritionApiService } from './nutrition-api.service';

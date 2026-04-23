@@ -24,7 +24,11 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index on user_id (already unique, but explicit for clarity)
-  await db.schema.createIndex('idx_user_nutrition_goals_user_id').on('user_nutrition_goals').column('user_id').execute();
+  await db.schema
+    .createIndex('idx_user_nutrition_goals_user_id')
+    .on('user_nutrition_goals')
+    .column('user_id')
+    .execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

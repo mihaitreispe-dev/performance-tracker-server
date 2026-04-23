@@ -58,8 +58,8 @@ export class HrvBaselineService {
       HealthMetricType.RESTING_HEART_RATE,
     );
 
-    const hrvValue = todayHrvMetrics.length > 0 ? parseFloat(todayHrvMetrics[0].value) : null;
-    const restingHr = todayRhrMetrics.length > 0 ? parseFloat(todayRhrMetrics[0].value) : null;
+    const hrvValue = todayHrvMetrics.length > 0 ? Number.parseFloat(todayHrvMetrics[0].value) : null;
+    const restingHr = todayRhrMetrics.length > 0 ? Number.parseFloat(todayRhrMetrics[0].value) : null;
 
     // Get historical HRV data for baseline calculation
     const startDate = new Date(targetDate);
@@ -72,9 +72,7 @@ export class HrvBaselineService {
       dateTo: new Date(targetDate.getTime() - 24 * 60 * 60 * 1000), // Exclude today
     });
 
-    const historicalValues = historicalMetrics
-      .map((m) => parseFloat(m.value))
-      .filter((v) => !isNaN(v) && v > 0);
+    const historicalValues = historicalMetrics.map((m) => Number.parseFloat(m.value)).filter((v) => !isNaN(v) && v > 0);
 
     // Calculate 7-day rolling stats
     let hrv7DayAvg: number | null = null;
@@ -161,9 +159,9 @@ export class HrvBaselineService {
       };
     }
 
-    const currentValue = latest.hrv_value ? parseFloat(latest.hrv_value) : null;
-    const baseline7Day = latest.hrv_7day_avg ? parseFloat(latest.hrv_7day_avg) : null;
-    const zScore = latest.hrv_zscore ? parseFloat(latest.hrv_zscore) : null;
+    const currentValue = latest.hrv_value ? Number.parseFloat(latest.hrv_value) : null;
+    const baseline7Day = latest.hrv_7day_avg ? Number.parseFloat(latest.hrv_7day_avg) : null;
+    const zScore = latest.hrv_zscore ? Number.parseFloat(latest.hrv_zscore) : null;
     const suppressionDays = history.filter((h) => h.is_suppressed).length;
 
     let trend: HrvTrend['trend'] = 'unknown';

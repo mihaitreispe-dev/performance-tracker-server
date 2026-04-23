@@ -47,8 +47,8 @@ const STANDARD_DISTANCES = {
   '1k': 1000,
   '5k': 5000,
   '10k': 10000,
-  half_marathon: 21097,
-  marathon: 42195,
+  'half_marathon': 21097,
+  'marathon': 42195,
 };
 
 // Map PR types to distances
@@ -153,7 +153,7 @@ export class RunningPredictionService {
     const confidenceUpper = Math.round(predictedTime + 1.96 * stdDev);
 
     // Calculate pace per km
-    const targetPacePerKm = (predictedTime / (input.targetDistanceMeters / 1000));
+    const targetPacePerKm = predictedTime / (input.targetDistanceMeters / 1000);
 
     return {
       predictedTimeSeconds: Math.round(predictedTime),
@@ -169,7 +169,9 @@ export class RunningPredictionService {
    * VDOT/Daniels prediction using lookup table with interpolation
    */
   private predictFromVdot(vdot: number, targetDistanceMeters: number): number | null {
-    const vdotLevels = Object.keys(VDOT_RACE_TIMES).map(Number).sort((a, b) => a - b);
+    const vdotLevels = Object.keys(VDOT_RACE_TIMES)
+      .map(Number)
+      .sort((a, b) => a - b);
 
     // Find surrounding VDOT levels for interpolation
     let lowerVdot = vdotLevels[0];
@@ -203,7 +205,9 @@ export class RunningPredictionService {
    * Interpolate time for non-standard distances
    */
   private interpolateDistance(times: Record<number, number>, targetDistance: number): number | null {
-    const distances = Object.keys(times).map(Number).sort((a, b) => a - b);
+    const distances = Object.keys(times)
+      .map(Number)
+      .sort((a, b) => a - b);
 
     // Find surrounding distances
     let lowerDist = distances[0];
@@ -288,7 +292,7 @@ export class RunningPredictionService {
     const a = 13.49681 - 0.000030363 * knownDistanceMeters + 835.7114 / Math.pow(knownDistanceMeters, 0.7905);
     const b = 13.49681 - 0.000030363 * targetDistanceMeters + 835.7114 / Math.pow(targetDistanceMeters, 0.7905);
 
-    const predictedTime = (knownTimeSeconds / knownDistanceMeters) * (targetDistanceMeters * a / b);
+    const predictedTime = (knownTimeSeconds / knownDistanceMeters) * ((targetDistanceMeters * a) / b);
 
     return Math.round(predictedTime);
   }
@@ -329,16 +333,16 @@ export class RunningPredictionService {
     let confidence = 0;
 
     // Base confidence from number of methods (max 0.30)
-    confidence += Math.min(0.30, methods.length * 0.05);
+    confidence += Math.min(0.3, methods.length * 0.05);
 
     // Average method confidence (max 0.50)
     const avgMethodConfidence = methods.reduce((sum, m) => sum + m.confidence, 0) / methods.length;
-    confidence += avgMethodConfidence * 0.50;
+    confidence += avgMethodConfidence * 0.5;
 
     // Consistency bonus - lower variance = higher confidence (max 0.20)
     const { variance, predictedTime } = this.calculateEnsemble(methods);
     const cv = Math.sqrt(variance) / predictedTime; // Coefficient of variation
-    const consistencyBonus = Math.max(0, 0.20 - cv);
+    const consistencyBonus = Math.max(0, 0.2 - cv);
     confidence += consistencyBonus;
 
     return Math.min(1.0, confidence);
@@ -391,7 +395,9 @@ export class RunningPredictionService {
    * Calculate VDOT from race result
    */
   calculateVdotFromRace(timeSeconds: number, distanceMeters: number): number | null {
-    const vdotLevels = Object.keys(VDOT_RACE_TIMES).map(Number).sort((a, b) => a - b);
+    const vdotLevels = Object.keys(VDOT_RACE_TIMES)
+      .map(Number)
+      .sort((a, b) => a - b);
 
     // Find VDOT that produces closest time for given distance
     let bestVdot = 30;

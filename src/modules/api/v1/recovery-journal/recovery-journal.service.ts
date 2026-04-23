@@ -188,7 +188,7 @@ export class RecoveryJournalService {
     for (const hrv of hrvBaselines) {
       if (hrv.hrv_zscore) {
         const dateStr = formatDateToYMD(hrv.date);
-        hrvByDate.set(dateStr, parseFloat(hrv.hrv_zscore));
+        hrvByDate.set(dateStr, Number.parseFloat(hrv.hrv_zscore));
       }
     }
 
@@ -284,7 +284,7 @@ export class RecoveryJournalService {
       const value = entry[field];
 
       if (hrvZscore !== undefined && value !== null && value !== undefined) {
-        const numValue = typeof value === 'string' ? parseFloat(value) : (value as number);
+        const numValue = typeof value === 'string' ? Number.parseFloat(value) : (value as number);
         if (!isNaN(numValue)) {
           pairs.push({ x: numValue, y: hrvZscore });
         }
@@ -342,8 +342,8 @@ export class RecoveryJournalService {
       motivationLevel: entry.motivation_level,
       caffeineMg: entry.caffeine_mg,
       caffeineCutoffTime: entry.caffeine_cutoff_time,
-      alcoholUnits: entry.alcohol_units ? parseFloat(entry.alcohol_units) : null,
-      hydrationLiters: entry.hydration_liters ? parseFloat(entry.hydration_liters) : null,
+      alcoholUnits: entry.alcohol_units ? Number.parseFloat(entry.alcohol_units) : null,
+      hydrationLiters: entry.hydration_liters ? Number.parseFloat(entry.hydration_liters) : null,
       mealQuality: entry.meal_quality,
       injuryConcerns: entry.injury_concerns,
       notes: entry.notes,

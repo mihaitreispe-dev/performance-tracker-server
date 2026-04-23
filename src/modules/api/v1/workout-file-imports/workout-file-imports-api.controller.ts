@@ -5,11 +5,7 @@ import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { ConfirmImportBody, RequestUploadBody, WorkoutFileImportIdParam } from './request.dto';
-import {
-  ImportPreviewResponse,
-  WorkoutFileUploadResultResponse,
-  WorkoutFileUploadUrlResponse,
-} from './response.dto';
+import { ImportPreviewResponse, WorkoutFileUploadResultResponse, WorkoutFileUploadUrlResponse } from './response.dto';
 import { WorkoutFileImportsApiService } from './workout-file-imports-api.service';
 
 @ApiTags('workout-executions')

@@ -123,8 +123,7 @@ export class SleepBaselineService {
 
     // Calculate HR nadir statistics
     const hrNadirValues = primaryLogs.filter((log) => log.hr_nadir !== null).map((log) => log.hr_nadir!);
-    const hrNadirAvg =
-      hrNadirValues.length >= SleepBaselineService.MIN_DATA_POINTS ? this.mean(hrNadirValues) : null;
+    const hrNadirAvg = hrNadirValues.length >= SleepBaselineService.MIN_DATA_POINTS ? this.mean(hrNadirValues) : null;
     const hrNadirStd = hrNadirAvg !== null ? this.std(hrNadirValues, hrNadirAvg) : null;
 
     // Calculate sleep debt (cumulative deviation from optimal)

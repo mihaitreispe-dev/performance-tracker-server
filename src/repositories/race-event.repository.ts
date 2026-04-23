@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-
 import { Database } from 'src/database/interfaces/database.interface';
 import {
-  RaceEvent,
-  NewRaceEvent,
-  RaceEventUpdate,
-  EventType,
   EventSource,
+  EventType,
+  NewRaceEvent,
+  RaceEvent,
+  RaceEventUpdate,
 } from 'src/database/interfaces/race-events-table.interface';
 
 export interface RaceEventFindManyOptions {

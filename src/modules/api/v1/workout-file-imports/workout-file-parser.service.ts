@@ -406,10 +406,7 @@ export class WorkoutFileParserService {
         }
 
         // Timer start events indicate pause end
-        if (
-          (eventType === 'timer' && eventAction === 'start') ||
-          eventType === 'start'
-        ) {
+        if ((eventType === 'timer' && eventAction === 'start') || eventType === 'start') {
           if (event.timestamp && pauseStart) {
             const pauseEnd = new Date(event.timestamp);
             const durationSeconds = (pauseEnd.getTime() - pauseStart.getTime()) / 1000;
@@ -979,11 +976,7 @@ export class WorkoutFileParserService {
           const lapDuration = (currPoint.timestamp.getTime() - lapStartTime.getTime()) / 1000;
 
           // Calculate elapsed time by subtracting pauses that overlap with this lap
-          const lapPauseDuration = this.calculateOverlappingPauseDuration(
-            pauses,
-            lapStartTime,
-            currPoint.timestamp,
-          );
+          const lapPauseDuration = this.calculateOverlappingPauseDuration(pauses, lapStartTime, currPoint.timestamp);
           const lapElapsedTime = lapDuration - lapPauseDuration;
 
           // Calculate pace from elapsed time (excluding pauses)
@@ -1096,11 +1089,7 @@ export class WorkoutFileParserService {
   /**
    * Calculate total pause duration that overlaps with a given time range
    */
-  private calculateOverlappingPauseDuration(
-    pauses: PausePeriod[],
-    rangeStart: Date,
-    rangeEnd: Date,
-  ): number {
+  private calculateOverlappingPauseDuration(pauses: PausePeriod[], rangeStart: Date, rangeEnd: Date): number {
     let totalOverlap = 0;
 
     for (const pause of pauses) {

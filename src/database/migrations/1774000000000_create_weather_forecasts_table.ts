@@ -5,9 +5,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable('weather_forecasts')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-    .addColumn('athlete_race_id', 'uuid', (col) =>
-      col.notNull().references('athlete_races.id').onDelete('cascade'),
-    )
+    .addColumn('athlete_race_id', 'uuid', (col) => col.notNull().references('athlete_races.id').onDelete('cascade'))
     .addColumn('latitude', 'decimal(10, 8)', (col) => col.notNull())
     .addColumn('longitude', 'decimal(11, 8)', (col) => col.notNull())
     .addColumn('race_date', 'date', (col) => col.notNull())

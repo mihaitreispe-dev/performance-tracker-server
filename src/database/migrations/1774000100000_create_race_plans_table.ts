@@ -6,12 +6,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .createTable('race_plans')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('user_id', 'uuid', (col) => col.notNull().references('users.id').onDelete('cascade'))
-    .addColumn('athlete_race_id', 'uuid', (col) =>
-      col.notNull().references('athlete_races.id').onDelete('cascade'),
-    )
-    .addColumn('race_prediction_id', 'uuid', (col) =>
-      col.references('race_predictions.id').onDelete('set null'),
-    )
+    .addColumn('athlete_race_id', 'uuid', (col) => col.notNull().references('athlete_races.id').onDelete('cascade'))
+    .addColumn('race_prediction_id', 'uuid', (col) => col.references('race_predictions.id').onDelete('set null'))
     .addColumn('predicted_finish_time_seconds', 'integer', (col) => col.notNull())
     .addColumn('target_finish_time_seconds', 'integer', (col) => col.defaultTo(null))
     .addColumn('pacing_strategy', 'varchar(50)', (col) => col.notNull().defaultTo('even'))
@@ -42,18 +38,10 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index for athlete_race_id queries
-  await db.schema
-    .createIndex('race_plans_athlete_race_id_idx')
-    .on('race_plans')
-    .columns(['athlete_race_id'])
-    .execute();
+  await db.schema.createIndex('race_plans_athlete_race_id_idx').on('race_plans').columns(['athlete_race_id']).execute();
 
   // Index for finding active plans
-  await db.schema
-    .createIndex('race_plans_status_idx')
-    .on('race_plans')
-    .columns(['status'])
-    .execute();
+  await db.schema.createIndex('race_plans_status_idx').on('race_plans').columns(['status']).execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

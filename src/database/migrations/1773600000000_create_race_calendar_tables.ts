@@ -50,19 +50,13 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Create index on user_id for faster queries
-  await db.schema
-    .createIndex('idx_athlete_races_user_id')
-    .on('athlete_races')
-    .column('user_id')
-    .execute();
+  await db.schema.createIndex('idx_athlete_races_user_id').on('athlete_races').column('user_id').execute();
 
   // Create periodization_plans table
   await db.schema
     .createTable('periodization_plans')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-    .addColumn('athlete_race_id', 'uuid', (col) =>
-      col.notNull().references('athlete_races.id').onDelete('cascade'),
-    )
+    .addColumn('athlete_race_id', 'uuid', (col) => col.notNull().references('athlete_races.id').onDelete('cascade'))
     .addColumn('status', 'varchar(20)', (col) => col.notNull().defaultTo('suggested'))
     .addColumn('phases', 'jsonb', (col) => col.notNull())
     .addColumn('created_by', 'varchar(50)', (col) => col.notNull().defaultTo('system'))

@@ -113,6 +113,6 @@ export class RpeTssTrackingRepository {
       .select((eb) => eb.fn.avg<string>('rpe_tss_ratio').as('avg_ratio'))
       .executeTakeFirst();
 
-    return result?.avg_ratio ? parseFloat(result.avg_ratio) : null;
+    return result?.avg_ratio ? Number.parseFloat(result.avg_ratio) : null;
   }
 }

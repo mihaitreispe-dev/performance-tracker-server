@@ -3,6 +3,7 @@ import { IsArray, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNest
 import { WorkoutFileImportStatus } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
+
 import { ImportSportType, ParsedLapDTO } from './request.dto';
 
 export class WorkoutFileUploadUrlDTO {

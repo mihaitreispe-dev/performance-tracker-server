@@ -30,7 +30,11 @@ export class QuickWellnessCheckinBody {
   @Max(5)
   muscleSoreness?: number;
 
-  @ApiPropertyOptional({ description: 'Stress level (1-5 inverted: 1=very stressed, 5=relaxed)', minimum: 1, maximum: 5 })
+  @ApiPropertyOptional({
+    description: 'Stress level (1-5 inverted: 1=very stressed, 5=relaxed)',
+    minimum: 1,
+    maximum: 5,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

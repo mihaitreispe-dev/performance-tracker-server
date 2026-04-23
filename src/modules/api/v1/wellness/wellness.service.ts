@@ -394,8 +394,7 @@ export class WellnessService {
    * Map illness log to DTO
    */
   private mapIllnessLogToDTO(log: IllnessLog): IllnessLogDTO {
-    const startDate =
-      log.start_date instanceof Date ? formatDateToYMD(log.start_date) : String(log.start_date);
+    const startDate = log.start_date instanceof Date ? formatDateToYMD(log.start_date) : String(log.start_date);
     const endDate = log.end_date
       ? log.end_date instanceof Date
         ? formatDateToYMD(log.end_date)

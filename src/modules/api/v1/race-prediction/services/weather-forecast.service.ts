@@ -1,9 +1,9 @@
+import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { WeatherForecastRepository } from 'src/repositories/weather-forecast.repository';
 import { ForecastConfidence, HourlyForecast, NewWeatherForecast, WeatherForecast } from 'src/database/interfaces';
+import { WeatherForecastRepository } from 'src/repositories/weather-forecast.repository';
 
 interface OpenWeatherResponse {
   hourly: {
@@ -229,16 +229,16 @@ export class WeatherForecastService {
    * Check if significant weather change occurred (for regeneration trigger)
    */
   hasSignificantWeatherChange(oldForecast: WeatherForecast, newForecast: WeatherForecast): boolean {
-    const oldTemp = parseFloat(oldForecast.race_hour_temperature_celsius || '0');
-    const newTemp = parseFloat(newForecast.race_hour_temperature_celsius || '0');
+    const oldTemp = Number.parseFloat(oldForecast.race_hour_temperature_celsius || '0');
+    const newTemp = Number.parseFloat(newForecast.race_hour_temperature_celsius || '0');
     const tempChange = Math.abs(newTemp - oldTemp);
 
     const oldHumidity = oldForecast.race_hour_humidity_percent || 0;
     const newHumidity = newForecast.race_hour_humidity_percent || 0;
     const humidityChange = Math.abs(newHumidity - oldHumidity);
 
-    const oldWind = parseFloat(oldForecast.race_hour_wind_speed_kmh || '0');
-    const newWind = parseFloat(newForecast.race_hour_wind_speed_kmh || '0');
+    const oldWind = Number.parseFloat(oldForecast.race_hour_wind_speed_kmh || '0');
+    const newWind = Number.parseFloat(newForecast.race_hour_wind_speed_kmh || '0');
     const windChange = Math.abs(newWind - oldWind);
 
     // Significant change thresholds

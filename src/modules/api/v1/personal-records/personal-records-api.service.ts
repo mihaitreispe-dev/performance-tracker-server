@@ -5,7 +5,13 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 
-import { ListPersonalRecordsQuery, PeriodComparisonQuery, PREvolutionQuery, PRHistoryQuery, RecentPRsQuery } from './request.dto';
+import {
+  ListPersonalRecordsQuery,
+  PeriodComparisonQuery,
+  PREvolutionQuery,
+  PRHistoryQuery,
+  RecentPRsQuery,
+} from './request.dto';
 import {
   ExercisePRsDTO,
   ExercisePRsResponse,

@@ -79,9 +79,7 @@ export class QuestionnaireInstanceRepository {
   }
 
   async count(filter: QuestionnaireInstanceFilter = {}): Promise<number> {
-    let query = this.db
-      .selectFrom('questionnaire_instances')
-      .select((eb) => eb.fn.countAll<string>().as('count'));
+    let query = this.db.selectFrom('questionnaire_instances').select((eb) => eb.fn.countAll<string>().as('count'));
 
     if (filter.coachId) {
       query = query.where('coach_id', '=', filter.coachId);

@@ -227,10 +227,7 @@ export class WellnessController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @Delete('illness-logs/:id')
-  async deleteIllnessLog(
-    @Req() req: Request & { user: AuthUser },
-    @Param() params: IllnessLogIdParam,
-  ): Promise<void> {
+  async deleteIllnessLog(@Req() req: Request & { user: AuthUser }, @Param() params: IllnessLogIdParam): Promise<void> {
     return this.service.deleteIllnessLog(req, params.id);
   }
 }

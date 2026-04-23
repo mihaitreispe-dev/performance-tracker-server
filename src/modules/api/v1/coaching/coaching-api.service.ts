@@ -41,9 +41,6 @@ import {
   WellnessPerformanceCorrelationResponse,
 } from '../advanced-metrics/response.dto';
 import { AnalyticsApiService } from '../analytics/analytics-api.service';
-import { RaceCalendarApiService } from '../race-calendar/race-calendar-api.service';
-import { UploadCourseBody } from '../race-calendar/request.dto';
-import { AthleteRaceDTO, CourseBasedPredictionDTO, CourseUploadResponseDTO } from '../race-calendar/response.dto';
 import { StrengthProgressionQuery, TrainingLoadHistoryQuery } from '../analytics/request.dto';
 import {
   CurrentTrainingLoadResponse,
@@ -53,6 +50,9 @@ import {
   TrainingLoadHistoryResponse,
 } from '../analytics/response.dto';
 import { NotificationsApiService } from '../notifications/notifications-api.service';
+import { RaceCalendarApiService } from '../race-calendar/race-calendar-api.service';
+import { UploadCourseBody } from '../race-calendar/request.dto';
+import { AthleteRaceDTO, CourseBasedPredictionDTO, CourseUploadResponseDTO } from '../race-calendar/response.dto';
 import { WorkoutPlanWithItemsResponse } from '../workout-plans/response.dto';
 import { WorkoutPlansApiService } from '../workout-plans/workout-plans-api.service';
 import { WorkoutResponse } from '../workouts/response.dto';
@@ -2199,9 +2199,7 @@ export class CoachingApiService {
 
       return {
         date:
-          checkin.checkin_date instanceof Date
-            ? formatDateToYMD(checkin.checkin_date)
-            : String(checkin.checkin_date),
+          checkin.checkin_date instanceof Date ? formatDateToYMD(checkin.checkin_date) : String(checkin.checkin_date),
         sleepQuality: checkin.sleep_quality ?? null,
         energyLevel: checkin.energy_level ?? null,
         muscleSoreness: checkin.muscle_soreness ?? null,
@@ -2339,7 +2337,10 @@ export class CoachingApiService {
   /**
    * Get team correlation overview with athletes by alert level and those needing attention
    */
-  async getTeamCorrelationOverview(req: Request & { user: AuthUser }, query: CorrelationQuery): Promise<TeamCorrelationOverviewResponse> {
+  async getTeamCorrelationOverview(
+    req: Request & { user: AuthUser },
+    query: CorrelationQuery,
+  ): Promise<TeamCorrelationOverviewResponse> {
     const days = query.days ?? 30;
 
     // Get all active athletes for this coach
@@ -2388,13 +2389,15 @@ export class CoachingApiService {
     });
 
     // Calculate team averages
-    const teamAverageRpeTssRatio = allRpeTssRatios.length > 0
-      ? Math.round((allRpeTssRatios.reduce((s, r) => s + r, 0) / allRpeTssRatios.length) * 100) / 100
-      : null;
+    const teamAverageRpeTssRatio =
+      allRpeTssRatios.length > 0
+        ? Math.round((allRpeTssRatios.reduce((s, r) => s + r, 0) / allRpeTssRatios.length) * 100) / 100
+        : null;
 
-    const teamAverageOvertrainingRisk = allOvertrainingRisks.length > 0
-      ? Math.round(allOvertrainingRisks.reduce((s, r) => s + r, 0) / allOvertrainingRisks.length)
-      : 0;
+    const teamAverageOvertrainingRisk =
+      allOvertrainingRisks.length > 0
+        ? Math.round(allOvertrainingRisks.reduce((s, r) => s + r, 0) / allOvertrainingRisks.length)
+        : 0;
 
     return {
       data: {
@@ -2423,7 +2426,10 @@ export class CoachingApiService {
   /**
    * Get athlete's wellness-performance correlation (coach access)
    */
-  async getAthleteWellnessPerformanceCorrelation(athleteId: string, query: CorrelationQuery): Promise<WellnessPerformanceCorrelationResponse> {
+  async getAthleteWellnessPerformanceCorrelation(
+    athleteId: string,
+    query: CorrelationQuery,
+  ): Promise<WellnessPerformanceCorrelationResponse> {
     const settings = await this.privacySettingsRepo.findByUserId(athleteId);
 
     // Requires analytics and wellness check-ins
@@ -2437,7 +2443,10 @@ export class CoachingApiService {
   /**
    * Get athlete's correlation summary (compact version for cards)
    */
-  async getAthleteCorrelationSummary(athleteId: string, query: CorrelationQuery): Promise<AthleteCorrelationSummaryResponse> {
+  async getAthleteCorrelationSummary(
+    athleteId: string,
+    query: CorrelationQuery,
+  ): Promise<AthleteCorrelationSummaryResponse> {
     const days = query.days ?? 30;
 
     const user = await this.userRepo.findById(athleteId);
@@ -2461,7 +2470,8 @@ export class CoachingApiService {
     const settings = await this.privacySettingsRepo.findByUserId(athleteId);
 
     // Check privacy - need both training load and wellness for correlations
-    const hasRequiredPrivacy = settings?.share_training_load && settings?.share_wellness_checkins && settings?.share_analytics;
+    const hasRequiredPrivacy =
+      settings?.share_training_load && settings?.share_wellness_checkins && settings?.share_analytics;
 
     // Default values for when data is unavailable
     let rpeTssRatio: number | null = null;
@@ -2491,7 +2501,10 @@ export class CoachingApiService {
 
       try {
         // Get wellness-performance correlation
-        const wellnessCorrelation = await this.advancedMetricsService.getWellnessPerformanceCorrelationForUser(athleteId, days);
+        const wellnessCorrelation = await this.advancedMetricsService.getWellnessPerformanceCorrelationForUser(
+          athleteId,
+          days,
+        );
         overtrainingRiskScore = wellnessCorrelation.data.overtrainingRiskScore;
         primaryRiskFactors = wellnessCorrelation.data.riskFactors;
 

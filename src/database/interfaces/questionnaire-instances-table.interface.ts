@@ -1,7 +1,7 @@
 import type { Generated, Insertable, Selectable, Updateable } from 'kysely';
 
-import type { QuestionnaireCategory } from './questionnaire-templates-table.interface';
 import type { QuestionConfig, QuestionType } from './questionnaire-questions-table.interface';
+import type { QuestionnaireCategory } from './questionnaire-templates-table.interface';
 import type { Timestamp } from './timestamp';
 
 export const QuestionnaireStatus = {

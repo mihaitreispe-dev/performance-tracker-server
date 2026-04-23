@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { Database, Food, FoodSource, NewFood, FoodUpdate } from 'src/database/interfaces';
+import { Database, Food, FoodSource, FoodUpdate, NewFood } from 'src/database/interfaces';
 
 export interface FoodSearchOptions {
   query?: string;

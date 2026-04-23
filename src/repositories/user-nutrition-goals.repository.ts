@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import {
-  Database,
-  UserNutritionGoals,
-  NewUserNutritionGoals,
-  UserNutritionGoalsUpdate,
-} from 'src/database/interfaces';
+import { Database, NewUserNutritionGoals, UserNutritionGoals, UserNutritionGoalsUpdate } from 'src/database/interfaces';
 
 @Injectable()
 export class UserNutritionGoalsRepository {

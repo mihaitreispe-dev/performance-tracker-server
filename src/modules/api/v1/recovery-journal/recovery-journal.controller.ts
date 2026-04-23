@@ -26,11 +26,7 @@ import {
   RecoveryJournalIdParam,
   UpdateRecoveryJournalEntryBody,
 } from './request.dto';
-import {
-  RecoveryCorrelationsResponse,
-  RecoveryHistoryResponse,
-  RecoveryJournalEntryResponse,
-} from './response.dto';
+import { RecoveryCorrelationsResponse, RecoveryHistoryResponse, RecoveryJournalEntryResponse } from './response.dto';
 
 @ApiTags('recovery-journal')
 @ApiBearerAuth('JWT')

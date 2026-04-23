@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable, ColumnType } from 'kysely';
+import { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 export type PeriodizationStatus = 'suggested' | 'accepted' | 'custom';
 export type PeriodizationCreator = 'system' | 'coach' | 'athlete';

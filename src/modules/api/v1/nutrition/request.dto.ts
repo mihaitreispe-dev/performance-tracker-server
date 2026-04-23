@@ -1,16 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type, Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
-  IsBoolean,
-  IsIn,
   IsUUID,
-  Min,
   Max,
   MaxLength,
+  Min,
   ValidateIf,
 } from 'class-validator';
 
@@ -156,7 +156,10 @@ export class FoodLogQuery {
   @IsDateString()
   date: string;
 
-  @ApiPropertyOptional({ enum: ['breakfast', 'lunch', 'dinner', 'snack', 'workout'], description: 'Filter by meal type' })
+  @ApiPropertyOptional({
+    enum: ['breakfast', 'lunch', 'dinner', 'snack', 'workout'],
+    description: 'Filter by meal type',
+  })
   @IsString()
   @IsOptional()
   @IsIn(['breakfast', 'lunch', 'dinner', 'snack', 'workout'])

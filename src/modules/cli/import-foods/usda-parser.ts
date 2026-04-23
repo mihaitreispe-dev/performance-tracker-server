@@ -1,7 +1,8 @@
+import * as fs from 'node:fs';
+import * as readline from 'node:readline';
+
 import { Logger } from '@nestjs/common';
-import { NewFood, FoodSource } from 'src/database/interfaces';
-import * as fs from 'fs';
-import * as readline from 'readline';
+import { FoodSource, NewFood } from 'src/database/interfaces';
 
 // USDA nutrient IDs
 const NUTRIENT_IDS = {
@@ -76,8 +77,8 @@ export class USDAParser {
         if (!nutrientsByFood.has(row.fdc_id)) {
           nutrientsByFood.set(row.fdc_id, new Map());
         }
-        const nutrientId = parseInt(row.nutrient_id, 10);
-        const amount = parseFloat(row.amount);
+        const nutrientId = Number.parseInt(row.nutrient_id, 10);
+        const amount = Number.parseFloat(row.amount);
         if (!isNaN(nutrientId) && !isNaN(amount)) {
           nutrientsByFood.get(row.fdc_id)!.set(nutrientId, amount);
         }
@@ -138,10 +139,7 @@ export class USDAParser {
       .trim();
   }
 
-  private async parseCSVFile(
-    filePath: string,
-    rowHandler: (row: Record<string, string>) => void,
-  ): Promise<void> {
+  private async parseCSVFile(filePath: string, rowHandler: (row: Record<string, string>) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!fs.existsSync(filePath)) {
         reject(new Error(`File not found: ${filePath}`));

@@ -1,15 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import {
-  CardioMetric,
-  CardioMetricType,
-  FitnessMetricType,
-  WorkoutExecution,
-} from 'src/database/interfaces';
+import { CardioMetric, CardioMetricType, FitnessMetricType, WorkoutExecution } from 'src/database/interfaces';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
 
 export type LthrMethod = 'peak_rolling' | 'hrmc' | 'tt_segment' | 'race_effort' | 'manual';
 export type LthrSport = 'running' | 'cycling' | 'general';
@@ -106,12 +101,7 @@ export class LthrEstimationService {
     const peakRollingResult = this.calculatePeakRollingHR(workouts);
 
     // Combine estimates with confidence weighting
-    return this.combineEstimates(
-      hrmcResult,
-      peakRollingResult,
-      workouts.length,
-      sport || 'general',
-    );
+    return this.combineEstimates(hrmcResult, peakRollingResult, workouts.length, sport || 'general');
   }
 
   /**
@@ -265,9 +255,7 @@ export class LthrEstimationService {
       const windowEnd = windowStart + windowSeconds;
 
       // Get values in this window
-      const windowValues = timeValues.filter(
-        (tv) => tv.time >= windowStart && tv.time < windowEnd,
-      );
+      const windowValues = timeValues.filter((tv) => tv.time >= windowStart && tv.time < windowEnd);
 
       if (windowValues.length < 10) continue; // Not enough samples
 
@@ -341,14 +329,10 @@ export class LthrEstimationService {
     // Prefer HRMC if it found a stable window with high confidence
     if (hrmcResult.hrmc > 0 && hrmcResult.confidence >= 0.7) {
       // HRMC is primary, cross-validate with peak rolling
-      if (
-        peakRollingResult.estimatedLthr > 0 &&
-        Math.abs(hrmcResult.hrmc - peakRollingResult.estimatedLthr) <= 5
-      ) {
+      if (peakRollingResult.estimatedLthr > 0 && Math.abs(hrmcResult.hrmc - peakRollingResult.estimatedLthr) <= 5) {
         // Both methods agree - average them with weighted confidence
         finalValue = Math.round(
-          (hrmcResult.hrmc * hrmcResult.confidence +
-            peakRollingResult.estimatedLthr * peakRollingResult.confidence) /
+          (hrmcResult.hrmc * hrmcResult.confidence + peakRollingResult.estimatedLthr * peakRollingResult.confidence) /
             (hrmcResult.confidence + peakRollingResult.confidence),
         );
         finalConfidence = Math.min(1.0, (hrmcResult.confidence + peakRollingResult.confidence) / 1.5);
@@ -439,12 +423,7 @@ export class LthrEstimationService {
   /**
    * Set manual LTHR override
    */
-  async setManualLTHR(
-    userId: string,
-    value: number,
-    sport?: LthrSport,
-    notes?: string,
-  ): Promise<LthrEstimate> {
+  async setManualLTHR(userId: string, value: number, sport?: LthrSport, notes?: string): Promise<LthrEstimate> {
     const metricType = this.getMetricTypeForSport(sport);
     const sportValue = sport || 'general';
 
@@ -506,11 +485,7 @@ export class LthrEstimationService {
   /**
    * Get workouts with HR data for a user
    */
-  private async getWorkoutsWithHR(
-    userId: string,
-    lookbackDays: number,
-    sport?: LthrSport,
-  ): Promise<WorkoutHRData[]> {
+  private async getWorkoutsWithHR(userId: string, lookbackDays: number, sport?: LthrSport): Promise<WorkoutHRData[]> {
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - lookbackDays);
 
@@ -531,19 +506,13 @@ export class LthrEstimationService {
     const workoutData: WorkoutHRData[] = [];
 
     // Batch fetch workout schedules and workouts for sport filtering
-    const scheduleIds = recentExecutions
-      .map((e) => e.workout_schedule_id)
-      .filter((id): id is string => id !== null);
+    const scheduleIds = recentExecutions.map((e) => e.workout_schedule_id).filter((id): id is string => id !== null);
 
-    const schedules = scheduleIds.length > 0
-      ? await this.workoutScheduleRepository.findByIds(scheduleIds)
-      : [];
+    const schedules = scheduleIds.length > 0 ? await this.workoutScheduleRepository.findByIds(scheduleIds) : [];
     const scheduleMap = new Map(schedules.map((s) => [s.id, s]));
 
     const workoutIds = schedules.map((s) => s.workout_id);
-    const workouts = workoutIds.length > 0
-      ? await this.workoutRepository.findByIds(workoutIds)
-      : [];
+    const workouts = workoutIds.length > 0 ? await this.workoutRepository.findByIds(workoutIds) : [];
     const workoutMap = new Map(workouts.map((w) => [w.id, w]));
 
     for (const execution of recentExecutions) {
@@ -617,9 +586,7 @@ export class LthrEstimationService {
     for (let windowStart = 0; windowStart <= totalDuration - windowSeconds; windowStart += 30) {
       const windowEnd = windowStart + windowSeconds;
 
-      const windowValues = timeValues.filter(
-        (tv) => tv.time >= windowStart && tv.time < windowEnd,
-      );
+      const windowValues = timeValues.filter((tv) => tv.time >= windowStart && tv.time < windowEnd);
 
       if (windowValues.length < 10) continue;
 
@@ -653,7 +620,7 @@ export class LthrEstimationService {
     if (hrMetrics.length === 0) return [];
 
     // Step 1: Remove out-of-bounds values
-    let filtered = hrMetrics.filter((m) => {
+    const filtered = hrMetrics.filter((m) => {
       const hr = Number.parseFloat(m.value);
       return hr >= LthrEstimationService.HR_MIN && hr <= LthrEstimationService.HR_MAX;
     });

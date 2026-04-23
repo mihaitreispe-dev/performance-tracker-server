@@ -183,7 +183,7 @@ export class OpenTrackService implements RaceApiAdapter {
         const distance = raceData.distance as number | string;
 
         if (distance) {
-          const distNum = typeof distance === 'string' ? parseFloat(distance) : distance;
+          const distNum = typeof distance === 'string' ? Number.parseFloat(distance) : distance;
           if (!isNaN(distNum)) {
             // Distance usually in meters for OpenTrack
             distanceMeters = Math.round(distNum);
@@ -241,7 +241,7 @@ export class OpenTrackService implements RaceApiAdapter {
     // Look for patterns like "10K", "5km", "100m"
     const distanceMatch = name.match(/(\d+(?:\.\d+)?)\s*(k|km|mi|mile|m)\b/i);
     if (distanceMatch) {
-      const value = parseFloat(distanceMatch[1]);
+      const value = Number.parseFloat(distanceMatch[1]);
       const unit = distanceMatch[2].toLowerCase();
 
       if (unit === 'k' || unit === 'km') {
@@ -265,43 +265,43 @@ export class OpenTrackService implements RaceApiAdapter {
   private getCountryCode(location: string): string | null {
     const locationLower = location.toLowerCase().trim();
     const countryMap: Record<string, string> = {
-      usa: 'US',
+      'usa': 'US',
       'united states': 'US',
-      uk: 'GB',
+      'uk': 'GB',
       'united kingdom': 'GB',
-      britain: 'GB',
-      england: 'GB',
-      germany: 'DE',
-      france: 'FR',
-      spain: 'ES',
-      italy: 'IT',
-      australia: 'AU',
-      canada: 'CA',
-      japan: 'JP',
-      china: 'CN',
-      brazil: 'BR',
-      mexico: 'MX',
-      netherlands: 'NL',
-      belgium: 'BE',
-      switzerland: 'CH',
-      austria: 'AT',
-      portugal: 'PT',
-      sweden: 'SE',
-      norway: 'NO',
-      denmark: 'DK',
-      finland: 'FI',
-      ireland: 'IE',
+      'britain': 'GB',
+      'england': 'GB',
+      'germany': 'DE',
+      'france': 'FR',
+      'spain': 'ES',
+      'italy': 'IT',
+      'australia': 'AU',
+      'canada': 'CA',
+      'japan': 'JP',
+      'china': 'CN',
+      'brazil': 'BR',
+      'mexico': 'MX',
+      'netherlands': 'NL',
+      'belgium': 'BE',
+      'switzerland': 'CH',
+      'austria': 'AT',
+      'portugal': 'PT',
+      'sweden': 'SE',
+      'norway': 'NO',
+      'denmark': 'DK',
+      'finland': 'FI',
+      'ireland': 'IE',
       'new zealand': 'NZ',
       'south africa': 'ZA',
-      singapore: 'SG',
+      'singapore': 'SG',
       'hong kong': 'HK',
-      korea: 'KR',
+      'korea': 'KR',
       'south korea': 'KR',
-      kenya: 'KE',
-      ethiopia: 'ET',
-      poland: 'PL',
-      russia: 'RU',
-      india: 'IN',
+      'kenya': 'KE',
+      'ethiopia': 'ET',
+      'poland': 'PL',
+      'russia': 'RU',
+      'india': 'IN',
     };
 
     // Check if it's already a 2-letter code

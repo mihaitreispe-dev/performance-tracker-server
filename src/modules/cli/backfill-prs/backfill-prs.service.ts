@@ -122,14 +122,12 @@ export class BackfillPRsService {
       const exec = executions[i];
 
       try {
-        this.logger.log(
-          `[${i + 1}/${executions.length}] Processing execution ${exec.id} (user: ${exec.user_id})...`,
-        );
+        this.logger.log(`[${i + 1}/${executions.length}] Processing execution ${exec.id} (user: ${exec.user_id})...`);
 
         await this.prDetectionService.detectAndStorePRs(exec.id, exec.user_id);
 
         success++;
-        this.logger.log(`  ✓ PR detection completed`);
+        this.logger.log('  ✓ PR detection completed');
 
         // Add delay between processing to reduce database load
         if (i < executions.length - 1 && delay > 0) {
@@ -146,10 +144,7 @@ export class BackfillPRsService {
     this.logger.log(`Failed: ${failed}`);
   }
 
-  private async findCompletedExecutions(
-    limit: number,
-    userId?: string,
-  ): Promise<CompletedExecution[]> {
+  private async findCompletedExecutions(limit: number, userId?: string): Promise<CompletedExecution[]> {
     let query = this.db
       .selectFrom('workout_executions')
       .select(['id', 'user_id', 'completed_at'])
@@ -169,7 +164,8 @@ export class BackfillPRsService {
     return rows.map((row) => ({
       id: row.id,
       user_id: row.user_id,
-      completed_at: row.completed_at instanceof Date ? row.completed_at : new Date(row.completed_at as unknown as string),
+      completed_at:
+        row.completed_at instanceof Date ? row.completed_at : new Date(row.completed_at as unknown as string),
     }));
   }
 
@@ -206,27 +202,23 @@ export class BackfillPRsService {
     ];
 
     // Build query for deprecated types
-    let recordsQuery = this.db
-      .deleteFrom('personal_records')
-      .where((eb) =>
-        eb.or([
-          // Deprecated PR types
-          eb('record_type', 'in', DEPRECATED_PR_TYPES),
-          // Cardio PRs without sport type
-          eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
-        ]),
-      );
+    let recordsQuery = this.db.deleteFrom('personal_records').where((eb) =>
+      eb.or([
+        // Deprecated PR types
+        eb('record_type', 'in', DEPRECATED_PR_TYPES),
+        // Cardio PRs without sport type
+        eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
+      ]),
+    );
 
-    let historyQuery = this.db
-      .deleteFrom('personal_record_history')
-      .where((eb) =>
-        eb.or([
-          // Deprecated PR types
-          eb('record_type', 'in', DEPRECATED_PR_TYPES),
-          // Cardio PRs without sport type
-          eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
-        ]),
-      );
+    let historyQuery = this.db.deleteFrom('personal_record_history').where((eb) =>
+      eb.or([
+        // Deprecated PR types
+        eb('record_type', 'in', DEPRECATED_PR_TYPES),
+        // Cardio PRs without sport type
+        eb.and([eb('record_type', 'in', cardioTypes), eb('workout_type', 'is', null)]),
+      ]),
+    );
 
     if (userId) {
       recordsQuery = recordsQuery.where('user_id', '=', userId);

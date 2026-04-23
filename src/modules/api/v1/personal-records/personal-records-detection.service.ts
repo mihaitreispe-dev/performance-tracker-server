@@ -9,9 +9,9 @@ import {
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
+import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
-import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 interface DetectedPR {
@@ -252,9 +252,7 @@ export class PersonalRecordsDetectionService {
       return [];
     }
 
-    const totalDistanceMeters = route.total_distance_meters
-      ? Number.parseFloat(route.total_distance_meters)
-      : null;
+    const totalDistanceMeters = route.total_distance_meters ? Number.parseFloat(route.total_distance_meters) : null;
     const totalDurationSeconds = execution.duration_seconds ?? null;
 
     if (!totalDistanceMeters || !totalDurationSeconds) {
@@ -264,11 +262,7 @@ export class PersonalRecordsDetectionService {
     const detectedPRs: DetectedPR[] = [];
 
     // Detect fastest distance PRs based on sport type
-    const distancePRs = this.detectDistancePRs(
-      workoutType,
-      totalDistanceMeters,
-      totalDurationSeconds,
-    );
+    const distancePRs = this.detectDistancePRs(workoutType, totalDistanceMeters, totalDurationSeconds);
     detectedPRs.push(...distancePRs);
 
     // Longest distance (per sport)
@@ -331,9 +325,7 @@ export class PersonalRecordsDetectionService {
       // Validate against minimum realistic times
       const minTime = MIN_TIMES[recordType as PersonalRecordType];
       if (minTime && estimatedTime < minTime) {
-        this.logger.warn(
-          `Skipping ${recordType}: estimated ${estimatedTime}s is below minimum ${minTime}s`,
-        );
+        this.logger.warn(`Skipping ${recordType}: estimated ${estimatedTime}s is below minimum ${minTime}s`);
         continue;
       }
 

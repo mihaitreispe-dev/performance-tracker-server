@@ -1,16 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsArray,
-  IsIn,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  IsUUID,
-  ValidateNested,
-} from 'class-validator';
-import { QuestionnaireStatus } from 'src/database/interfaces';
+import { IsArray, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import type { ResponseValue } from 'src/database/interfaces';
+import { QuestionnaireStatus } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 
 import { QuestionDTO } from '../templates/response.dto';
@@ -160,7 +151,10 @@ export class QuestionnaireInstanceDTO {
   @IsObject()
   templateSnapshot: TemplateSnapshotDTO;
 
-  @ApiPropertyOptional({ type: [QuestionnaireResponseDTO], description: 'Responses (included when fetching single instance)' })
+  @ApiPropertyOptional({
+    type: [QuestionnaireResponseDTO],
+    description: 'Responses (included when fetching single instance)',
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @IsOptional()

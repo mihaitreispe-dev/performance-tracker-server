@@ -32,7 +32,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .createTable('race_predictions')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('user_id', 'uuid', (col) => col.notNull().references('users.id').onDelete('cascade'))
-    .addColumn('athlete_race_id', 'uuid', (col) => col.references('athlete_races.id').onDelete('cascade').defaultTo(null))
+    .addColumn('athlete_race_id', 'uuid', (col) =>
+      col.references('athlete_races.id').onDelete('cascade').defaultTo(null),
+    )
     .addColumn('sport', 'varchar(20)', (col) => col.notNull())
     .addColumn('distance_meters', 'integer', (col) => col.notNull())
     .addColumn('race_date', 'date', (col) => col.defaultTo(null))
@@ -54,11 +56,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index for user's predictions
-  await db.schema
-    .createIndex('race_predictions_user_id_idx')
-    .on('race_predictions')
-    .columns(['user_id'])
-    .execute();
+  await db.schema.createIndex('race_predictions_user_id_idx').on('race_predictions').columns(['user_id']).execute();
 
   // Index for looking up predictions by athlete_race_id
   await db.schema
@@ -79,7 +77,9 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .createTable('historical_race_results')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('user_id', 'uuid', (col) => col.notNull().references('users.id').onDelete('cascade'))
-    .addColumn('athlete_race_id', 'uuid', (col) => col.references('athlete_races.id').onDelete('set null').defaultTo(null))
+    .addColumn('athlete_race_id', 'uuid', (col) =>
+      col.references('athlete_races.id').onDelete('set null').defaultTo(null),
+    )
     .addColumn('race_name', 'varchar(255)', (col) => col.notNull())
     .addColumn('race_date', 'date', (col) => col.notNull())
     .addColumn('sport', 'varchar(20)', (col) => col.notNull())

@@ -196,7 +196,9 @@ export class PredictionCronService {
       }
     }
 
-    this.logger.log(`Backfill completed for user ${userId}: ${datesProcessed} weeks, ${predictionsGenerated} predictions`);
+    this.logger.log(
+      `Backfill completed for user ${userId}: ${datesProcessed} weeks, ${predictionsGenerated} predictions`,
+    );
     return { datesProcessed, predictionsGenerated };
   }
 

@@ -169,8 +169,8 @@ export class Vo2MaxService {
       sport: 'general',
       dataPointsUsed: 0,
       confidenceInterval: {
-        lower: Math.round((vo2max * 0.85) * 10) / 10,
-        upper: Math.round((vo2max * 1.15) * 10) / 10,
+        lower: Math.round(vo2max * 0.85 * 10) / 10,
+        upper: Math.round(vo2max * 1.15 * 10) / 10,
       },
       metadata: {
         lookbackDays: 0,
@@ -377,7 +377,7 @@ export class Vo2MaxService {
     // Calculate VO2 for each segment using ACSM cycling equation
     const dataPoints = segments.map((seg) => ({
       hrPercent: seg.avgHR / maxHR,
-      vo2: (10.8 * (seg.avgPower ?? 0) / bodyMassKg) + 7,
+      vo2: (10.8 * (seg.avgPower ?? 0)) / bodyMassKg + 7,
     }));
 
     // Linear regression: VO2 vs HR%
@@ -602,8 +602,7 @@ export class Vo2MaxService {
     }
 
     // EWMA: VO2max_smooth = α × VO2max_new + (1-α) × VO2max_previous
-    const smoothedValue = Vo2MaxService.EWMA_ALPHA * result.value +
-      (1 - Vo2MaxService.EWMA_ALPHA) * previousValue;
+    const smoothedValue = Vo2MaxService.EWMA_ALPHA * result.value + (1 - Vo2MaxService.EWMA_ALPHA) * previousValue;
 
     return {
       ...result,

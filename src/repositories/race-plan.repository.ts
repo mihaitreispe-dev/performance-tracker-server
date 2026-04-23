@@ -102,7 +102,10 @@ export class RacePlanRepository {
   }
 
   async deleteByAthleteRaceId(athleteRaceId: string): Promise<number> {
-    const result = await this.db.deleteFrom('race_plans').where('athlete_race_id', '=', athleteRaceId).executeTakeFirst();
+    const result = await this.db
+      .deleteFrom('race_plans')
+      .where('athlete_race_id', '=', athleteRaceId)
+      .executeTakeFirst();
     return Number(result.numDeletedRows);
   }
 
@@ -116,10 +119,7 @@ export class RacePlanRepository {
       .selectAll('race_plans')
       .where('race_plans.status', '=', RacePlanStatus.ACTIVE)
       .where((eb) =>
-        eb.or([
-          eb('athlete_races.manual_date', '>=', new Date()),
-          eb('athlete_races.manual_date', '<=', cutoffDate),
-        ]),
+        eb.or([eb('athlete_races.manual_date', '>=', new Date()), eb('athlete_races.manual_date', '<=', cutoffDate)]),
       )
       .execute();
   }

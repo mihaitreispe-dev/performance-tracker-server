@@ -41,10 +41,7 @@ export class RecoveryJournalRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<RecoveryJournalEntry[]> {
-    let query = this.db
-      .selectFrom('recovery_journal_entries')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('recovery_journal_entries').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.dateFrom) {
       const dateFromStr = formatDateToYMD(options.filter.dateFrom);

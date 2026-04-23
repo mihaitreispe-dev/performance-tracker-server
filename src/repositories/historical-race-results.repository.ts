@@ -33,10 +33,7 @@ export class HistoricalRaceResultsRepository {
   }
 
   async findMany(options: FindManyOptions): Promise<HistoricalRaceResult[]> {
-    let query = this.db
-      .selectFrom('historical_race_results')
-      .selectAll()
-      .where('user_id', '=', options.filter.userId);
+    let query = this.db.selectFrom('historical_race_results').selectAll().where('user_id', '=', options.filter.userId);
 
     if (options.filter.sport) {
       query = query.where('sport', '=', options.filter.sport);

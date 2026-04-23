@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+
 import { FitnessFatigueService } from '../../advanced-metrics/services/fitness-fatigue.service';
 
 export interface TaperAssessment {
@@ -92,7 +93,7 @@ export class TaperOptimizationService {
     return {
       projectedTsb,
       assessment: 'fatigued',
-      timeFactor: Math.round((1.0 + Math.min(0.10, penalty)) * 1000) / 1000,
+      timeFactor: Math.round((1.0 + Math.min(0.1, penalty)) * 1000) / 1000,
       description: `Significantly fatigued. Rest is essential before race. Potential ${Math.round(penalty * 100)}% slowdown if racing without recovery.`,
     };
   }
@@ -100,11 +101,7 @@ export class TaperOptimizationService {
   /**
    * Generate a taper plan leading to race day
    */
-  async generateTaperPlan(
-    userId: string,
-    raceDateStr: string,
-    targetTsb: number = 15,
-  ): Promise<TaperPlan> {
+  async generateTaperPlan(userId: string, raceDateStr: string, targetTsb: number = 15): Promise<TaperPlan> {
     const raceDate = new Date(raceDateStr);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -119,12 +116,7 @@ export class TaperOptimizationService {
     const currentTsb = current?.tsb || 0;
 
     // Generate daily TSS plan to achieve target TSB
-    const dailyPlan = this.calculateTaperSchedule(
-      currentCtl,
-      currentAtl,
-      daysUntilRace,
-      targetTsb,
-    );
+    const dailyPlan = this.calculateTaperSchedule(currentCtl, currentAtl, daysUntilRace, targetTsb);
 
     // Project race day form
     const plannedTss = dailyPlan.map((d) => d.suggestedTss);
@@ -134,12 +126,7 @@ export class TaperOptimizationService {
     const raceDayAssessment = this.calculateFormAdjustment(raceDayProjection?.tsb || currentTsb);
 
     // Generate recommendations
-    const recommendations = this.generateRecommendations(
-      currentCtl,
-      currentTsb,
-      daysUntilRace,
-      raceDayAssessment,
-    );
+    const recommendations = this.generateRecommendations(currentCtl, currentTsb, daysUntilRace, raceDayAssessment);
 
     return {
       raceDate: raceDateStr,
@@ -189,7 +176,7 @@ export class TaperOptimizationService {
       // Ensure we're on track for target TSB
       // TSB = CTL - ATL, we want to increase TSB by reducing ATL faster than CTL
       const projectedTsb = ctl - atl;
-      const targetTsbAtDay = currentCtl - currentAtl + ((targetTsb - (currentCtl - currentAtl)) * day / daysUntilRace);
+      const targetTsbAtDay = currentCtl - currentAtl + ((targetTsb - (currentCtl - currentAtl)) * day) / daysUntilRace;
 
       // Adjust TSS if we're off track
       if (projectedTsb < targetTsbAtDay - 5) {

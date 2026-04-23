@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { firstValueFrom, catchError, of, timeout } from 'rxjs';
-import { FoodRepository } from 'src/repositories/food.repository';
+import { catchError, firstValueFrom, of, timeout } from 'rxjs';
 import { Food, FoodSource, NewFood } from 'src/database/interfaces';
-import { USDAFood, USDANutrient, OpenFoodFactsProduct } from '../types';
+import { FoodRepository } from 'src/repositories/food.repository';
+
+import { OpenFoodFactsProduct, USDAFood, USDANutrient } from '../types';
 
 const USDA_API_URL = 'https://api.nal.usda.gov/fdc/v1';
 const OFF_API_URL = 'https://world.openfoodfacts.org/api/v2';

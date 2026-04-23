@@ -76,8 +76,9 @@ export class LoadModelingCronService {
 
     try {
       // Get users with sufficient data for parameter updates
-      const eligibleUserIds =
-        await this.loadModelParametersRepository.getAllUsersWithSufficientData(this.MIN_DATA_POINTS_FOR_UPDATE);
+      const eligibleUserIds = await this.loadModelParametersRepository.getAllUsersWithSufficientData(
+        this.MIN_DATA_POINTS_FOR_UPDATE,
+      );
 
       this.logger.log(`Updating parameters for ${eligibleUserIds.length} eligible users`);
 

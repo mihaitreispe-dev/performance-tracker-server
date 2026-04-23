@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import { Database } from 'src/database/interfaces';
 import { CardioMetricType } from 'src/database/interfaces/cardio-metrics-table.interface';
 
@@ -137,7 +137,7 @@ export class SwimMetricsService {
     }
 
     // Calculate average pace from total distance and duration
-    const avgPace = totalDistance > 0 ? (totalDuration / (totalDistance / 100)) : 0;
+    const avgPace = totalDistance > 0 ? totalDuration / (totalDistance / 100) : 0;
 
     return {
       totalDistance: Math.round(totalDistance),
@@ -246,7 +246,7 @@ export class SwimMetricsService {
       const strokeRate = workout.avgStrokeRate || 0;
       const totalStrokes = strokeRate * (workout.durationSeconds / 60);
       const distancePerStroke = totalStrokes > 0 ? (workout.distanceMeters || 0) / totalStrokes : 0;
-      const avgPace = workout.avgPace || (workout.durationSeconds / ((workout.distanceMeters || 1) / 100));
+      const avgPace = workout.avgPace || workout.durationSeconds / ((workout.distanceMeters || 1) / 100);
 
       trend.push({
         date: workout.startedAt.toISOString().split('T')[0],
@@ -382,7 +382,14 @@ export class SwimMetricsService {
     // Group by stroke type
     const strokeData = new Map<
       StrokeType,
-      { distance: number; totalPace: number; paceCount: number; totalSwolf: number; swolfCount: number; sessions: number }
+      {
+        distance: number;
+        totalPace: number;
+        paceCount: number;
+        totalSwolf: number;
+        swolfCount: number;
+        sessions: number;
+      }
     >();
 
     let totalDistance = 0;
@@ -457,12 +464,7 @@ export class SwimMetricsService {
       .where('we.started_at', '>=', startDate)
       // Filter for swim workouts - this would ideally check workout type
       // For now, we'll identify swims by looking at cadence patterns typical of swimming
-      .select([
-        'we.id as workout_execution_id',
-        'we.started_at',
-        'we.duration_seconds',
-        'wr.total_distance_meters',
-      ])
+      .select(['we.id as workout_execution_id', 'we.started_at', 'we.duration_seconds', 'wr.total_distance_meters'])
       .select((eb) => eb.fn.avg<string>('cm.value').as('avg_cadence'))
       .groupBy(['we.id', 'we.started_at', 'we.duration_seconds', 'wr.total_distance_meters'])
       .execute();

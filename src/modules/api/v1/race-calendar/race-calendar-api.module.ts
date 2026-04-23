@@ -9,11 +9,11 @@ import { PeriodizationPlanRepository } from 'src/repositories/periodization-plan
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
+
 import { CourseAnalysisService } from '../race-prediction/services/course-analysis.service';
 import { CourseFileProcessorService } from '../race-prediction/services/course-file-processor.service';
 import { RunningPredictionService } from '../race-prediction/services/running-prediction.service';
 import { WorkoutFileParserService } from '../workout-file-imports/workout-file-parser.service';
-
 import { ActiveNetworkService, OpenTrackService, RunSignUpService, WorldTriathlonService } from './race-apis';
 import { RaceCalendarApiController } from './race-calendar-api.controller';
 import { RaceCalendarApiService } from './race-calendar-api.service';

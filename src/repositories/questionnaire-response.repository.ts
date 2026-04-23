@@ -17,11 +17,7 @@ export class QuestionnaireResponseRepository {
   }
 
   async findByInstanceId(instanceId: string): Promise<QuestionnaireResponse[]> {
-    return this.db
-      .selectFrom('questionnaire_responses')
-      .where('instance_id', '=', instanceId)
-      .selectAll()
-      .execute();
+    return this.db.selectFrom('questionnaire_responses').where('instance_id', '=', instanceId).selectAll().execute();
   }
 
   async findByInstanceAndQuestion(instanceId: string, questionId: string): Promise<QuestionnaireResponse | undefined> {

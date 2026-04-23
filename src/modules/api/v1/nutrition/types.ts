@@ -1,4 +1,4 @@
-import { Food, FoodLogEntry, DailyNutritionSummary } from 'src/database/interfaces';
+import { DailyNutritionSummary, Food, FoodLogEntry } from 'src/database/interfaces';
 
 export interface NutritionTotals {
   calories: number;
@@ -89,22 +89,22 @@ export interface OpenFoodFactsProduct {
   brands?: string;
   serving_size?: string;
   nutriments: {
-    energy_kcal_100g?: number;
-    proteins_100g?: number;
-    carbohydrates_100g?: number;
-    fat_100g?: number;
-    fiber_100g?: number;
-    sugars_100g?: number;
-    sodium_100g?: number;
-    potassium_100g?: number;
-    calcium_100g?: number;
-    iron_100g?: number;
+    'energy_kcal_100g'?: number;
+    'proteins_100g'?: number;
+    'carbohydrates_100g'?: number;
+    'fat_100g'?: number;
+    'fiber_100g'?: number;
+    'sugars_100g'?: number;
+    'sodium_100g'?: number;
+    'potassium_100g'?: number;
+    'calcium_100g'?: number;
+    'iron_100g'?: number;
     'vitamin-a_100g'?: number;
     'vitamin-c_100g'?: number;
     'vitamin-d_100g'?: number;
     'vitamin-b12_100g'?: number;
     'saturated-fat_100g'?: number;
     'trans-fat_100g'?: number;
-    cholesterol_100g?: number;
+    'cholesterol_100g'?: number;
   };
 }

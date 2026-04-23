@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import {
-  Database,
   DailyNutritionSummary,
-  NewDailyNutritionSummary,
   DailyNutritionSummaryUpdate,
+  Database,
+  NewDailyNutritionSummary,
 } from 'src/database/interfaces';
 
 export interface WeeklyAverage {
@@ -143,13 +143,7 @@ export class DailyNutritionSummaryRepository {
 
     const results = await this.db
       .selectFrom('daily_nutrition_summaries')
-      .select([
-        sql<string>`date::text`.as('date'),
-        'total_calories',
-        'total_protein',
-        'total_carbs',
-        'total_fat',
-      ])
+      .select([sql<string>`date::text`.as('date'), 'total_calories', 'total_protein', 'total_carbs', 'total_fat'])
       .where('user_id', '=', userId)
       .where('date', '>=', sql<Date>`${startDate.toISOString().split('T')[0]}::date`)
       .where('date', '<=', sql<Date>`${endDate.toISOString().split('T')[0]}::date`)

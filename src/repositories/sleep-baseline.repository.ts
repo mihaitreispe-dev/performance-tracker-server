@@ -67,10 +67,6 @@ export class SleepBaselineRepository {
   }
 
   async deleteByUserAndDate(userId: string, date: Date): Promise<void> {
-    await this.db
-      .deleteFrom('sleep_baselines')
-      .where('user_id', '=', userId)
-      .where('date', '=', date)
-      .execute();
+    await this.db.deleteFrom('sleep_baselines').where('user_id', '=', userId).where('date', '=', date).execute();
   }
 }

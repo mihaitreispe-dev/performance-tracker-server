@@ -306,7 +306,7 @@ export class WorkoutExecutionsApiService {
 
     // Get calculated TSS from training stress scores (if available)
     const trainingStress = await this.trainingStressRepository.findByWorkoutExecutionId(id);
-    const calculatedTss = trainingStress?.tss ? parseFloat(trainingStress.tss) : null;
+    const calculatedTss = trainingStress?.tss ? Number.parseFloat(trainingStress.tss) : null;
 
     // Calculate RPE:TSS ratio
     let rpeTssRatio: number | null = null;
@@ -390,9 +390,9 @@ export class WorkoutExecutionsApiService {
 
     const responseData: SessionRPEDTO = {
       sessionRpe: execution.session_rpe,
-      srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : 0,
-      calculatedTss: tracking?.calculated_tss ? parseFloat(tracking.calculated_tss) : null,
-      rpeTssRatio: tracking?.rpe_tss_ratio ? parseFloat(tracking.rpe_tss_ratio) : null,
+      srpeTss: execution.srpe_tss ? Number.parseFloat(execution.srpe_tss) : 0,
+      calculatedTss: tracking?.calculated_tss ? Number.parseFloat(tracking.calculated_tss) : null,
+      rpeTssRatio: tracking?.rpe_tss_ratio ? Number.parseFloat(tracking.rpe_tss_ratio) : null,
       accumulatedFatigueFlag: tracking?.accumulated_fatigue_flag ?? false,
       rpeCollectedAt: execution.rpe_collected_at
         ? new Date(execution.rpe_collected_at).toISOString()
@@ -734,7 +734,7 @@ export class WorkoutExecutionsApiService {
       externalId: execution.external_id,
       notes: execution.notes,
       sessionRpe: execution.session_rpe,
-      srpeTss: execution.srpe_tss ? parseFloat(execution.srpe_tss) : null,
+      srpeTss: execution.srpe_tss ? Number.parseFloat(execution.srpe_tss) : null,
       rpeCollectedAt,
       createdAt,
       updatedAt,

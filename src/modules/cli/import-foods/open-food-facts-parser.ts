@@ -1,34 +1,35 @@
+import * as fs from 'node:fs';
+import * as readline from 'node:readline';
+import * as zlib from 'node:zlib';
+
 import { Logger } from '@nestjs/common';
-import { NewFood, FoodSource } from 'src/database/interfaces';
-import * as fs from 'fs';
-import * as readline from 'readline';
-import * as zlib from 'zlib';
+import { FoodSource, NewFood } from 'src/database/interfaces';
 
 interface OFFProduct {
-  code: string;
-  product_name: string;
-  brands?: string;
-  serving_size?: string;
-  completeness?: number;
-  countries_tags?: string;
+  'code': string;
+  'product_name': string;
+  'brands'?: string;
+  'serving_size'?: string;
+  'completeness'?: number;
+  'countries_tags'?: string;
   // Nutrients
-  energy_kcal_100g?: string;
-  proteins_100g?: string;
-  carbohydrates_100g?: string;
-  fat_100g?: string;
-  fiber_100g?: string;
-  sugars_100g?: string;
-  sodium_100g?: string;
-  potassium_100g?: string;
-  calcium_100g?: string;
-  iron_100g?: string;
+  'energy_kcal_100g'?: string;
+  'proteins_100g'?: string;
+  'carbohydrates_100g'?: string;
+  'fat_100g'?: string;
+  'fiber_100g'?: string;
+  'sugars_100g'?: string;
+  'sodium_100g'?: string;
+  'potassium_100g'?: string;
+  'calcium_100g'?: string;
+  'iron_100g'?: string;
   'vitamin-a_100g'?: string;
   'vitamin-c_100g'?: string;
   'vitamin-d_100g'?: string;
   'vitamin-b12_100g'?: string;
   'saturated-fat_100g'?: string;
   'trans-fat_100g'?: string;
-  cholesterol_100g?: string;
+  'cholesterol_100g'?: string;
 }
 
 export class OpenFoodFactsParser {
@@ -59,7 +60,7 @@ export class OpenFoodFactsParser {
       if (result.length >= limit) return;
 
       // Filter by completeness
-      const completeness = parseFloat(String(product.completeness ?? '0'));
+      const completeness = Number.parseFloat(String(product.completeness ?? '0'));
       if (completeness < minCompleteness) {
         skipped++;
         return;
@@ -129,15 +130,12 @@ export class OpenFoodFactsParser {
   }
 
   private cleanProductName(name: string): string {
-    return name
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 500); // Limit length
+    return name.replace(/\s+/g, ' ').trim().slice(0, 500); // Limit length
   }
 
   private parseNumber(value: string | undefined): number | null {
     if (!value) return null;
-    const num = parseFloat(value);
+    const num = Number.parseFloat(value);
     return isNaN(num) ? null : num;
   }
 
@@ -159,10 +157,7 @@ export class OpenFoodFactsParser {
     return num;
   }
 
-  private async parseFile(
-    filePath: string,
-    rowHandler: (row: OFFProduct) => void,
-  ): Promise<void> {
+  private async parseFile(filePath: string, rowHandler: (row: OFFProduct) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!fs.existsSync(filePath)) {
         reject(new Error(`File not found: ${filePath}`));

@@ -11,6 +11,7 @@
  * values are still validated by class-validator via `Env` — stubs are enough.
  */
 import 'reflect-metadata';
+
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
@@ -52,8 +53,7 @@ async function main() {
   // openapi-typescript collides on non-unique ids.
   const document = SwaggerModule.createDocument(app, builder.build(), {
     deepScanRoutes: true,
-    operationIdFactory: (controllerKey: string, methodKey: string) =>
-      `${controllerKey}_${methodKey}`,
+    operationIdFactory: (controllerKey: string, methodKey: string) => `${controllerKey}_${methodKey}`,
   });
 
   mkdirSync(dirname(outputPath), { recursive: true });

@@ -155,11 +155,11 @@ export class QuickWellnessCheckinRepository {
       .executeTakeFirst();
 
     return {
-      sleepQuality: result?.avg_sleep ? parseFloat(result.avg_sleep) : null,
-      energyLevel: result?.avg_energy ? parseFloat(result.avg_energy) : null,
-      muscleSoreness: result?.avg_soreness ? parseFloat(result.avg_soreness) : null,
-      stressLevel: result?.avg_stress ? parseFloat(result.avg_stress) : null,
-      trainingReadiness: result?.avg_readiness ? parseFloat(result.avg_readiness) : null,
+      sleepQuality: result?.avg_sleep ? Number.parseFloat(result.avg_sleep) : null,
+      energyLevel: result?.avg_energy ? Number.parseFloat(result.avg_energy) : null,
+      muscleSoreness: result?.avg_soreness ? Number.parseFloat(result.avg_soreness) : null,
+      stressLevel: result?.avg_stress ? Number.parseFloat(result.avg_stress) : null,
+      trainingReadiness: result?.avg_readiness ? Number.parseFloat(result.avg_readiness) : null,
     };
   }
 }

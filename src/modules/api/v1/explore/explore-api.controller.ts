@@ -6,11 +6,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { ExploreApiService } from './explore-api.service';
 import { MetricHistoryQuery, MetricIdParam, PeriodComparisonQuery } from './request.dto';
-import {
-  AvailableMetricsResponse,
-  MetricHistoryResponse,
-  PeriodComparisonResponse,
-} from './response.dto';
+import { AvailableMetricsResponse, MetricHistoryResponse, PeriodComparisonResponse } from './response.dto';
 
 @ApiTags('explore')
 @ApiBearerAuth('JWT')

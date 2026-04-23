@@ -1,13 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import {
-  Database,
-  UserFrequentFood,
-  NewUserFrequentFood,
-  UserFrequentFoodUpdate,
-  Food,
-} from 'src/database/interfaces';
+import { Database, Food, NewUserFrequentFood, UserFrequentFood, UserFrequentFoodUpdate } from 'src/database/interfaces';
 
 export interface UserFrequentFoodWithFood extends UserFrequentFood {
   food: Food;

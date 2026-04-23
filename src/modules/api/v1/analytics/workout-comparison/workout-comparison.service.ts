@@ -98,7 +98,7 @@ export class WorkoutComparisonService {
     const matchCriteria: MatchCriteriaDTO = {};
 
     // Find similar executions based on match type
-    let similarExecutions: typeof execution[] = [];
+    let similarExecutions: (typeof execution)[] = [];
 
     if (matchType === MatchType.EXACT && workoutId) {
       // Match by exact workoutId through schedule
@@ -323,7 +323,9 @@ export class WorkoutComparisonService {
         limit: 1,
       });
 
-      const matchingExecution = allExecutions.find((e) => e.workout_schedule_id && scheduleIds.includes(e.workout_schedule_id));
+      const matchingExecution = allExecutions.find(
+        (e) => e.workout_schedule_id && scheduleIds.includes(e.workout_schedule_id),
+      );
 
       if (!matchingExecution) {
         athleteExecutions.push({
@@ -345,9 +347,7 @@ export class WorkoutComparisonService {
     }
 
     // Calculate comparison summary from valid executions
-    const validExecutions = athleteExecutions
-      .filter((ae) => ae.execution !== null)
-      .map((ae) => ae.execution!);
+    const validExecutions = athleteExecutions.filter((ae) => ae.execution !== null).map((ae) => ae.execution!);
 
     const comparisonSummary = this.calculateComparisonSummary(validExecutions);
 
@@ -397,7 +397,10 @@ export class WorkoutComparisonService {
     }
 
     // Get average heart rate
-    const hrMetrics = await this.cardioMetricsRepository.getAggregatedMetrics(execution.id, CardioMetricType.HEART_RATE);
+    const hrMetrics = await this.cardioMetricsRepository.getAggregatedMetrics(
+      execution.id,
+      CardioMetricType.HEART_RATE,
+    );
     const avgHeartRate = hrMetrics?.avg ?? null;
 
     const startedAt =

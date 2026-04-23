@@ -6,18 +6,23 @@ import {
   RacePlan,
   RacePlanStatus,
 } from 'src/database/interfaces';
+import {
+  CaffeineTolerance,
+  CarbSource,
+  GiSensitivity,
+} from 'src/database/interfaces/athlete-profile-metrics-table.interface';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository';
+import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePlanRepository } from 'src/repositories/race-plan.repository';
 import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
-import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
-import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
-import { WeatherForecastService } from './weather-forecast.service';
-import { WeatherAdjustmentService } from './weather-adjustment.service';
-import { PacingStrategyService } from './pacing-strategy.service';
+
 import { CourseAnalysisService } from './course-analysis.service';
 import { NutritionPlanService } from './nutrition-plan.service';
-import { CaffeineTolerance, GiSensitivity, CarbSource } from 'src/database/interfaces/athlete-profile-metrics-table.interface';
+import { PacingStrategyService } from './pacing-strategy.service';
+import { WeatherAdjustmentService } from './weather-adjustment.service';
+import { WeatherForecastService } from './weather-forecast.service';
 
 interface GenerateRacePlanOptions {
   pacingStrategy?: PacingStrategyType;
@@ -92,8 +97,8 @@ export class RacePlanGeneratorService {
         weatherForecast = await this.weatherForecastService.getOrRefreshForecast(
           athleteRaceId,
           new Date(athleteRace.manual_date),
-          parseFloat(raceEvent.latitude.toString()),
-          parseFloat(raceEvent.longitude.toString()),
+          Number.parseFloat(raceEvent.latitude.toString()),
+          Number.parseFloat(raceEvent.longitude.toString()),
           undefined,
           options.forceRefresh,
         );
@@ -103,9 +108,9 @@ export class RacePlanGeneratorService {
     // 5. Apply weather adjustments to segment paces
     let weatherAdjustments = null;
     if (weatherForecast) {
-      const temp = parseFloat(weatherForecast.race_hour_temperature_celsius || '15');
+      const temp = Number.parseFloat(weatherForecast.race_hour_temperature_celsius || '15');
       const humidity = weatherForecast.race_hour_humidity_percent || 50;
-      const windSpeed = parseFloat(weatherForecast.race_hour_wind_speed_kmh || '0');
+      const windSpeed = Number.parseFloat(weatherForecast.race_hour_wind_speed_kmh || '0');
 
       weatherAdjustments = this.weatherAdjustmentService.calculateWeatherImpact(
         predictedTimeSeconds,
@@ -125,20 +130,20 @@ export class RacePlanGeneratorService {
 
     // 6. Apply selected pacing strategy
     const strategy = options.pacingStrategy || 'even';
-    const { segments: strategyAdjustedSegments, negativeSplitRatio } =
-      this.pacingStrategyService.applyPacingStrategy(segments, strategy);
+    const { segments: strategyAdjustedSegments, negativeSplitRatio } = this.pacingStrategyService.applyPacingStrategy(
+      segments,
+      strategy,
+    );
 
     // 7. Calculate effort zones per segment
     const lthrMetric = await this.fitnessMetricsRepository.getLatestByType(userId, 'lthr');
-    const lthrBpm = lthrMetric ? parseFloat(lthrMetric.value) : undefined;
+    const lthrBpm = lthrMetric ? Number.parseFloat(lthrMetric.value) : undefined;
     const effortZones = this.pacingStrategyService.calculateEffortZones(strategyAdjustedSegments, lthrBpm);
 
     // 8. Generate energy management plan using personalized nutrition service
     const athleteProfile = await this.athleteProfileMetricsRepository.findByUserId(userId);
-    const athleteWeightKg = athleteProfile?.weight_kg ? parseFloat(athleteProfile.weight_kg.toString()) : 70;
-    const temperature = weatherForecast
-      ? parseFloat(weatherForecast.race_hour_temperature_celsius || '15')
-      : 15;
+    const athleteWeightKg = athleteProfile?.weight_kg ? Number.parseFloat(athleteProfile.weight_kg.toString()) : 70;
+    const temperature = weatherForecast ? Number.parseFloat(weatherForecast.race_hour_temperature_celsius || '15') : 15;
     const humidity = weatherForecast?.race_hour_humidity_percent || 50;
 
     const energyPlan = this.nutritionPlanService.generateNutritionPlan(
@@ -150,7 +155,7 @@ export class RacePlanGeneratorService {
       weatherAdjustments?.hydration_multiplier || 1.0,
       {
         sweatRateMlPerHour: athleteProfile?.sweat_rate_ml_per_hour
-          ? parseFloat(athleteProfile.sweat_rate_ml_per_hour.toString())
+          ? Number.parseFloat(athleteProfile.sweat_rate_ml_per_hour.toString())
           : undefined,
         giSensitivity: (athleteProfile?.gi_sensitivity as GiSensitivity) || 'moderate',
         preferredCarbSources: (athleteProfile?.preferred_carb_sources as CarbSource[]) || [],
@@ -177,8 +182,8 @@ export class RacePlanGeneratorService {
       user_id: userId,
       athlete_race_id: athleteRaceId,
       race_prediction_id: prediction.id,
-      predicted_finish_time_seconds: strategyAdjustedSegments[strategyAdjustedSegments.length - 1]
-        .cumulative_time_seconds,
+      predicted_finish_time_seconds:
+        strategyAdjustedSegments[strategyAdjustedSegments.length - 1].cumulative_time_seconds,
       target_finish_time_seconds: targetTimeSeconds,
       pacing_strategy: strategy,
       negative_split_ratio: negativeSplitRatio?.toString() || null,
@@ -297,11 +302,7 @@ export class RacePlanGeneratorService {
   /**
    * Generate key race advice
    */
-  private generateKeyAdvice(
-    distanceMeters: number,
-    weatherAdjustments: any,
-    strategy: PacingStrategyType,
-  ): string[] {
+  private generateKeyAdvice(distanceMeters: number, weatherAdjustments: any, strategy: PacingStrategyType): string[] {
     const advice: string[] = [];
 
     // Start conservatively

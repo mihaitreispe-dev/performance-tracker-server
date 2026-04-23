@@ -10,11 +10,7 @@ import {
   SimilarExecutionsParam,
   SimilarExecutionsQuery,
 } from './request.dto';
-import {
-  CoachAthleteComparisonResponse,
-  SimilarExecutionsResponse,
-  WorkoutComparisonResponse,
-} from './response.dto';
+import { CoachAthleteComparisonResponse, SimilarExecutionsResponse, WorkoutComparisonResponse } from './response.dto';
 import { WorkoutComparisonService } from './workout-comparison.service';
 
 @ApiTags('analytics')

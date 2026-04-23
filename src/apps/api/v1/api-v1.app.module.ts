@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MulterModule } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cors from 'cors';
-import { json, urlencoded, type NextFunction, type Request, type Response } from 'express';
+import { json, type NextFunction, type Request, type Response, urlencoded } from 'express';
 import basicAuth from 'express-basic-auth';
 import helmet from 'helmet';
 import { uploadsDir } from 'src/lib/fs/dirs';

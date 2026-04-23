@@ -34,7 +34,10 @@ export class TemplatesService {
     private readonly questionRepo: QuestionnaireQuestionRepository,
   ) {}
 
-  async create(req: Request & { user: AuthUser }, body: CreateQuestionnaireTemplateBody): Promise<QuestionnaireTemplateResponse> {
+  async create(
+    req: Request & { user: AuthUser },
+    body: CreateQuestionnaireTemplateBody,
+  ): Promise<QuestionnaireTemplateResponse> {
     const coachId = req.user.id;
 
     const template = await this.templateRepo.create({
@@ -190,7 +193,11 @@ export class TemplatesService {
   }
 
   // Question CRUD
-  async addQuestion(req: Request & { user: AuthUser }, templateId: string, body: AddQuestionBody): Promise<QuestionResponse> {
+  async addQuestion(
+    req: Request & { user: AuthUser },
+    templateId: string,
+    body: AddQuestionBody,
+  ): Promise<QuestionResponse> {
     const template = await this.templateRepo.findById(templateId);
     if (!template) {
       throw new NotFoundException('Template not found');
@@ -281,7 +288,11 @@ export class TemplatesService {
     await this.templateRepo.updateById(templateId, {});
   }
 
-  async reorderQuestions(req: Request & { user: AuthUser }, templateId: string, body: ReorderQuestionsBody): Promise<QuestionnaireTemplateResponse> {
+  async reorderQuestions(
+    req: Request & { user: AuthUser },
+    templateId: string,
+    body: ReorderQuestionsBody,
+  ): Promise<QuestionnaireTemplateResponse> {
     const template = await this.templateRepo.findById(templateId);
     if (!template) {
       throw new NotFoundException('Template not found');

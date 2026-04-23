@@ -13,8 +13,8 @@ import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository'
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { HistoricalRaceResultsRepository } from 'src/repositories/historical-race-results.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
-import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
 import { RacePlanRepository } from 'src/repositories/race-plan.repository';
+import { RacePredictionRepository } from 'src/repositories/race-prediction.repository';
 
 import {
   CourseBasedPredictionBody,
@@ -39,9 +39,9 @@ import {
 import { CourseAnalysisService } from './services/course-analysis.service';
 import { CourseFileProcessorService } from './services/course-file-processor.service';
 import { CyclingPredictionResult, CyclingPredictionService } from './services/cycling-prediction.service';
+import { RacePlanGeneratorService } from './services/race-plan-generator.service';
 import { RunningPredictionResult, RunningPredictionService } from './services/running-prediction.service';
 import { TaperOptimizationService } from './services/taper-optimization.service';
-import { RacePlanGeneratorService } from './services/race-plan-generator.service';
 
 type PredictionResult = RunningPredictionResult | CyclingPredictionResult;
 
@@ -86,9 +86,7 @@ export class RacePredictionApiService {
     // Determine sport and distance
     const sport = (body.sport as RaceSport) || athleteRace.manual_event_type || RaceSport.RUN;
     const distanceMeters = body.distance_meters || athleteRace.manual_distance_meters || 10000;
-    const raceDate = athleteRace.manual_date
-      ? new Date(athleteRace.manual_date).toISOString().split('T')[0]
-      : null;
+    const raceDate = athleteRace.manual_date ? new Date(athleteRace.manual_date).toISOString().split('T')[0] : null;
 
     // Get athlete profile for demographics
     const profile = await this.athleteProfileMetricsRepository.findByUserId(userId);
@@ -146,9 +144,7 @@ export class RacePredictionApiService {
     }
 
     // Calculate final prediction
-    const adjustedTime = Math.round(
-      (prediction.predictedTimeSeconds + elevationAdjustment) * taperFactor,
-    );
+    const adjustedTime = Math.round((prediction.predictedTimeSeconds + elevationAdjustment) * taperFactor);
     const adjustedLower = Math.round(prediction.confidenceLowerSeconds * taperFactor);
     const adjustedUpper = Math.round(prediction.confidenceUpperSeconds * taperFactor);
 
@@ -235,10 +231,7 @@ export class RacePredictionApiService {
   /**
    * Quick prediction without a registered race
    */
-  async quickPrediction(
-    req: Request & { user: AuthUser },
-    body: QuickPredictionBody,
-  ): Promise<RacePredictionDTO> {
+  async quickPrediction(req: Request & { user: AuthUser }, body: QuickPredictionBody): Promise<RacePredictionDTO> {
     const userId = req.user.id;
 
     // Get athlete profile
@@ -330,24 +323,16 @@ export class RacePredictionApiService {
     const format = ext === '.fit' ? 'fit' : 'gpx';
 
     // Parse the course file
-    const courseProfile = await this.courseFileProcessorService.parseCourseFile(
-      file.buffer,
-      format as 'gpx' | 'fit',
-    );
+    const courseProfile = await this.courseFileProcessorService.parseCourseFile(file.buffer, format as 'gpx' | 'fit');
 
     // Use provided distance or file distance
     const distanceMeters = body.distance_meters || courseProfile.totalDistanceMeters;
 
     // Get athlete profile and fitness data for base prediction
     const profile = await this.athleteProfileMetricsRepository.findByUserId(userId);
-    const vo2maxMetric = await this.fitnessMetricsRepository.getLatestByType(
-      userId,
-      FitnessMetricType.VO2_MAX,
-    );
+    const vo2maxMetric = await this.fitnessMetricsRepository.getLatestByType(userId, FitnessMetricType.VO2_MAX);
     const vo2max = vo2maxMetric ? Number.parseFloat(vo2maxMetric.value) : undefined;
-    const vo2maxConfidence = vo2maxMetric
-      ? Number.parseFloat(vo2maxMetric.confidence || '0.5')
-      : undefined;
+    const vo2maxConfidence = vo2maxMetric ? Number.parseFloat(vo2maxMetric.confidence || '0.5') : undefined;
 
     // Generate flat terrain base prediction
     const basePrediction = await this.runningPredictionService.predictRaceTime(userId, {
@@ -360,10 +345,7 @@ export class RacePredictionApiService {
     // Apply taper adjustment if race date provided
     let taperFactor = 1.0;
     if (body.race_date) {
-      const projectedTsb = await this.taperOptimizationService.projectTsbForDate(
-        userId,
-        new Date(body.race_date),
-      );
+      const projectedTsb = await this.taperOptimizationService.projectTsbForDate(userId, new Date(body.race_date));
       const assessment = this.taperOptimizationService.calculateFormAdjustment(projectedTsb);
       taperFactor = assessment.timeFactor;
     }
@@ -419,8 +401,7 @@ export class RacePredictionApiService {
       predicted_time_formatted: this.formatTime(coursePrediction.predictedTimeSeconds),
       flat_equivalent_time_seconds: coursePrediction.flatEquivalentTimeSeconds,
       flat_equivalent_time_formatted: this.formatTime(coursePrediction.flatEquivalentTimeSeconds),
-      elevation_adjustment_seconds:
-        coursePrediction.predictedTimeSeconds - coursePrediction.flatEquivalentTimeSeconds,
+      elevation_adjustment_seconds: coursePrediction.predictedTimeSeconds - coursePrediction.flatEquivalentTimeSeconds,
       distance_meters: distanceMeters,
       confidence_score: basePrediction.confidenceScore,
       segments,
@@ -513,11 +494,7 @@ export class RacePredictionApiService {
   /**
    * Get taper plan for a race
    */
-  async getTaperPlan(
-    req: Request & { user: AuthUser },
-    raceId: string,
-    query: TaperPlanQuery,
-  ): Promise<TaperPlanDTO> {
+  async getTaperPlan(req: Request & { user: AuthUser }, raceId: string, query: TaperPlanQuery): Promise<TaperPlanDTO> {
     const userId = req.user.id;
 
     // Get the athlete race
@@ -617,17 +594,13 @@ export class RacePredictionApiService {
       athlete_race_id: prediction.athlete_race_id || undefined,
       sport: prediction.sport,
       distance_meters: prediction.distance_meters,
-      race_date: prediction.race_date
-        ? new Date(prediction.race_date).toISOString().split('T')[0]
-        : undefined,
+      race_date: prediction.race_date ? new Date(prediction.race_date).toISOString().split('T')[0] : undefined,
       predicted_time_seconds: prediction.predicted_time_seconds,
       predicted_time_formatted: this.formatTime(prediction.predicted_time_seconds),
       confidence_lower_seconds: prediction.confidence_lower_seconds,
       confidence_upper_seconds: prediction.confidence_upper_seconds,
       confidence_score: Number.parseFloat(prediction.confidence_score),
-      target_pace_per_km: prediction.target_pace_per_km
-        ? Number.parseFloat(prediction.target_pace_per_km)
-        : undefined,
+      target_pace_per_km: prediction.target_pace_per_km ? Number.parseFloat(prediction.target_pace_per_km) : undefined,
       target_power_watts: prediction.target_power_watts || undefined,
       segment_targets: prediction.segment_targets || undefined,
       risk_score: prediction.risk_score || undefined,
@@ -669,21 +642,15 @@ export class RacePredictionApiService {
     return {
       id: profile.id,
       user_id: profile.user_id,
-      birth_date: profile.birth_date
-        ? new Date(profile.birth_date).toISOString().split('T')[0]
-        : undefined,
+      birth_date: profile.birth_date ? new Date(profile.birth_date).toISOString().split('T')[0] : undefined,
       gender: profile.gender || undefined,
       weight_kg: profile.weight_kg ? Number.parseFloat(profile.weight_kg) : undefined,
       height_cm: profile.height_cm ? Number.parseFloat(profile.height_cm) : undefined,
       current_vdot: profile.current_vdot ? Number.parseFloat(profile.current_vdot) : undefined,
       vdot_source: profile.vdot_source || undefined,
-      vdot_calculated_at: profile.vdot_calculated_at
-        ? new Date(profile.vdot_calculated_at).toISOString()
-        : undefined,
+      vdot_calculated_at: profile.vdot_calculated_at ? new Date(profile.vdot_calculated_at).toISOString() : undefined,
       years_training: profile.years_training || undefined,
-      weekly_volume_hours: profile.weekly_volume_hours
-        ? Number.parseFloat(profile.weekly_volume_hours)
-        : undefined,
+      weekly_volume_hours: profile.weekly_volume_hours ? Number.parseFloat(profile.weekly_volume_hours) : undefined,
       created_at: new Date(profile.created_at).toISOString(),
       updated_at: new Date(profile.updated_at).toISOString(),
     };
@@ -706,11 +673,7 @@ export class RacePredictionApiService {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  private generateSegmentTargets(
-    distanceMeters: number,
-    totalTimeSeconds: number,
-    sport: string,
-  ): SegmentTarget[] {
+  private generateSegmentTargets(distanceMeters: number, totalTimeSeconds: number, sport: string): SegmentTarget[] {
     const targets: SegmentTarget[] = [];
     const segmentDistance = sport === RaceSport.BIKE ? 5000 : 1000; // 5km for bike, 1km for run
     const numSegments = Math.ceil(distanceMeters / segmentDistance);
@@ -718,12 +681,8 @@ export class RacePredictionApiService {
 
     for (let i = 0; i < numSegments; i++) {
       const isLastSegment = i === numSegments - 1;
-      const segmentDist = isLastSegment
-        ? distanceMeters - i * segmentDistance
-        : segmentDistance;
-      const segmentTime = isLastSegment
-        ? totalTimeSeconds - i * pacePerSegment
-        : pacePerSegment;
+      const segmentDist = isLastSegment ? distanceMeters - i * segmentDistance : segmentDistance;
+      const segmentTime = isLastSegment ? totalTimeSeconds - i * pacePerSegment : pacePerSegment;
 
       targets.push({
         segment_number: i + 1,
@@ -879,16 +838,16 @@ export class RacePredictionApiService {
       predicted_finish_time_seconds: plan.predicted_finish_time_seconds,
       target_finish_time_seconds: plan.target_finish_time_seconds,
       pacing_strategy: plan.pacing_strategy,
-      negative_split_ratio: plan.negative_split_ratio ? parseFloat(plan.negative_split_ratio) : undefined,
+      negative_split_ratio: plan.negative_split_ratio ? Number.parseFloat(plan.negative_split_ratio) : undefined,
       segment_splits: plan.segment_splits,
       effort_zones: plan.effort_zones,
       energy_management: plan.energy_management,
       fatigue_model: plan.fatigue_model,
       weather: plan.forecast_temperature_celsius
         ? {
-            temperature_celsius: parseFloat(plan.forecast_temperature_celsius),
+            temperature_celsius: Number.parseFloat(plan.forecast_temperature_celsius),
             humidity_percent: plan.forecast_humidity_percent,
-            wind_speed_kmh: parseFloat(plan.forecast_wind_speed_kmh || '0'),
+            wind_speed_kmh: Number.parseFloat(plan.forecast_wind_speed_kmh || '0'),
             conditions: 'N/A',
             adjustments: plan.weather_adjustments
               ? {

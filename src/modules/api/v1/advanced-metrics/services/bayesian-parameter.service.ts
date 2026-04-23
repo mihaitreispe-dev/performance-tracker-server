@@ -82,7 +82,7 @@ export class BayesianParameterService {
 
     // Calculate what we predicted HRV would be
     const predicted = this.predictHrvZscore(yesterdayLoad, journal ?? null, params);
-    const actual = parseFloat(hrvBaseline.hrv_zscore);
+    const actual = Number.parseFloat(hrvBaseline.hrv_zscore);
     const error = actual - predicted;
 
     // Store the prediction error
@@ -129,7 +129,7 @@ export class BayesianParameterService {
 
     // Calculate new confidence
     const newConfidence = Math.min(
-      parseFloat(params.parameter_confidence) + this.CONFIDENCE_GROWTH_RATE * recentErrors.length,
+      Number.parseFloat(params.parameter_confidence) + this.CONFIDENCE_GROWTH_RATE * recentErrors.length,
       this.MAX_CONFIDENCE,
     );
 
@@ -186,7 +186,7 @@ export class BayesianParameterService {
 
     // Compare recent MAE to previous snapshot
     const previousSnapshot = history[history.length - 2];
-    const currentMae = parseFloat(params.mae_7day);
+    const currentMae = Number.parseFloat(params.mae_7day);
 
     if (previousSnapshot.mae && currentMae > previousSnapshot.mae * this.ROLLBACK_THRESHOLD) {
       // Performance degraded by more than threshold, rollback
@@ -204,7 +204,7 @@ export class BayesianParameterService {
         w_sleep: previousSnapshot.params.w_sleep,
         w_alcohol: previousSnapshot.params.w_alcohol,
         w_stress: previousSnapshot.params.w_stress,
-        parameter_confidence: parseFloat(params.parameter_confidence) * 0.8, // Reduce confidence
+        parameter_confidence: Number.parseFloat(params.parameter_confidence) * 0.8, // Reduce confidence
       };
 
       await this.loadModelParametersRepository.updateByUserId(userId, rollbackParams);
@@ -222,15 +222,11 @@ export class BayesianParameterService {
   /**
    * Predict HRV z-score based on training load and journal factors
    */
-  private predictHrvZscore(
-    loadData: any,
-    journal: RecoveryJournalEntry | null,
-    params: LoadModelParameters,
-  ): number {
+  private predictHrvZscore(loadData: any, journal: RecoveryJournalEntry | null, params: LoadModelParameters): number {
     // Normalize TSB values
-    const aerobicTsb = loadData.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : 0;
-    const mskTsb = loadData.msk_tsb ? parseFloat(loadData.msk_tsb) : 0;
-    const neuralTsb = loadData.neural_tsb ? parseFloat(loadData.neural_tsb) : 0;
+    const aerobicTsb = loadData.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : 0;
+    const mskTsb = loadData.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : 0;
+    const neuralTsb = loadData.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : 0;
 
     // Normalize to -1 to 1 range (from -25 to +25)
     const aerobicNorm = aerobicTsb / 25;
@@ -242,16 +238,16 @@ export class BayesianParameterService {
 
     // Add journal factors
     if (journal) {
-      const wSleep = parseFloat(params.w_sleep);
-      const wAlcohol = parseFloat(params.w_alcohol);
-      const wStress = parseFloat(params.w_stress);
+      const wSleep = Number.parseFloat(params.w_sleep);
+      const wAlcohol = Number.parseFloat(params.w_alcohol);
+      const wStress = Number.parseFloat(params.w_stress);
 
       if (journal.sleep_quality_rating) {
         prediction += ((journal.sleep_quality_rating - 3) / 2) * wSleep;
       }
 
       if (journal.alcohol_units) {
-        const units = parseFloat(journal.alcohol_units);
+        const units = Number.parseFloat(journal.alcohol_units);
         prediction -= units * 0.2 * wAlcohol;
       }
 
@@ -268,11 +264,11 @@ export class BayesianParameterService {
    */
   private extractFeatures(loadData: any, journal: RecoveryJournalEntry | null): PredictionError['features'] {
     return {
-      aerobic_tsb: loadData.aerobic_tsb ? parseFloat(loadData.aerobic_tsb) : undefined,
-      msk_tsb: loadData.msk_tsb ? parseFloat(loadData.msk_tsb) : undefined,
-      neural_tsb: loadData.neural_tsb ? parseFloat(loadData.neural_tsb) : undefined,
+      aerobic_tsb: loadData.aerobic_tsb ? Number.parseFloat(loadData.aerobic_tsb) : undefined,
+      msk_tsb: loadData.msk_tsb ? Number.parseFloat(loadData.msk_tsb) : undefined,
+      neural_tsb: loadData.neural_tsb ? Number.parseFloat(loadData.neural_tsb) : undefined,
       sleep_quality: journal?.sleep_quality_rating ?? undefined,
-      alcohol_units: journal?.alcohol_units ? parseFloat(journal.alcohol_units) : undefined,
+      alcohol_units: journal?.alcohol_units ? Number.parseFloat(journal.alcohol_units) : undefined,
       stress_level: journal?.stress_level ?? undefined,
     };
   }
@@ -292,7 +288,7 @@ export class BayesianParameterService {
 
     // For each learnable parameter
     for (const key of Object.keys(LearnableParameters)) {
-      const currentValue = parseFloat((params as any)[key] ?? LearnableParameters[key].default);
+      const currentValue = Number.parseFloat((params as any)[key] ?? LearnableParameters[key].default);
 
       // Calculate loss with perturbed value
       const perturbedParams = { ...params, [key]: currentValue + epsilon };
@@ -323,11 +319,11 @@ export class BayesianParameterService {
     gradients: Partial<Record<string, number>>,
   ): Partial<UpdateLoadModelParameters> {
     const updates: Partial<UpdateLoadModelParameters> = {};
-    const confidence = parseFloat(params.parameter_confidence);
+    const confidence = Number.parseFloat(params.parameter_confidence);
 
     for (const [key, config] of Object.entries(LearnableParameters)) {
       const gradient = gradients[key] || 0;
-      const currentValue = parseFloat((params as any)[key] ?? config.default);
+      const currentValue = Number.parseFloat((params as any)[key] ?? config.default);
 
       // Scale learning rate by confidence (more confident = smaller updates)
       const effectiveLR = config.learningRate * (1 - confidence * 0.5);
@@ -359,20 +355,20 @@ export class BayesianParameterService {
    */
   private extractCurrentParams(params: LoadModelParameters): ParameterSnapshot['params'] {
     return {
-      aerobic_ctl_decay: parseFloat(params.aerobic_ctl_decay) || DefaultLoadModelParameters.aerobic_ctl_decay,
-      aerobic_atl_decay: parseFloat(params.aerobic_atl_decay) || DefaultLoadModelParameters.aerobic_atl_decay,
-      msk_ctl_decay: parseFloat(params.msk_ctl_decay) || DefaultLoadModelParameters.msk_ctl_decay,
-      msk_atl_decay: parseFloat(params.msk_atl_decay) || DefaultLoadModelParameters.msk_atl_decay,
-      neural_ctl_decay: parseFloat(params.neural_ctl_decay) || DefaultLoadModelParameters.neural_ctl_decay,
-      neural_atl_decay: parseFloat(params.neural_atl_decay) || DefaultLoadModelParameters.neural_atl_decay,
-      run_aerobic_coef: parseFloat(params.run_aerobic_coef) || DefaultLoadModelParameters.run_aerobic_coef,
-      bike_aerobic_coef: parseFloat(params.bike_aerobic_coef) || DefaultLoadModelParameters.bike_aerobic_coef,
-      swim_aerobic_coef: parseFloat(params.swim_aerobic_coef) || DefaultLoadModelParameters.swim_aerobic_coef,
+      aerobic_ctl_decay: Number.parseFloat(params.aerobic_ctl_decay) || DefaultLoadModelParameters.aerobic_ctl_decay,
+      aerobic_atl_decay: Number.parseFloat(params.aerobic_atl_decay) || DefaultLoadModelParameters.aerobic_atl_decay,
+      msk_ctl_decay: Number.parseFloat(params.msk_ctl_decay) || DefaultLoadModelParameters.msk_ctl_decay,
+      msk_atl_decay: Number.parseFloat(params.msk_atl_decay) || DefaultLoadModelParameters.msk_atl_decay,
+      neural_ctl_decay: Number.parseFloat(params.neural_ctl_decay) || DefaultLoadModelParameters.neural_ctl_decay,
+      neural_atl_decay: Number.parseFloat(params.neural_atl_decay) || DefaultLoadModelParameters.neural_atl_decay,
+      run_aerobic_coef: Number.parseFloat(params.run_aerobic_coef) || DefaultLoadModelParameters.run_aerobic_coef,
+      bike_aerobic_coef: Number.parseFloat(params.bike_aerobic_coef) || DefaultLoadModelParameters.bike_aerobic_coef,
+      swim_aerobic_coef: Number.parseFloat(params.swim_aerobic_coef) || DefaultLoadModelParameters.swim_aerobic_coef,
       strength_aerobic_coef:
-        parseFloat(params.strength_aerobic_coef) || DefaultLoadModelParameters.strength_aerobic_coef,
-      w_sleep: parseFloat(params.w_sleep) || DefaultLoadModelParameters.w_sleep,
-      w_alcohol: parseFloat(params.w_alcohol) || DefaultLoadModelParameters.w_alcohol,
-      w_stress: parseFloat(params.w_stress) || DefaultLoadModelParameters.w_stress,
+        Number.parseFloat(params.strength_aerobic_coef) || DefaultLoadModelParameters.strength_aerobic_coef,
+      w_sleep: Number.parseFloat(params.w_sleep) || DefaultLoadModelParameters.w_sleep,
+      w_alcohol: Number.parseFloat(params.w_alcohol) || DefaultLoadModelParameters.w_alcohol,
+      w_stress: Number.parseFloat(params.w_stress) || DefaultLoadModelParameters.w_stress,
     };
   }
 
@@ -403,7 +399,7 @@ export class BayesianParameterService {
     const parameterDiffs: { param: string; current: number; default: number; diff: number }[] = [];
 
     for (const [key, config] of Object.entries(LearnableParameters)) {
-      const current = parseFloat((params as any)[key] ?? config.default);
+      const current = Number.parseFloat((params as any)[key] ?? config.default);
       const diff = current - config.default;
 
       if (Math.abs(diff) > 0.01) {
@@ -417,10 +413,10 @@ export class BayesianParameterService {
     }
 
     return {
-      confidence: parseFloat(params.parameter_confidence),
+      confidence: Number.parseFloat(params.parameter_confidence),
       dataPointsUsed: params.data_points_used,
-      mae7day: params.mae_7day ? parseFloat(params.mae_7day) : null,
-      mae30day: params.mae_30day ? parseFloat(params.mae_30day) : null,
+      mae7day: params.mae_7day ? Number.parseFloat(params.mae_7day) : null,
+      mae30day: params.mae_30day ? Number.parseFloat(params.mae_30day) : null,
       parameterDiffs,
       lastUpdateDate: params.last_update_date,
     };
@@ -458,9 +454,9 @@ export class BayesianParameterService {
     }
 
     const dataPointsUsed = params.data_points_used;
-    const mae7day = params.mae_7day ? parseFloat(params.mae_7day) : null;
-    const mae30day = params.mae_30day ? parseFloat(params.mae_30day) : null;
-    const confidence = parseFloat(params.parameter_confidence);
+    const mae7day = params.mae_7day ? Number.parseFloat(params.mae_7day) : null;
+    const mae30day = params.mae_30day ? Number.parseFloat(params.mae_30day) : null;
+    const confidence = Number.parseFloat(params.parameter_confidence);
 
     // Determine convergence status
     let convergenceStatus: 'converging' | 'stable' | 'diverging' | 'insufficient_data';
@@ -486,7 +482,7 @@ export class BayesianParameterService {
     const parameterDrifts: { param: string; current: number; default: number; percentChange: number }[] = [];
 
     for (const [key, config] of Object.entries(LearnableParameters)) {
-      const current = parseFloat((params as any)[key] ?? config.default);
+      const current = Number.parseFloat((params as any)[key] ?? config.default);
       const diff = current - config.default;
       const percentChange = config.default !== 0 ? (diff / config.default) * 100 : 0;
 

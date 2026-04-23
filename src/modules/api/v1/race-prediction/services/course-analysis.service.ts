@@ -86,8 +86,8 @@ export class CourseAnalysisService {
   private readonly MINETTI_FLAT_COST = 3.6; // Cr at 0% grade (J/kg/m)
 
   // Grade limits for the model (beyond these, clip the values)
-  private readonly MAX_GRADE = 0.20; // 20%
-  private readonly MIN_GRADE = -0.20; // -20%
+  private readonly MAX_GRADE = 0.2; // 20%
+  private readonly MIN_GRADE = -0.2; // -20%
 
   // Minimum pace cap for downhill (prevent unrealistic speeds)
   // Default: ~4:00/km = 240 sec/km = 4.17 m/s
@@ -114,12 +114,7 @@ export class CourseAnalysisService {
 
     // Minetti polynomial
     const cost =
-      155.4 * Math.pow(i, 5) -
-      30.4 * Math.pow(i, 4) -
-      43.3 * Math.pow(i, 3) +
-      46.3 * Math.pow(i, 2) +
-      19.5 * i +
-      3.6;
+      155.4 * Math.pow(i, 5) - 30.4 * Math.pow(i, 4) - 43.3 * Math.pow(i, 3) + 46.3 * Math.pow(i, 2) + 19.5 * i + 3.6;
 
     // Ensure cost is never below a minimum threshold (very steep downhill can go negative)
     return Math.max(cost, 1.5);
@@ -163,10 +158,7 @@ export class CourseAnalysisService {
    * @param windowMeters - Window size in meters (default 100m)
    * @returns Smoothed elevation points
    */
-  smoothElevationProfile(
-    points: ElevationPoint[],
-    windowMeters: number = 100,
-  ): ElevationPoint[] {
+  smoothElevationProfile(points: ElevationPoint[], windowMeters: number = 100): ElevationPoint[] {
     if (points.length < 3) return points;
 
     const smoothed: ElevationPoint[] = [];
@@ -177,13 +169,10 @@ export class CourseAnalysisService {
       const windowEnd = currentDistance + windowMeters / 2;
 
       // Find all points within the window
-      const windowPoints = points.filter(
-        (p) => p.distance >= windowStart && p.distance <= windowEnd,
-      );
+      const windowPoints = points.filter((p) => p.distance >= windowStart && p.distance <= windowEnd);
 
       // Average elevation within window
-      const avgElevation =
-        windowPoints.reduce((sum, p) => sum + p.elevation, 0) / windowPoints.length;
+      const avgElevation = windowPoints.reduce((sum, p) => sum + p.elevation, 0) / windowPoints.length;
 
       smoothed.push({
         distance: currentDistance,
@@ -221,10 +210,7 @@ export class CourseAnalysisService {
     } = options;
 
     // Smooth the elevation data
-    const smoothedPoints = this.smoothElevationProfile(
-      courseProfile.points,
-      smoothingWindowMeters,
-    );
+    const smoothedPoints = this.smoothElevationProfile(courseProfile.points, smoothingWindowMeters);
 
     // Calculate flat velocity
     const flatVelocityMps = courseProfile.totalDistanceMeters / flatPredictionSeconds;
@@ -274,11 +260,7 @@ export class CourseAnalysisService {
       if (gradePercent < steepestDescent) steepestDescent = gradePercent;
 
       // Calculate adjusted velocity for this micro-segment
-      const adjustedVelocity = this.calculateGradeAdjustedVelocity(
-        flatVelocityMps,
-        grade,
-        downhillSpeedCapMps,
-      );
+      const adjustedVelocity = this.calculateGradeAdjustedVelocity(flatVelocityMps, grade, downhillSpeedCapMps);
 
       // Time for this micro-segment
       const microTime = distanceDelta / adjustedVelocity;
@@ -297,9 +279,7 @@ export class CourseAnalysisService {
       // Check if we've completed a segment
       if (currPoint.distance - currentSegmentStart >= segmentDistanceMeters) {
         const segmentDistance = currPoint.distance - currentSegmentStart;
-        const avgGrade = segmentGrades.length > 0
-          ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length
-          : 0;
+        const avgGrade = segmentGrades.length > 0 ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length : 0;
         const segmentTime = segmentTimes.reduce((a, b) => a + b, 0);
         const avgPace = (segmentTime / segmentDistance) * 1000;
 
@@ -328,9 +308,7 @@ export class CourseAnalysisService {
     if (segmentTimes.length > 0) {
       const lastPoint = smoothedPoints[smoothedPoints.length - 1];
       const segmentDistance = lastPoint.distance - currentSegmentStart;
-      const avgGrade = segmentGrades.length > 0
-        ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length
-        : 0;
+      const avgGrade = segmentGrades.length > 0 ? segmentGrades.reduce((a, b) => a + b, 0) / segmentGrades.length : 0;
       const segmentTime = segmentTimes.reduce((a, b) => a + b, 0);
       const avgPace = segmentDistance > 0 ? (segmentTime / segmentDistance) * 1000 : 0;
 
@@ -366,10 +344,7 @@ export class CourseAnalysisService {
         totalElevationLoss: Math.round(totalLoss),
         steepestClimbPercent: Math.round(steepestClimb * 100) / 100,
         steepestDescentPercent: Math.round(Math.abs(steepestDescent) * 100) / 100,
-        averageGradePercent:
-          Math.round(
-            ((totalGain - totalLoss) / courseProfile.totalDistanceMeters) * 10000,
-          ) / 100,
+        averageGradePercent: Math.round(((totalGain - totalLoss) / courseProfile.totalDistanceMeters) * 10000) / 100,
       },
     };
   }
@@ -401,7 +376,7 @@ export class CourseAnalysisService {
     const totalAdjustmentSeconds = Math.round(netAdjustmentPerKm * distanceKm);
 
     // Calculate time factor
-    const elevationTimeFactor = 1 + (totalAdjustmentSeconds / flatTimeSeconds);
+    const elevationTimeFactor = 1 + totalAdjustmentSeconds / flatTimeSeconds;
 
     // Generate description
     let description = '';
@@ -474,7 +449,7 @@ export class CourseAnalysisService {
     } else if (avgGradePercent > 0.5) {
       description = `Uphill course with net ${netElevation}m elevation gain. Plan for increased effort.`;
     } else if (avgGradePercent < -0.5) {
-      description = `Net downhill course. Potential time savings, but maintain power on flats.`;
+      description = 'Net downhill course. Potential time savings, but maintain power on flats.';
     } else if (elevationProfile.totalElevationGain > 500) {
       description = `Rolling course with ${elevationProfile.totalElevationGain}m total climbing. Pace climbing sections conservatively.`;
     } else {
@@ -491,10 +466,7 @@ export class CourseAnalysisService {
   /**
    * Calculate segment-by-segment adjustments for running
    */
-  calculateRunningSegmentAdjustments(
-    flatPaceSecondsPerKm: number,
-    segments: ElevationSegment[],
-  ): SegmentAdjustment[] {
+  calculateRunningSegmentAdjustments(flatPaceSecondsPerKm: number, segments: ElevationSegment[]): SegmentAdjustment[] {
     return segments.map((segment, index) => {
       const segmentDistanceKm = (segment.endDistanceMeters - segment.startDistanceMeters) / 1000;
       const baseTimeSeconds = flatPaceSecondsPerKm * segmentDistanceKm;
@@ -602,9 +574,7 @@ export class CourseAnalysisService {
     const totalDistance = elevationPoints[elevationPoints.length - 1].distance;
     const netElevation = totalGain - totalLoss;
     const avgGrade = (netElevation / totalDistance) * 100;
-    const maxGrade = segments.length > 0
-      ? Math.max(...segments.map((s) => Math.abs(s.gradePercent)))
-      : 0;
+    const maxGrade = segments.length > 0 ? Math.max(...segments.map((s) => Math.abs(s.gradePercent))) : 0;
 
     return {
       totalElevationGain: Math.round(totalGain),

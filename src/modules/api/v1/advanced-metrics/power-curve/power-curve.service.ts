@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import { Database } from 'src/database/interfaces';
 import { CardioMetricType } from 'src/database/interfaces/cardio-metrics-table.interface';
 
@@ -276,11 +276,7 @@ export class PowerCurveService {
       .where('workout_executions.user_id', '=', userId)
       .where('cardio_metrics.metric_type', '=', CardioMetricType.POWER)
       .where('cardio_metrics.recorded_at', '>=', startDate)
-      .select([
-        'cardio_metrics.workout_execution_id',
-        'cardio_metrics.recorded_at',
-        'cardio_metrics.value',
-      ])
+      .select(['cardio_metrics.workout_execution_id', 'cardio_metrics.recorded_at', 'cardio_metrics.value'])
       .orderBy('cardio_metrics.workout_execution_id')
       .orderBy('cardio_metrics.recorded_at')
       .execute();
@@ -292,11 +288,7 @@ export class PowerCurveService {
     }));
   }
 
-  private async getPowerDataForUserRange(
-    userId: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<PowerDataPoint[]> {
+  private async getPowerDataForUserRange(userId: string, startDate: Date, endDate: Date): Promise<PowerDataPoint[]> {
     const results = await this.db
       .selectFrom('cardio_metrics')
       .innerJoin('workout_executions', 'workout_executions.id', 'cardio_metrics.workout_execution_id')
@@ -304,11 +296,7 @@ export class PowerCurveService {
       .where('cardio_metrics.metric_type', '=', CardioMetricType.POWER)
       .where('cardio_metrics.recorded_at', '>=', startDate)
       .where('cardio_metrics.recorded_at', '<=', endDate)
-      .select([
-        'cardio_metrics.workout_execution_id',
-        'cardio_metrics.recorded_at',
-        'cardio_metrics.value',
-      ])
+      .select(['cardio_metrics.workout_execution_id', 'cardio_metrics.recorded_at', 'cardio_metrics.value'])
       .orderBy('cardio_metrics.workout_execution_id')
       .orderBy('cardio_metrics.recorded_at')
       .execute();

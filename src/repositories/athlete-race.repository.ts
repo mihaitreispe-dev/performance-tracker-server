@@ -1,13 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-
+import { AthleteRace, AthleteRaceUpdate, NewAthleteRace } from 'src/database/interfaces/athlete-races-table.interface';
 import { Database } from 'src/database/interfaces/database.interface';
-import {
-  AthleteRace,
-  NewAthleteRace,
-  AthleteRaceUpdate,
-} from 'src/database/interfaces/athlete-races-table.interface';
 import { RaceEvent } from 'src/database/interfaces/race-events-table.interface';
 
 export interface AthleteRaceWithEvent extends AthleteRace {

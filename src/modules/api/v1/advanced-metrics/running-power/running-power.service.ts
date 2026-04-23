@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectKysely } from 'nestjs-kysely';
 import { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 import { Database } from 'src/database/interfaces';
 import { CardioMetricType } from 'src/database/interfaces/cardio-metrics-table.interface';
 
@@ -160,7 +160,7 @@ export class RunningPowerService {
       const effectiveness = speedMps / workout.avgPower;
 
       // Convert pace to sec/km
-      const paceSecPerKm = workout.avgPace ?? (workout.durationSeconds / (workout.distanceMeters / 1000));
+      const paceSecPerKm = workout.avgPace ?? workout.durationSeconds / (workout.distanceMeters / 1000);
 
       trend.push({
         date: workout.startedAt.toISOString().split('T')[0],
@@ -341,10 +341,7 @@ export class RunningPowerService {
         'we.source',
         'wr.total_distance_meters',
       ])
-      .select((eb) => [
-        eb.fn.avg<string>('cm.value').as('avg_power'),
-        eb.fn.max<string>('cm.value').as('max_power'),
-      ])
+      .select((eb) => [eb.fn.avg<string>('cm.value').as('avg_power'), eb.fn.max<string>('cm.value').as('max_power')])
       .groupBy(['we.id', 'we.started_at', 'we.duration_seconds', 'we.source', 'wr.total_distance_meters'])
       .execute();
 

@@ -49,7 +49,12 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Index on barcode for quick lookup
-  await db.schema.createIndex('idx_foods_barcode').on('foods').column('barcode').where('barcode', 'is not', null).execute();
+  await db.schema
+    .createIndex('idx_foods_barcode')
+    .on('foods')
+    .column('barcode')
+    .where('barcode', 'is not', null)
+    .execute();
 
   // GIN index on name for full-text search
   await sql`CREATE INDEX idx_foods_name_gin ON foods USING gin(to_tsvector('english', name))`.execute(db);

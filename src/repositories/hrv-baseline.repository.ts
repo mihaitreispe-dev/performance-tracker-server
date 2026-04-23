@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import {
-  Database,
-  HrvBaselineDaily,
-  NewHrvBaselineDaily,
-  UpdateHrvBaselineDaily,
-} from 'src/database/interfaces';
+import { Database, HrvBaselineDaily, NewHrvBaselineDaily, UpdateHrvBaselineDaily } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 
 interface FindManyFilter {

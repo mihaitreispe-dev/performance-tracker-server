@@ -14,11 +14,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Create index for finding injuries
-  await db.schema
-    .createIndex('pain_logs_user_injury_idx')
-    .on('pain_logs')
-    .columns(['user_id', 'is_injury'])
-    .execute();
+  await db.schema.createIndex('pain_logs_user_injury_idx').on('pain_logs').columns(['user_id', 'is_injury']).execute();
 }
 
 export async function down(db: Kysely<unknown>): Promise<void> {

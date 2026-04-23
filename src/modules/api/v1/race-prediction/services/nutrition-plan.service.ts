@@ -9,7 +9,11 @@ import {
   ProductRecommendation,
   SweatRateBasis,
 } from 'src/database/interfaces';
-import { CaffeineTolerance, GiSensitivity, CarbSource } from 'src/database/interfaces/athlete-profile-metrics-table.interface';
+import {
+  CaffeineTolerance,
+  CarbSource,
+  GiSensitivity,
+} from 'src/database/interfaces/athlete-profile-metrics-table.interface';
 
 export interface NutritionPreferences {
   sweatRateMlPerHour?: number | null;
@@ -299,7 +303,7 @@ export class NutritionPlanService {
 
       nutrition.push({
         time_elapsed_minutes: timeElapsed,
-        distance_km: parseFloat(distanceCovered.toFixed(1)),
+        distance_km: Number.parseFloat(distanceCovered.toFixed(1)),
         carbs_grams: adjustedCarbs,
         hydration_ml: hydrationForInterval,
         sodium_mg: sodiumForInterval,

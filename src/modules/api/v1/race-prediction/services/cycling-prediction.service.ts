@@ -28,13 +28,13 @@ export interface CyclingPredictionResult {
 // Power duration model - sustainable power as % of FTP
 const POWER_DURATION_MODEL: Record<number, number> = {
   // Duration in minutes -> % of FTP
-  5: 1.20,
-  10: 1.10,
+  5: 1.2,
+  10: 1.1,
   20: 1.05,
-  30: 1.00,
+  30: 1.0,
   45: 0.97,
   60: 0.95,
-  90: 0.90,
+  90: 0.9,
   120: 0.85,
   180: 0.82,
   240: 0.78,
@@ -103,7 +103,7 @@ export class CyclingPredictionService {
 
     // Estimate duration first, then iterate
     const estimatedSpeed = this.estimateAverageSpeed(ftp, weight, grade, cda, rollingResistance);
-    const estimatedDuration = (input.targetDistanceMeters / 1000) / estimatedSpeed * 60; // minutes
+    const estimatedDuration = (input.targetDistanceMeters / 1000 / estimatedSpeed) * 60; // minutes
 
     return this.predictFromDuration(
       input.targetDistanceMeters,
@@ -137,14 +137,14 @@ export class CyclingPredictionService {
     const speedKmh = this.calculateSpeedFromPower(sustainablePower, weight, grade, cda, rollingResistance);
 
     // Calculate actual time
-    const timeHours = (distanceMeters / 1000) / speedKmh;
+    const timeHours = distanceMeters / 1000 / speedKmh;
     const timeSeconds = Math.round(timeHours * 3600);
 
     // Recalculate for actual duration
     const actualDuration = timeSeconds / 60;
     const adjustedPower = this.getSustainablePower(ftp, actualDuration);
     const adjustedSpeed = this.calculateSpeedFromPower(adjustedPower, weight, grade, cda, rollingResistance);
-    const adjustedTimeSeconds = Math.round((distanceMeters / 1000) / adjustedSpeed * 3600);
+    const adjustedTimeSeconds = Math.round((distanceMeters / 1000 / adjustedSpeed) * 3600);
 
     // Calculate normalized power (higher for variable terrain)
     const normalizedPower = adjustedPower * (grade !== 0 ? 1.05 : 1.0);
@@ -153,7 +153,7 @@ export class CyclingPredictionService {
     const energyKj = Math.round(adjustedPower * (adjustedTimeSeconds / 1000));
 
     // Confidence interval
-    const uncertaintyFactor = 0.05 + (1 - ftpConfidence) * 0.10;
+    const uncertaintyFactor = 0.05 + (1 - ftpConfidence) * 0.1;
     const confidenceLower = Math.round(adjustedTimeSeconds * (1 - uncertaintyFactor));
     const confidenceUpper = Math.round(adjustedTimeSeconds * (1 + uncertaintyFactor));
 
@@ -166,7 +166,7 @@ export class CyclingPredictionService {
     if (grade > 2) {
       description = `Climbing at ${Math.round(adjustedPower)}W averaging ${adjustedSpeed.toFixed(1)} km/h on ${grade}% grade.`;
     } else if (grade < -2) {
-      description = `Descending course. Power estimate may be conservative; actual time could be faster.`;
+      description = 'Descending course. Power estimate may be conservative; actual time could be faster.';
     } else {
       description = `Flat to rolling terrain at ${Math.round(adjustedPower)}W, targeting ${adjustedSpeed.toFixed(1)} km/h average.`;
     }
@@ -194,12 +194,14 @@ export class CyclingPredictionService {
       // Estimate W' (anaerobic work capacity) as ~15-25 kJ
       const wPrime = ftp * 20; // ~20 seconds at FTP worth of anaerobic capacity
       const cp = ftp * 0.95; // CP is typically ~95% of FTP
-      const power = cp + (wPrime / (durationMinutes * 60));
+      const power = cp + wPrime / (durationMinutes * 60);
       return Math.min(power, ftp * 1.5); // Cap at 150% FTP
     }
 
     // Find surrounding duration points in model
-    const durations = Object.keys(POWER_DURATION_MODEL).map(Number).sort((a, b) => a - b);
+    const durations = Object.keys(POWER_DURATION_MODEL)
+      .map(Number)
+      .sort((a, b) => a - b);
 
     if (durationMinutes >= durations[durations.length - 1]) {
       // Beyond model - extrapolate conservatively
@@ -276,7 +278,8 @@ export class CyclingPredictionService {
       const totalPower = rollingPower + gravityPower + aeroPower;
 
       // Calculate derivative for Newton-Raphson
-      const derivative = crr * totalMass * this.GRAVITY +
+      const derivative =
+        crr * totalMass * this.GRAVITY +
         totalMass * this.GRAVITY * grade +
         1.5 * this.AIR_DENSITY * cda * Math.pow(speed, 2);
 

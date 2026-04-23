@@ -45,9 +45,9 @@ export class WeatherAdjustmentService {
       humidity_impact_seconds: Math.round(humidityImpact),
       wind_impact_seconds: Math.round(windImpact),
       total_impact_seconds: Math.round(totalImpactSeconds),
-      total_impact_percent: parseFloat(totalImpactPercent.toFixed(2)),
+      total_impact_percent: Number.parseFloat(totalImpactPercent.toFixed(2)),
       heat_stress_level: heatStressLevel,
-      hydration_multiplier: parseFloat(hydrationMultiplier.toFixed(2)),
+      hydration_multiplier: Number.parseFloat(hydrationMultiplier.toFixed(2)),
       pacing_advice: pacingAdvice,
       risk_warnings: riskWarnings.length > 0 ? riskWarnings : undefined,
     };
@@ -58,7 +58,11 @@ export class WeatherAdjustmentService {
    * ~1-2% slower per 5°C above optimal
    * Impact scales with distance (marathon more affected than 5K)
    */
-  private calculateTemperatureImpact(predictedTimeSeconds: number, distanceMeters: number, temperature: number): number {
+  private calculateTemperatureImpact(
+    predictedTimeSeconds: number,
+    distanceMeters: number,
+    temperature: number,
+  ): number {
     const optimalMidpoint = (this.OPTIMAL_TEMP_MIN + this.OPTIMAL_TEMP_MAX) / 2;
     const tempDeviation = temperature - optimalMidpoint;
 
@@ -252,7 +256,9 @@ export class WeatherAdjustmentService {
     }
 
     if (heatStressLevel === HeatStressLevel.HIGH) {
-      warnings.push('Heat stress warning: Monitor for signs of heat exhaustion. Slow down if feeling dizzy or nauseated.');
+      warnings.push(
+        'Heat stress warning: Monitor for signs of heat exhaustion. Slow down if feeling dizzy or nauseated.',
+      );
     }
 
     if (temperature > 30) {

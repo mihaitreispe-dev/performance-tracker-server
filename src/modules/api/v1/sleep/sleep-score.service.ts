@@ -154,17 +154,17 @@ export class SleepScoreService {
     const tstAvg = baseline.tst_14day_avg;
     const tstStd = baseline.tst_14day_std;
 
-    const se = sleepLog.sleep_efficiency ? parseFloat(sleepLog.sleep_efficiency) : null;
-    const seAvg = baseline.se_14day_avg ? parseFloat(baseline.se_14day_avg) : null;
-    const seStd = baseline.se_14day_std ? parseFloat(baseline.se_14day_std) : null;
+    const se = sleepLog.sleep_efficiency ? Number.parseFloat(sleepLog.sleep_efficiency) : null;
+    const seAvg = baseline.se_14day_avg ? Number.parseFloat(baseline.se_14day_avg) : null;
+    const seStd = baseline.se_14day_std ? Number.parseFloat(baseline.se_14day_std) : null;
 
     const hrv = sleepLog.avg_hrv;
-    const hrvAvg = baseline.sleep_hrv_14day_avg ? parseFloat(baseline.sleep_hrv_14day_avg) : null;
-    const hrvStd = baseline.sleep_hrv_14day_std ? parseFloat(baseline.sleep_hrv_14day_std) : null;
+    const hrvAvg = baseline.sleep_hrv_14day_avg ? Number.parseFloat(baseline.sleep_hrv_14day_avg) : null;
+    const hrvStd = baseline.sleep_hrv_14day_std ? Number.parseFloat(baseline.sleep_hrv_14day_std) : null;
 
     const hrNadir = sleepLog.hr_nadir;
-    const hrNadirAvg = baseline.hr_nadir_14day_avg ? parseFloat(baseline.hr_nadir_14day_avg) : null;
-    const hrNadirStd = baseline.hr_nadir_14day_std ? parseFloat(baseline.hr_nadir_14day_std) : null;
+    const hrNadirAvg = baseline.hr_nadir_14day_avg ? Number.parseFloat(baseline.hr_nadir_14day_avg) : null;
+    const hrNadirStd = baseline.hr_nadir_14day_std ? Number.parseFloat(baseline.hr_nadir_14day_std) : null;
 
     return {
       tst: this.baselineService.calculateZScore(tst, tstAvg, tstStd),
@@ -260,7 +260,7 @@ export class SleepScoreService {
     let availableWeights = 0;
 
     // Sleep Efficiency (SE) - TST / TIB
-    const se = sleepLog.sleep_efficiency ? parseFloat(sleepLog.sleep_efficiency) : null;
+    const se = sleepLog.sleep_efficiency ? Number.parseFloat(sleepLog.sleep_efficiency) : null;
     if (se !== null) {
       if (zScores.se !== null) {
         // With baseline
@@ -433,8 +433,8 @@ export class SleepScoreService {
     }
 
     // HRV trend bonus/penalty (if we have first/second half data)
-    const firstHalf = sleepLog.hrv_first_half_avg ? parseFloat(sleepLog.hrv_first_half_avg) : null;
-    const secondHalf = sleepLog.hrv_second_half_avg ? parseFloat(sleepLog.hrv_second_half_avg) : null;
+    const firstHalf = sleepLog.hrv_first_half_avg ? Number.parseFloat(sleepLog.hrv_first_half_avg) : null;
+    const secondHalf = sleepLog.hrv_second_half_avg ? Number.parseFloat(sleepLog.hrv_second_half_avg) : null;
 
     if (firstHalf !== null && secondHalf !== null) {
       const diff = secondHalf - firstHalf;
@@ -614,7 +614,8 @@ export class SleepScoreService {
    */
   private legacyToEnhancedBreakdown(legacy: LegacyBreakdown, totalScore: number): SleepScoreBreakdown {
     // Approximate distribution based on legacy weights
-    const total = legacy.durationScore + legacy.deepSleepScore + legacy.remSleepScore + legacy.awakeScore + legacy.efficiencyScore;
+    const total =
+      legacy.durationScore + legacy.deepSleepScore + legacy.remSleepScore + legacy.awakeScore + legacy.efficiencyScore;
     const factor = total > 0 ? 100 / total : 1;
 
     return {
@@ -814,12 +815,10 @@ export class SleepScoreService {
       }
     }
 
-    const firstHalf = firstHalfSamples.length > 0
-      ? firstHalfSamples.reduce((a, b) => a + b, 0) / firstHalfSamples.length
-      : null;
-    const secondHalf = secondHalfSamples.length > 0
-      ? secondHalfSamples.reduce((a, b) => a + b, 0) / secondHalfSamples.length
-      : null;
+    const firstHalf =
+      firstHalfSamples.length > 0 ? firstHalfSamples.reduce((a, b) => a + b, 0) / firstHalfSamples.length : null;
+    const secondHalf =
+      secondHalfSamples.length > 0 ? secondHalfSamples.reduce((a, b) => a + b, 0) / secondHalfSamples.length : null;
 
     return { firstHalf, secondHalf };
   }

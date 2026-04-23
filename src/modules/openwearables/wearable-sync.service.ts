@@ -276,8 +276,7 @@ export class WearableSyncService {
       // Filter by provider and calculate average
       const hrvSamples = hrvResponse.items.filter(
         (item) =>
-          item.source?.provider &&
-          this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
+          item.source?.provider && this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
       );
       if (hrvSamples.length > 0) {
         const sum = hrvSamples.reduce((acc, item) => acc + item.value, 0);
@@ -294,8 +293,7 @@ export class WearableSyncService {
       // Filter by provider and calculate average (typically would be the minimum/resting)
       const hrSamples = hrResponse.items.filter(
         (item) =>
-          item.source?.provider &&
-          this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
+          item.source?.provider && this.openWearablesService.mapToWearableProvider(item.source.provider) === provider,
       );
       if (hrSamples.length > 0) {
         // For resting HR, we often want the minimum or average of overnight readings

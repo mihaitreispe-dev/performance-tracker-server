@@ -1,16 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { FoodLogEntryRepository, FoodLogEntryWithFood } from 'src/repositories/food-log-entry.repository';
-import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
-import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
-import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { MealType, NewDailyNutritionSummary } from 'src/database/interfaces';
-import {
-  NutritionTotals,
-  MealBreakdown,
-  FoodLogEntryWithNutrition,
-  GoalProgress,
-  CalculatedGoals,
-} from '../types';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
+import { FoodLogEntryRepository, FoodLogEntryWithFood } from 'src/repositories/food-log-entry.repository';
+import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
+
+import { CalculatedGoals, FoodLogEntryWithNutrition, GoalProgress, MealBreakdown, NutritionTotals } from '../types';
 
 @Injectable()
 export class NutritionSummaryService {
@@ -60,20 +55,20 @@ export class NutritionSummaryService {
     const servingRatio = (Number(food.serving_size_grams) || 100) / 100;
 
     return {
-      calories: ((Number(food.calories) || 0) * factor * servingRatio),
-      protein: ((Number(food.protein_g) || 0) * factor * servingRatio),
-      carbs: ((Number(food.carbs_g) || 0) * factor * servingRatio),
-      fat: ((Number(food.fat_g) || 0) * factor * servingRatio),
-      fiber: ((Number(food.fiber_g) || 0) * factor * servingRatio),
-      sugar: ((Number(food.sugar_g) || 0) * factor * servingRatio),
-      sodium: ((Number(food.sodium_mg) || 0) * factor * servingRatio),
-      potassium: ((Number(food.potassium_mg) || 0) * factor * servingRatio),
-      calcium: ((Number(food.calcium_mg) || 0) * factor * servingRatio),
-      iron: ((Number(food.iron_mg) || 0) * factor * servingRatio),
-      vitamin_a: ((Number(food.vitamin_a_mcg) || 0) * factor * servingRatio),
-      vitamin_c: ((Number(food.vitamin_c_mg) || 0) * factor * servingRatio),
-      vitamin_d: ((Number(food.vitamin_d_mcg) || 0) * factor * servingRatio),
-      vitamin_b12: ((Number(food.vitamin_b12_mcg) || 0) * factor * servingRatio),
+      calories: (Number(food.calories) || 0) * factor * servingRatio,
+      protein: (Number(food.protein_g) || 0) * factor * servingRatio,
+      carbs: (Number(food.carbs_g) || 0) * factor * servingRatio,
+      fat: (Number(food.fat_g) || 0) * factor * servingRatio,
+      fiber: (Number(food.fiber_g) || 0) * factor * servingRatio,
+      sugar: (Number(food.sugar_g) || 0) * factor * servingRatio,
+      sodium: (Number(food.sodium_mg) || 0) * factor * servingRatio,
+      potassium: (Number(food.potassium_mg) || 0) * factor * servingRatio,
+      calcium: (Number(food.calcium_mg) || 0) * factor * servingRatio,
+      iron: (Number(food.iron_mg) || 0) * factor * servingRatio,
+      vitamin_a: (Number(food.vitamin_a_mcg) || 0) * factor * servingRatio,
+      vitamin_c: (Number(food.vitamin_c_mg) || 0) * factor * servingRatio,
+      vitamin_d: (Number(food.vitamin_d_mcg) || 0) * factor * servingRatio,
+      vitamin_b12: (Number(food.vitamin_b12_mcg) || 0) * factor * servingRatio,
     };
   }
 
@@ -83,7 +78,13 @@ export class NutritionSummaryService {
   async getMealBreakdown(userId: string, date: string): Promise<MealBreakdown[]> {
     const entries = await this.foodLogEntryRepository.findByUserAndDate({ userId, date });
 
-    const mealTypes: MealType[] = [MealType.BREAKFAST, MealType.LUNCH, MealType.DINNER, MealType.SNACK, MealType.WORKOUT];
+    const mealTypes: MealType[] = [
+      MealType.BREAKFAST,
+      MealType.LUNCH,
+      MealType.DINNER,
+      MealType.SNACK,
+      MealType.WORKOUT,
+    ];
 
     return mealTypes.map((mealType) => {
       const mealEntries = entries.filter((e) => e.meal_type === mealType);

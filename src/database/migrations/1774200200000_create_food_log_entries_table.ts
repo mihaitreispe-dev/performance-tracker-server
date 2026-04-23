@@ -24,7 +24,11 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .execute();
 
   // Primary query index: user's logs by date
-  await db.schema.createIndex('idx_food_log_entries_user_date').on('food_log_entries').columns(['user_id', 'log_date']).execute();
+  await db.schema
+    .createIndex('idx_food_log_entries_user_date')
+    .on('food_log_entries')
+    .columns(['user_id', 'log_date'])
+    .execute();
 
   // Index for querying by meal type
   await db.schema

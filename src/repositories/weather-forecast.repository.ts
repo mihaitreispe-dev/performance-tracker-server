@@ -68,10 +68,6 @@ export class WeatherForecastRepository {
   }
 
   async findStaleForecasts(cutoffDate: Date): Promise<WeatherForecast[]> {
-    return this.db
-      .selectFrom('weather_forecasts')
-      .selectAll()
-      .where('forecast_date', '<', cutoffDate)
-      .execute();
+    return this.db.selectFrom('weather_forecasts').selectAll().where('forecast_date', '<', cutoffDate).execute();
   }
 }

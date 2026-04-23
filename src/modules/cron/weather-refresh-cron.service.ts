@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { RacePlanGeneratorService } from 'src/modules/api/v1/race-prediction/services/race-plan-generator.service';
+import { WeatherForecastService } from 'src/modules/api/v1/race-prediction/services/weather-forecast.service';
 import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository';
 import { RaceEventRepository } from 'src/repositories/race-event.repository';
 import { RacePlanRepository } from 'src/repositories/race-plan.repository';
 import { WeatherForecastRepository } from 'src/repositories/weather-forecast.repository';
-import { WeatherForecastService } from 'src/modules/api/v1/race-prediction/services/weather-forecast.service';
-import { RacePlanGeneratorService } from 'src/modules/api/v1/race-prediction/services/race-plan-generator.service';
 
 /**
  * Cron service for automatically refreshing weather forecasts and regenerating race plans
@@ -83,14 +83,16 @@ export class WeatherRefreshCronService {
             continue;
           }
 
-          this.logger.log(`Refreshing weather for race ${plan.athlete_race_id} (${athleteRace.manual_name || 'unnamed'})`);
+          this.logger.log(
+            `Refreshing weather for race ${plan.athlete_race_id} (${athleteRace.manual_name || 'unnamed'})`,
+          );
 
           // Fetch new forecast
           const newForecast = await this.weatherForecastService.fetchForecast(
             plan.athlete_race_id,
             raceDate,
-            parseFloat(raceEvent.latitude.toString()),
-            parseFloat(raceEvent.longitude.toString()),
+            Number.parseFloat(raceEvent.latitude.toString()),
+            Number.parseFloat(raceEvent.longitude.toString()),
             undefined,
           );
 
@@ -101,9 +103,7 @@ export class WeatherRefreshCronService {
             existingForecast &&
             this.weatherForecastService.hasSignificantWeatherChange(existingForecast, newForecast)
           ) {
-            this.logger.log(
-              `Significant weather change detected for race ${plan.athlete_race_id}, regenerating plan`,
-            );
+            this.logger.log(`Significant weather change detected for race ${plan.athlete_race_id}, regenerating plan`);
 
             // Regenerate race plan with new weather
             await this.racePlanGeneratorService.generateRacePlan(plan.user_id, plan.athlete_race_id, {

@@ -293,10 +293,10 @@ export class SleepApiService {
       wasoSeconds: log.waso_seconds,
       wasoCount: log.waso_count,
       timeInBedSeconds: log.time_in_bed_seconds,
-      sleepEfficiency: log.sleep_efficiency ? parseFloat(log.sleep_efficiency) : null,
+      sleepEfficiency: log.sleep_efficiency ? Number.parseFloat(log.sleep_efficiency) : null,
       hrNadir: log.hr_nadir,
-      hrvFirstHalfAvg: log.hrv_first_half_avg ? parseFloat(log.hrv_first_half_avg) : null,
-      hrvSecondHalfAvg: log.hrv_second_half_avg ? parseFloat(log.hrv_second_half_avg) : null,
+      hrvFirstHalfAvg: log.hrv_first_half_avg ? Number.parseFloat(log.hrv_first_half_avg) : null,
+      hrvSecondHalfAvg: log.hrv_second_half_avg ? Number.parseFloat(log.hrv_second_half_avg) : null,
     };
   }
 

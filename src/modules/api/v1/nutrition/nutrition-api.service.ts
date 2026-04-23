@@ -1,38 +1,39 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
+import { Food, FoodSource } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
 import { FoodRepository } from 'src/repositories/food.repository';
 import { FoodLogEntryRepository, FoodLogEntryWithFood } from 'src/repositories/food-log-entry.repository';
-import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
-import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
 import { UserFrequentFoodRepository } from 'src/repositories/user-frequent-food.repository';
-import { FoodSource, Food } from 'src/database/interfaces';
-import { FoodDatabaseService } from './services/food-database.service';
-import { NutritionSummaryService } from './services/nutrition-summary.service';
+import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
+
 import {
-  FoodSearchQuery,
   CreateCustomFoodBody,
-  FoodLogQuery,
   CreateFoodLogBody,
-  UpdateFoodLogBody,
-  WeeklySummaryQuery,
+  FoodLogQuery,
+  FoodSearchQuery,
   MonthlySummaryQuery,
+  UpdateFoodLogBody,
   UpdateNutritionGoalsBody,
+  WeeklySummaryQuery,
 } from './request.dto';
 import {
+  DailyMealsResponseDTO,
+  DailyNutritionSummaryDTO,
   FoodDTO,
   FoodListResponseDTO,
   FoodLogEntryDTO,
-  DailyNutritionSummaryDTO,
-  DailyMealsResponseDTO,
-  WeeklySummaryDTO,
+  FrequentFoodsResponseDTO,
+  MealBreakdownDTO,
   MonthlySummaryDTO,
   NutritionGoalsDTO,
-  FrequentFoodsResponseDTO,
   NutritionTotalsDTO,
-  MealBreakdownDTO,
+  WeeklySummaryDTO,
 } from './response.dto';
-import { MealBreakdown, NutritionTotals, FoodLogEntryWithNutrition } from './types';
+import { FoodDatabaseService } from './services/food-database.service';
+import { NutritionSummaryService } from './services/nutrition-summary.service';
+import { FoodLogEntryWithNutrition, MealBreakdown, NutritionTotals } from './types';
 
 @Injectable()
 export class NutritionApiService {
@@ -269,7 +270,10 @@ export class NutritionApiService {
   // Summaries
   // ==========================================================================
 
-  async getDailySummary(req: Request & { user: AuthUser }, date?: string): Promise<{ data: DailyNutritionSummaryDTO | null }> {
+  async getDailySummary(
+    req: Request & { user: AuthUser },
+    date?: string,
+  ): Promise<{ data: DailyNutritionSummaryDTO | null }> {
     const userId = req.user.id;
     const targetDate = date || new Date().toISOString().split('T')[0];
 
@@ -317,7 +321,10 @@ export class NutritionApiService {
     };
   }
 
-  async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<{ data: WeeklySummaryDTO }> {
+  async getWeeklySummary(
+    req: Request & { user: AuthUser },
+    query: WeeklySummaryQuery,
+  ): Promise<{ data: WeeklySummaryDTO }> {
     const userId = req.user.id;
     const endDate = query.date ? new Date(query.date) : new Date();
     const startDate = new Date(endDate);
@@ -349,7 +356,10 @@ export class NutritionApiService {
     };
   }
 
-  async getMonthlySummary(req: Request & { user: AuthUser }, query: MonthlySummaryQuery): Promise<{ data: MonthlySummaryDTO }> {
+  async getMonthlySummary(
+    req: Request & { user: AuthUser },
+    query: MonthlySummaryQuery,
+  ): Promise<{ data: MonthlySummaryDTO }> {
     const userId = req.user.id;
 
     const trend = await this.dailySummaryRepository.getMonthlyTrend(userId, query.year, query.month);
@@ -504,8 +514,12 @@ export class NutritionApiService {
     };
   }
 
-  private toFoodLogEntryDTO(entry: (FoodLogEntryWithFood | FoodLogEntryWithNutrition) & { calculated_nutrition?: NutritionTotals }, nutrition?: NutritionTotals): FoodLogEntryDTO {
-    const logDate = entry.log_date instanceof Date ? entry.log_date.toISOString().split('T')[0] : String(entry.log_date);
+  private toFoodLogEntryDTO(
+    entry: (FoodLogEntryWithFood | FoodLogEntryWithNutrition) & { calculated_nutrition?: NutritionTotals },
+    nutrition?: NutritionTotals,
+  ): FoodLogEntryDTO {
+    const logDate =
+      entry.log_date instanceof Date ? entry.log_date.toISOString().split('T')[0] : String(entry.log_date);
 
     return {
       id: entry.id,
