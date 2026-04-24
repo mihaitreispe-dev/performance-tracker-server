@@ -1281,9 +1281,12 @@ export class AnalyticsApiService {
     currentWeekStart.setDate(today.getDate() + diffToMonday);
     currentWeekStart.setHours(0, 0, 0, 0);
 
-    // Go back far enough to calculate longest streak (1 year)
+    // Go back far enough to calculate longest streak (1 year). Use a 52-week
+    // offset (not 365 days) so lookbackStart lands on a Monday and each step
+    // below stays week-aligned — otherwise weekStartDates keys don't match
+    // the Monday-indexed executionsByWeek map.
     const lookbackStart = new Date(currentWeekStart);
-    lookbackStart.setDate(lookbackStart.getDate() - 365);
+    lookbackStart.setDate(lookbackStart.getDate() - 52 * 7);
 
     // Fetch all completed executions
     const executions = await this.workoutExecutionRepository.findMany({

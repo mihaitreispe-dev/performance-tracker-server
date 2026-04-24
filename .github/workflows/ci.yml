@@ -23,6 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm test
 
       # Regenerate the OpenAPI spec and fail the build if it drifts from what's
       # committed. FirebaseService is stubbed inside extract-openapi.ts so only

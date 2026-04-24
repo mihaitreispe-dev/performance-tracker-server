@@ -2,7 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 
 import { WorkoutExecution, WorkoutExecutionSource } from '../../../../database/interfaces';
+import { AthletePrivacySettingsRepository } from '../../../../repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from '../../../../repositories/cardio-metrics.repository';
+import { CoachAthleteRelationshipRepository } from '../../../../repositories/coach-athlete-relationship.repository';
 import { DailyTrainingLoadRepository } from '../../../../repositories/daily-training-load.repository';
 import { ExecutionWeatherRepository } from '../../../../repositories/execution-weather.repository';
 import { ExerciseRepository } from '../../../../repositories/exercise.repository';
@@ -41,11 +43,12 @@ describe('AnalyticsApiService', () => {
     const mockWorkoutScheduleRepo = {
       findMany: jest.fn(),
       findById: jest.fn(),
+      findByIds: jest.fn().mockResolvedValue([]),
     };
 
     const mockWorkoutRepo = {
       findById: jest.fn(),
-      findByIds: jest.fn(),
+      findByIds: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -64,6 +67,8 @@ describe('AnalyticsApiService', () => {
         { provide: DailyTrainingLoadRepository, useValue: {} },
         { provide: PersonalRecordRepository, useValue: {} },
         { provide: ExecutionWeatherRepository, useValue: {} },
+        { provide: CoachAthleteRelationshipRepository, useValue: {} },
+        { provide: AthletePrivacySettingsRepository, useValue: {} },
       ],
     }).compile();
 
