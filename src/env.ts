@@ -178,16 +178,6 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   CORS_ORIGINS?: string;
 
-  // OpenAI (Voice Assistant)
-
-  @IsString()
-  @IsOptional()
-  OPENAI_API_KEY?: string;
-
-  @IsString()
-  @IsOptional()
-  OPENAI_MODEL?: string;
-
   // OpenWearables
 
   @IsString()

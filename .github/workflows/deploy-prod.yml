@@ -126,9 +126,6 @@ jobs:
           GARMIN_CONSUMER_KEY=${{ secrets.GARMIN_CONSUMER_KEY_PROD }}
           GARMIN_CONSUMER_SECRET=${{ secrets.GARMIN_CONSUMER_SECRET_PROD }}
           GARMIN_REDIRECT_URI=${{ vars.GARMIN_REDIRECT_URI_PROD }}
-          # OpenAI
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY_PROD }}
-          OPENAI_MODEL=${{ vars.OPENAI_MODEL_PROD }}
           # OpenWearables bridge
           OPENWEARABLES_API_KEY=${{ secrets.OPENWEARABLES_API_KEY_PROD }}
           OW_DB_HOST=${{ secrets.OW_DB_HOST_PROD }}

@@ -73,7 +73,6 @@ Per environment (suffix `_STAGING` or `_PROD`):
 | `MEDIA_CONVERT_ROLE_*` / `MEDIA_CONVERT_QUEUE_*` | MediaConvert role + queue ARNs |
 | `STRAVA_CLIENT_ID_*` / `STRAVA_CLIENT_SECRET_*` / `STRAVA_WEBHOOK_VERIFY_TOKEN_*` | Strava OAuth/webhook |
 | `GARMIN_CONSUMER_KEY_*` / `GARMIN_CONSUMER_SECRET_*` | Garmin OAuth |
-| `OPENAI_API_KEY_*` | OpenAI API key |
 | `OPENWEARABLES_API_KEY_*` | API key used by the NestJS app to call OpenWearables |
 | `OW_DB_HOST_*` / `OW_DB_PORT_*` / `OW_DB_NAME_*` / `OW_DB_USER_*` / `OW_DB_PASSWORD_*` | OpenWearables database credentials |
 | `OPENWEARABLES_ENV_*` | Full contents of the OpenWearables `.env` file (see `openwearables/backend/config/.env.example`) |
@@ -94,7 +93,6 @@ Per environment (suffix `_STAGING` or `_PROD`):
 | `MEDIA_CONVERT_REGION_*` / `DISABLE_MEDIA_CONVERT_*` | MediaConvert config |
 | `FIREBASE_PROJECT_ID_*` | Firebase project ID |
 | `STRAVA_REDIRECT_URI_*` / `GARMIN_REDIRECT_URI_*` | OAuth redirect URIs |
-| `OPENAI_MODEL_*` | OpenAI model (e.g. `gpt-4-turbo`) |
 
 ## Manual Operations
 

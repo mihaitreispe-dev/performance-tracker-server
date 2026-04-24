@@ -199,16 +199,6 @@ export class AppConfigService {
     return origins.split(',').map((origin: string) => origin.trim());
   }
 
-  // OpenAI (Voice Assistant)
-
-  get openaiApiKey(): string | undefined {
-    return this.configService.get('OPENAI_API_KEY');
-  }
-
-  get openaiModel(): string {
-    return this.configService.get('OPENAI_MODEL') || 'gpt-4-turbo';
-  }
-
   // OpenWearables
 
   get openwearablesApiUrl(): string {

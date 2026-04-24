@@ -122,7 +122,6 @@ pnpm cli              # Run CLI commands
 | `AWS_SECRET_ACCESS_KEY` | AWS credentials |
 | `AWS_S3_BUCKET` | S3 bucket name |
 | `AWS_CLOUDFRONT_DOMAIN` | CloudFront distribution |
-| `OPENAI_API_KEY` | OpenAI API for voice features |
 | `OPEN_METEO_API_URL` | Weather API endpoint |
 
 ## Project Structure

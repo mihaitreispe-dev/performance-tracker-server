@@ -30,7 +30,6 @@ import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module'
 import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
 import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
-import { VoiceApiModule } from './voice/voice.module';
 import { WearablesApiModule } from './wearables/wearables-api.module';
 import { WellnessModule } from './wellness/wellness.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
@@ -60,7 +59,6 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     PersonalRecordsApiModule.register(),
     SleepApiModule.register(),
     PainLogsApiModule.register(),
-    VoiceApiModule.register(),
     WearablesApiModule.register(),
     DataImportApiModule.register(),
     DataExportApiModule.register(),
