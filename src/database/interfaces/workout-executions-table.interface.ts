@@ -5,7 +5,6 @@ import { Timestamp } from './timestamp';
 export enum WorkoutExecutionSource {
   MANUAL = 'manual',
   GARMIN = 'garmin',
-  STRAVA = 'strava',
   APPLE_HEALTH = 'apple_health',
   FITBIT = 'fitbit',
   TRAININGPEAKS = 'trainingpeaks',

@@ -10,7 +10,6 @@ import { WorkoutFileParserService } from '../workout-file-imports/workout-file-p
 import { DataImportController } from './data-import.controller';
 import { DataImportService } from './data-import.service';
 import { GarminArchiveProcessor } from './garmin-archive.processor';
-import { StravaArchiveProcessor } from './strava-archive.processor';
 
 @Module({})
 export class DataImportApiModule {
@@ -23,7 +22,6 @@ export class DataImportApiModule {
         imports: [AppConfigModule.register(), S3Module.register()],
         providers: [
           DataImportService,
-          StravaArchiveProcessor,
           GarminArchiveProcessor,
           WorkoutFileParserService,
           DataImportJobRepository,

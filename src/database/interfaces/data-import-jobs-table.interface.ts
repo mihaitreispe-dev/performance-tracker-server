@@ -3,7 +3,6 @@ import { Generated, Insertable, Selectable, Updateable } from 'kysely';
 import { Timestamp } from './timestamp';
 
 export enum DataImportType {
-  STRAVA_ARCHIVE = 'strava_archive',
   GARMIN_ARCHIVE = 'garmin_archive',
   TRAININGPEAKS_ARCHIVE = 'trainingpeaks_archive',
 }

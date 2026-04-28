@@ -8,7 +8,6 @@ export enum WearableProvider {
   OURA = 'oura',
   POLAR = 'polar',
   SUUNTO = 'suunto',
-  STRAVA = 'strava',
   APPLE_HEALTH = 'apple_health',
   SAMSUNG_HEALTH = 'samsung_health',
   FITBIT = 'fitbit',

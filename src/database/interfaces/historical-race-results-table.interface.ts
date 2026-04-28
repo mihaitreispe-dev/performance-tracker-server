@@ -1,7 +1,6 @@
 import type { ColumnType, Insertable, Selectable, Updateable } from 'kysely';
 
 export const RaceResultSource = {
-  STRAVA: 'strava',
   GARMIN: 'garmin',
   MANUAL: 'manual',
 } as const;

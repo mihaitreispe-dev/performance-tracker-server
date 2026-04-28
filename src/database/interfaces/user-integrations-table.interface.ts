@@ -3,7 +3,6 @@ import { Generated, Insertable, Selectable, Updateable } from 'kysely';
 import { Timestamp } from './timestamp';
 
 export enum IntegrationProvider {
-  STRAVA = 'strava',
   GARMIN = 'garmin',
   APPLE_HEALTH = 'apple_health',
   FITBIT = 'fitbit',

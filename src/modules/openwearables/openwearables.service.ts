@@ -89,7 +89,6 @@ export const PROVIDER_CAPABILITIES: Record<WearableProvider, WearableDataCategor
     WearableDataCategory.HEALTH_METRICS,
   ],
   [WearableProvider.SUUNTO]: [WearableDataCategory.WORKOUTS],
-  [WearableProvider.STRAVA]: [WearableDataCategory.WORKOUTS],
   [WearableProvider.APPLE_HEALTH]: [
     WearableDataCategory.WORKOUTS,
     WearableDataCategory.SLEEP,
@@ -354,7 +353,6 @@ export class OpenWearablesService {
       oura: WearableProvider.OURA,
       polar: WearableProvider.POLAR,
       suunto: WearableProvider.SUUNTO,
-      strava: WearableProvider.STRAVA,
       apple_health: WearableProvider.APPLE_HEALTH,
       samsung_health: WearableProvider.SAMSUNG_HEALTH,
       fitbit: WearableProvider.FITBIT,

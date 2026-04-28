@@ -268,7 +268,7 @@ export class HistoricalRaceResultDTO {
   @ApiPropertyOptional({ description: 'Prediction error as percentage' })
   prediction_error_percent?: number;
 
-  @ApiProperty({ enum: ['strava', 'garmin', 'manual'] })
+  @ApiProperty({ enum: ['garmin', 'manual'] })
   source: string;
 
   @ApiProperty()

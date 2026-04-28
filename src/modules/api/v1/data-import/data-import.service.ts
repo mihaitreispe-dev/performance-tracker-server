@@ -16,7 +16,6 @@ import {
   RequestUploadUrlDTO,
   RequestUploadUrlResponse,
 } from './response.dto';
-import { StravaArchiveProcessor } from './strava-archive.processor';
 
 @Injectable()
 export class DataImportService {
@@ -26,7 +25,6 @@ export class DataImportService {
     private readonly dataImportJobRepo: DataImportJobRepository,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
-    private readonly stravaArchiveProcessor: StravaArchiveProcessor,
     private readonly garminArchiveProcessor: GarminArchiveProcessor,
   ) {}
 
@@ -139,9 +137,6 @@ export class DataImportService {
       // Process based on import type
       let result;
       switch (job.import_type) {
-        case DataImportType.STRAVA_ARCHIVE:
-          result = await this.stravaArchiveProcessor.processArchive(archiveData, job);
-          break;
         case DataImportType.GARMIN_ARCHIVE:
           result = await this.garminArchiveProcessor.processArchive(archiveData, job);
           break;

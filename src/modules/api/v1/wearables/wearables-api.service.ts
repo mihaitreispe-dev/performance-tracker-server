@@ -34,7 +34,6 @@ const PROVIDER_DISPLAY_NAMES: Record<WearableProvider, string> = {
   [WearableProvider.OURA]: 'Oura',
   [WearableProvider.POLAR]: 'Polar',
   [WearableProvider.SUUNTO]: 'Suunto',
-  [WearableProvider.STRAVA]: 'Strava',
   [WearableProvider.APPLE_HEALTH]: 'Apple Health',
   [WearableProvider.SAMSUNG_HEALTH]: 'Samsung Health',
   [WearableProvider.FITBIT]: 'Fitbit',

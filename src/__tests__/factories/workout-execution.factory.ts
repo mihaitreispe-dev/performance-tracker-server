@@ -48,14 +48,6 @@ export function createCompletedWorkoutExecution(options: WorkoutExecutionFactory
   });
 }
 
-export function createStravaExecution(options: WorkoutExecutionFactoryOptions = {}): WorkoutExecution {
-  return createWorkoutExecution({
-    ...options,
-    source: WorkoutExecutionSource.STRAVA,
-    externalId: options.externalId ?? `strava-${executionCounter}`,
-  });
-}
-
 export function resetExecutionCounter(): void {
   executionCounter = 0;
 }

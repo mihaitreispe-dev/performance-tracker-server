@@ -144,20 +144,6 @@ export class Env extends BoostrapEnv {
   @Matches('^Y|N$', 'i')
   DISABLE_MEDIA_CONVERT: string;
 
-  // Strava Integration
-
-  @IsString()
-  STRAVA_CLIENT_ID: string;
-
-  @IsString()
-  STRAVA_CLIENT_SECRET: string;
-
-  @IsString()
-  STRAVA_REDIRECT_URI: string;
-
-  @IsString()
-  STRAVA_WEBHOOK_VERIFY_TOKEN: string;
-
   // Garmin Integration
 
   @IsString()

@@ -9,7 +9,14 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 
 import { WorkoutFileParserService } from '../workout-file-imports/workout-file-parser.service';
-import { ArchiveProcessingResult } from './strava-archive.processor';
+
+export interface ArchiveProcessingResult {
+  totalFiles: number;
+  processedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  errors: string[];
+}
 
 @Injectable()
 export class GarminArchiveProcessor {

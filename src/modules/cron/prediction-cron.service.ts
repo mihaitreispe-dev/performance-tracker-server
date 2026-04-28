@@ -145,7 +145,7 @@ export class PredictionCronService {
 
   /**
    * Backfill historical predictions for a user based on their workout history
-   * This is called when a user uploads historical data (e.g., syncs from Strava)
+   * This is called when a user uploads historical data (e.g., a Garmin archive)
    */
   async backfillPredictions(userId: string): Promise<{ datesProcessed: number; predictionsGenerated: number }> {
     this.logger.log(`Starting prediction backfill for user ${userId}`);
