@@ -1971,7 +1971,6 @@
               "enum": [
                 "manual",
                 "garmin",
-                "strava",
                 "apple_health",
                 "fitbit",
                 "trainingpeaks"
@@ -6990,323 +6989,6 @@
         ]
       }
     },
-    "/v1/integrations/strava/auth": {
-      "get": {
-        "operationId": "IntegrationsApiController_getStravaAuthUrl",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthUrlResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Get Strava OAuth authorization URL",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/v1/integrations/strava/callback": {
-      "get": {
-        "operationId": "IntegrationsApiController_handleStravaCallback",
-        "parameters": [
-          {
-            "name": "code",
-            "required": true,
-            "in": "query",
-            "description": "Authorization code from OAuth provider",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "required": false,
-            "in": "query",
-            "description": "State parameter for CSRF protection",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "scope",
-            "required": false,
-            "in": "query",
-            "description": "Scope of access granted",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserIntegrationResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid callback",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Strava OAuth callback",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/v1/integrations/strava/webhook": {
-      "get": {
-        "operationId": "IntegrationsApiController_handleStravaWebhookVerify",
-        "parameters": [
-          {
-            "name": "hub.mode",
-            "required": false,
-            "in": "query",
-            "description": "Hub mode for subscription verification",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "hub.challenge",
-            "required": false,
-            "in": "query",
-            "description": "Hub challenge for subscription verification",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "hub.verify_token",
-            "required": false,
-            "in": "query",
-            "description": "Hub verify token for subscription verification",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Strava webhook endpoint (verification and events)",
-        "tags": [
-          "integrations"
-        ]
-      },
-      "post": {
-        "operationId": "IntegrationsApiController_handleStravaWebhook",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StravaWebhookBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WebhookAckResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Strava webhook receiver",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/v1/integrations/strava/sync": {
-      "post": {
-        "operationId": "IntegrationsApiController_syncAllStravaActivities",
-        "parameters": [
-          {
-            "name": "after",
-            "required": false,
-            "in": "query",
-            "description": "Sync activities after this date (ISO 8601 format)",
-            "schema": {
-              "example": "2024-01-01T00:00:00Z",
-              "type": "string"
-            }
-          },
-          {
-            "name": "before",
-            "required": false,
-            "in": "query",
-            "description": "Sync activities before this date (ISO 8601 format)",
-            "schema": {
-              "example": "2024-12-31T23:59:59Z",
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Maximum number of activities to sync",
-            "schema": {
-              "minimum": 1,
-              "maximum": 1000,
-              "default": 200,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StravaSyncResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized or token expired",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No Strava integration found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Sync all Strava activities",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
-    "/v1/integrations/strava/push": {
-      "post": {
-        "operationId": "IntegrationsApiController_pushToStrava",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PushToStravaBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PushToStravaResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Cannot push Strava-synced workouts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized or token expired",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No Strava integration or workout not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Push a workout execution to Strava",
-        "tags": [
-          "integrations"
-        ]
-      }
-    },
     "/v1/integrations/garmin/auth": {
       "get": {
         "operationId": "IntegrationsApiController_getGarminAuthUrl",
@@ -9735,7 +9417,6 @@
                 "oura",
                 "polar",
                 "suunto",
-                "strava",
                 "apple_health",
                 "samsung_health",
                 "fitbit",
@@ -18098,6 +17779,1246 @@
         ]
       }
     },
+    "/v1/organisations": {
+      "post": {
+        "operationId": "OrganisationsApiController_createOrganisation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganisationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create an organisation (self-serve). The caller becomes ORG_OWNER.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/me": {
+      "get": {
+        "operationId": "OrganisationsApiController_listMyOrganisations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List organisations the current user is a member of",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}": {
+      "get": {
+        "operationId": "OrganisationsApiController_getOrganisation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch a single organisation by id (member-only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "patch": {
+        "operationId": "OrganisationsApiController_updateOrganisation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganisationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update organisation metadata (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/logo": {
+      "post": {
+        "operationId": "OrganisationsApiController_requestLogoUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestLogoUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request a presigned PUT URL to upload a new organisation logo (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "delete": {
+        "operationId": "OrganisationsApiController_clearLogo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the organisation logo (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/logo/complete": {
+      "post": {
+        "operationId": "OrganisationsApiController_confirmLogoUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmLogoUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm the logo upload (verifies the S3 object, persists bucket/key on the org)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/memberships": {
+      "get": {
+        "operationId": "MembershipsApiController_listMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List members of an organisation",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "post": {
+        "operationId": "MembershipsApiController_inviteMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invite an existing user into this organisation (admin/owner only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/memberships/{membershipId}": {
+      "patch": {
+        "operationId": "MembershipsApiController_updateRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membershipId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMembershipRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a member's role (admin/owner only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "delete": {
+        "operationId": "MembershipsApiController_removeMember",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membershipId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a member (admin/owner only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/memberships/{membershipId}/accept": {
+      "post": {
+        "operationId": "MembershipsApiController_acceptInvitation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membershipId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Accept a pending invitation (the invitee only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/theme": {
+      "get": {
+        "operationId": "ThemesApiController_getTheme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch the active theme for an organisation (members only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "put": {
+        "operationId": "ThemesApiController_updateTheme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateThemeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upsert the theme for an organisation (admin/owner only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/modules/catalogue": {
+      "get": {
+        "operationId": "ModulesApiController_listCatalogue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the module catalogue (the same for all orgs)",
+        "tags": [
+          "Modules"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/modules/resolved": {
+      "get": {
+        "operationId": "ModulesApiController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "athleteId",
+            "required": false,
+            "in": "query",
+            "description": "Athlete user id to resolve overrides for. Omit to get the org defaults only.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resolve which modules are enabled for an org (and optionally an athlete)",
+        "tags": [
+          "Modules"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/modules/org-settings": {
+      "post": {
+        "operationId": "ModulesApiController_setOrgModule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrgModuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the org-level enabled state for a module (admin/owner)",
+        "tags": [
+          "Modules"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/modules/athlete-overrides": {
+      "post": {
+        "operationId": "ModulesApiController_setAthleteOverride",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAthleteOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set a per-athlete override for a module (coach or above)",
+        "tags": [
+          "Modules"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/modules/athlete-overrides/{athleteUserId}/{moduleKey}": {
+      "delete": {
+        "operationId": "ModulesApiController_clearAthleteOverride",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "athleteUserId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "moduleKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clear a per-athlete override so the org default applies again",
+        "tags": [
+          "Modules"
+        ]
+      }
+    },
+    "/v1/content-items": {
+      "get": {
+        "operationId": "ContentItemsApiController_list",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "snack",
+                "course_lesson",
+                "exercise_intro"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "upload_pending",
+                "ready",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List content items in the active organisation",
+        "tags": [
+          "Content Items"
+        ]
+      },
+      "post": {
+        "operationId": "ContentItemsApiController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a content item. If videoMimeType is supplied, the response includes a presigned PUT upload URL.",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/{id}": {
+      "get": {
+        "operationId": "ContentItemsApiController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch a single content item",
+        "tags": [
+          "Content Items"
+        ]
+      },
+      "patch": {
+        "operationId": "ContentItemsApiController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a content item",
+        "tags": [
+          "Content Items"
+        ]
+      },
+      "delete": {
+        "operationId": "ContentItemsApiController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a content item (and its uploaded video, best effort)",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/{id}/upload-complete": {
+      "post": {
+        "operationId": "ContentItemsApiController_markUploadComplete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark the video upload as complete (verifies the S3 object exists, flips status to READY)",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/courses": {
+      "get": {
+        "operationId": "CoursesApiController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "published",
+                "archived"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List courses in the active organisation",
+        "tags": [
+          "Courses"
+        ]
+      },
+      "post": {
+        "operationId": "CoursesApiController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCourseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a course (coach/admin/owner)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}": {
+      "get": {
+        "operationId": "CoursesApiController_getById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch a course with its ordered lessons",
+        "tags": [
+          "Courses"
+        ]
+      },
+      "patch": {
+        "operationId": "CoursesApiController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCourseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update course metadata or status (coach/admin/owner)",
+        "tags": [
+          "Courses"
+        ]
+      },
+      "delete": {
+        "operationId": "CoursesApiController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a course (coach/admin/owner)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}/lessons": {
+      "post": {
+        "operationId": "CoursesApiController_addLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLessonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Append a content item as a lesson at the end of the course",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}/lessons/reorder": {
+      "patch": {
+        "operationId": "CoursesApiController_reorderLessons",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderLessonsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reorder all lessons. Body must list every existing lesson id in the new order.",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}/lessons/{lessonId}": {
+      "delete": {
+        "operationId": "CoursesApiController_removeLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a lesson from a course (does not delete the content item)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}/lessons/{lessonId}/complete": {
+      "post": {
+        "operationId": "CoursesApiController_markLessonComplete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lessonId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark a lesson complete for the current user (idempotent)",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
+    "/v1/courses/{id}/progress": {
+      "get": {
+        "operationId": "CoursesApiController_getProgress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the current user’s progress through this course",
+        "tags": [
+          "Courses"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -21117,6 +22038,10 @@
               "$ref": "#/components/schemas/MuscleGroupDTO"
             }
           },
+          "introContentItemId": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -21315,6 +22240,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "introContentItemId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Intro content_item ID (kind=exercise_intro). Pass null to clear."
           }
         }
       },
@@ -22431,7 +23361,6 @@
             "enum": [
               "manual",
               "garmin",
-              "strava",
               "apple_health",
               "fitbit",
               "trainingpeaks"
@@ -28396,7 +29325,6 @@
           "provider": {
             "type": "string",
             "enum": [
-              "strava",
               "garmin",
               "apple_health",
               "fitbit",
@@ -28484,149 +29412,6 @@
           "data"
         ]
       },
-      "StravaWebhookBody": {
-        "type": "object",
-        "properties": {
-          "object_type": {
-            "type": "string",
-            "description": "Object type (activity, athlete)"
-          },
-          "object_id": {
-            "type": "number",
-            "description": "Object ID"
-          },
-          "aspect_type": {
-            "type": "string",
-            "description": "Aspect type (create, update, delete)"
-          },
-          "owner_id": {
-            "type": "number",
-            "description": "Owner ID (athlete ID)"
-          },
-          "subscription_id": {
-            "type": "number",
-            "description": "Subscription ID"
-          },
-          "event_time": {
-            "type": "number",
-            "description": "Event time"
-          },
-          "updates": {
-            "type": "object",
-            "description": "Updates object for update events"
-          }
-        },
-        "required": [
-          "object_type",
-          "object_id",
-          "aspect_type",
-          "owner_id",
-          "subscription_id",
-          "event_time"
-        ]
-      },
-      "WebhookAckResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "StravaSyncResultDTO": {
-        "type": "object",
-        "properties": {
-          "totalActivities": {
-            "type": "number",
-            "description": "Total number of activities found in Strava"
-          },
-          "syncedCount": {
-            "type": "number",
-            "description": "Number of activities successfully synced"
-          },
-          "skippedCount": {
-            "type": "number",
-            "description": "Number of activities skipped (already synced)"
-          },
-          "failedCount": {
-            "type": "number",
-            "description": "Number of activities that failed to sync"
-          },
-          "status": {
-            "type": "string",
-            "description": "Overall sync status",
-            "enum": [
-              "completed",
-              "error"
-            ]
-          }
-        },
-        "required": [
-          "totalActivities",
-          "syncedCount",
-          "skippedCount",
-          "failedCount",
-          "status"
-        ]
-      },
-      "StravaSyncResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/StravaSyncResultDTO"
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "PushToStravaBody": {
-        "type": "object",
-        "properties": {
-          "workoutExecutionId": {
-            "type": "string",
-            "description": "The workout execution ID to push to Strava"
-          }
-        },
-        "required": [
-          "workoutExecutionId"
-        ]
-      },
-      "PushToStravaResultDTO": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "description": "Whether the push was successful"
-          },
-          "stravaActivityId": {
-            "type": "number",
-            "description": "The Strava activity ID if successful"
-          },
-          "error": {
-            "type": "string",
-            "description": "Error message if failed"
-          }
-        },
-        "required": [
-          "success",
-          "stravaActivityId"
-        ]
-      },
-      "PushToStravaResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/PushToStravaResultDTO"
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
       "GarminWebhookBody": {
         "type": "object",
         "properties": {
@@ -28645,6 +29430,17 @@
             }
           }
         }
+      },
+      "WebhookAckResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
       },
       "TrainingPeaksSyncResultDTO": {
         "type": "object",
@@ -30717,7 +31513,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -30775,7 +31570,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -30860,7 +31654,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -30887,7 +31680,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -30953,7 +31745,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -31017,7 +31808,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -31086,7 +31876,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -31146,7 +31935,6 @@
               "oura",
               "polar",
               "suunto",
-              "strava",
               "apple_health",
               "samsung_health",
               "fitbit",
@@ -31180,7 +31968,6 @@
             "type": "string",
             "description": "Type of archive to import",
             "enum": [
-              "strava_archive",
               "garmin_archive",
               "trainingpeaks_archive"
             ]
@@ -31263,7 +32050,6 @@
           "importType": {
             "type": "string",
             "enum": [
-              "strava_archive",
               "garmin_archive",
               "trainingpeaks_archive"
             ]
@@ -34896,7 +35682,6 @@
           "source": {
             "type": "string",
             "enum": [
-              "strava",
               "garmin",
               "manual"
             ]
@@ -36702,6 +37487,303 @@
             "description": "Protein grams per kg body weight (for auto-calculation)"
           }
         }
+      },
+      "CreateOrganisationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name of the organisation"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-safe slug (lowercase, hyphens). Auto-generated from name if omitted."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateOrganisationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
+      "RequestLogoUploadDto": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "description": "Mime type of the logo image",
+            "example": "image/png"
+          }
+        },
+        "required": [
+          "mimeType"
+        ]
+      },
+      "ConfirmLogoUploadDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "key"
+        ]
+      },
+      "InviteMemberDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email of the user to invite. Must already have an account."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ],
+            "description": "Role to grant in this organisation"
+          }
+        },
+        "required": [
+          "email",
+          "role"
+        ]
+      },
+      "UpdateMembershipRoleDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "UpdateThemeDto": {
+        "type": "object",
+        "properties": {
+          "themeTokens": {
+            "type": "object",
+            "description": "Theme tokens map (color names → hex/rgb strings). Replaces stored value if provided.",
+            "example": {
+              "primary": "#ff6b35",
+              "secondary": "#004e89",
+              "background": "#ffffff"
+            }
+          },
+          "copyOverrides": {
+            "type": "object",
+            "description": "Copy override map (key → replacement string). Replaces stored value if provided.",
+            "example": {
+              "athletes": "clients",
+              "welcome": "Welcome to FastClub"
+            }
+          },
+          "fontFamily": {
+            "type": "object",
+            "description": "Font family CSS string"
+          }
+        }
+      },
+      "SetOrgModuleDto": {
+        "type": "object",
+        "properties": {
+          "moduleKey": {
+            "type": "string",
+            "enum": [
+              "workouts",
+              "workout_plans",
+              "workout_schedules",
+              "exercises",
+              "movement_snacks",
+              "courses"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moduleKey",
+          "enabled"
+        ]
+      },
+      "SetAthleteOverrideDto": {
+        "type": "object",
+        "properties": {
+          "athleteUserId": {
+            "type": "string"
+          },
+          "moduleKey": {
+            "type": "string",
+            "enum": [
+              "workouts",
+              "workout_plans",
+              "workout_schedules",
+              "exercises",
+              "movement_snacks",
+              "courses"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "athleteUserId",
+          "moduleKey",
+          "enabled"
+        ]
+      },
+      "CreateContentItemDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "snack",
+              "course_lesson",
+              "exercise_intro"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "videoMimeType": {
+            "type": "string",
+            "description": "Mime type of the video to upload. If set, a presigned PUT URL is returned."
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Duration in seconds (client-provided; refined after transcode in future)"
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ]
+      },
+      "UpdateContentItemDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "upload_pending",
+              "ready",
+              "failed"
+            ]
+          },
+          "durationSeconds": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateCourseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateCourseDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          }
+        }
+      },
+      "AddLessonDto": {
+        "type": "object",
+        "properties": {
+          "contentItemId": {
+            "type": "string",
+            "description": "ID of the content_item (kind=COURSE_LESSON) to attach"
+          }
+        },
+        "required": [
+          "contentItemId"
+        ]
+      },
+      "ReorderLessonsDto": {
+        "type": "object",
+        "properties": {
+          "lessonIds": {
+            "description": "Lesson IDs in their new order",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "lessonIds"
+        ]
       },
       "CreateScheduledPromptBody": {
         "type": "object",

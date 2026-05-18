@@ -43,3 +43,22 @@ export class OrganisationIdParam {
   @IsUUID()
   id: string;
 }
+
+export class RequestLogoUploadDto {
+  @ApiProperty({ description: 'Mime type of the logo image', example: 'image/png' })
+  @IsString()
+  @Matches(/^image\/(png|jpeg|svg\+xml|webp)$/, {
+    message: 'mimeType must be image/png, image/jpeg, image/svg+xml or image/webp',
+  })
+  mimeType: string;
+}
+
+export class ConfirmLogoUploadDto {
+  @ApiProperty()
+  @IsString()
+  bucket: string;
+
+  @ApiProperty()
+  @IsString()
+  key: string;
+}

@@ -29,6 +29,24 @@ export const s3Keys = {
     }) => ({
       cover: `courses/${organisationId}/${courseId}/cover-${filename}`,
     }),
+    organisationLogo: ({
+      organisationId,
+      filename,
+    }: {
+      organisationId: string;
+      filename: string;
+    }) => ({
+      logo: `organisations/${organisationId}/logo-${filename}`,
+    }),
+    organisationFavicon: ({
+      organisationId,
+      filename,
+    }: {
+      organisationId: string;
+      filename: string;
+    }) => ({
+      favicon: `organisations/${organisationId}/favicon-${filename}`,
+    }),
   },
   content: {
     exercise: ({ userId, exerciseId }: { userId: string; exerciseId: string }) => {

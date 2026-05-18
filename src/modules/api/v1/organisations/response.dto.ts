@@ -32,3 +32,19 @@ export class MyOrganisationsListResponse {
   @ApiProperty({ type: [MyOrganisationDTO] })
   data: MyOrganisationDTO[];
 }
+
+export class LogoUploadDTO {
+  @ApiProperty({ description: 'Presigned PUT URL valid for 1 hour' })
+  uploadUrl: string;
+
+  @ApiProperty()
+  bucket: string;
+
+  @ApiProperty()
+  key: string;
+}
+
+export class LogoUploadResponse {
+  @ApiProperty({ type: LogoUploadDTO })
+  data: LogoUploadDTO;
+}

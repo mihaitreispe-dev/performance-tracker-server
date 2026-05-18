@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
+import { S3Module } from 'src/modules/s3/s3.module';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
@@ -20,7 +21,7 @@ export class OrganisationsApiModule {
     if (!this.instance) {
       this.instance = {
         module: OrganisationsApiModule,
-        imports: [AuthModule.register()],
+        imports: [AuthModule.register(), S3Module.register()],
         providers: [
           OrganisationsApiService,
           MembershipsApiService,

@@ -31,17 +31,21 @@ export class ModulesApiService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Seed the catalogue idempotently so adding a module is just a code change.
-    for (const entry of MODULE_CATALOGUE) {
-      await this.moduleRepo.upsertModule({
-        key: entry.key,
-        name: entry.name,
-        description: entry.description,
-        default_enabled: entry.defaultEnabled,
-        sort_order: entry.sortOrder,
-      });
+    // Seed the catalogue idempotently. Tolerate DB-unavailable boots (e.g. `openapi:extract`).
+    try {
+      for (const entry of MODULE_CATALOGUE) {
+        await this.moduleRepo.upsertModule({
+          key: entry.key,
+          name: entry.name,
+          description: entry.description,
+          default_enabled: entry.defaultEnabled,
+          sort_order: entry.sortOrder,
+        });
+      }
+      this.logger.log(`Seeded ${MODULE_CATALOGUE.length} modules`);
+    } catch (err) {
+      this.logger.warn(`Skipping module seed (DB unavailable): ${(err as Error).message}`);
     }
-    this.logger.log(`Seeded ${MODULE_CATALOGUE.length} modules`);
   }
 
   async listCatalogue(): Promise<ModulesListResponse> {
