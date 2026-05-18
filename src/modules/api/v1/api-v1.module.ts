@@ -16,6 +16,7 @@ import { WorkoutComparisonModule } from './analytics/workout-comparison/workout-
 import { AuthApiModule } from './auth/auth-api.module';
 import { CardioCategoriesApiModule } from './cardio-categories/cardio-categories-api.module';
 import { CoachingApiModule } from './coaching/coaching-api.module';
+import { ContentItemsApiModule } from './content-items/content-items-api.module';
 import { DataExportApiModule } from './data-export/data-export.module';
 import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
@@ -76,6 +77,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     NutritionApiModule.register(),
     OrganisationsApiModule.register(),
     ModulesApiModule.register(),
+    ContentItemsApiModule.register(),
   ],
   providers: [
     {

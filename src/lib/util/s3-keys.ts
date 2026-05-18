@@ -6,6 +6,29 @@ export const s3Keys = {
     workoutImport: ({ userId, filename }: { userId: string; filename: string }) => ({
       file: `workout-imports/${userId}/${filename}`,
     }),
+    contentItem: ({
+      organisationId,
+      contentItemId,
+      filename,
+    }: {
+      organisationId: string;
+      contentItemId: string;
+      filename: string;
+    }) => ({
+      video: `content-items/${organisationId}/${contentItemId}/${filename}`,
+      thumbnail: `content-items/${organisationId}/${contentItemId}/thumbnail-${filename}`,
+    }),
+    courseCover: ({
+      organisationId,
+      courseId,
+      filename,
+    }: {
+      organisationId: string;
+      courseId: string;
+      filename: string;
+    }) => ({
+      cover: `courses/${organisationId}/${courseId}/cover-${filename}`,
+    }),
   },
   content: {
     exercise: ({ userId, exerciseId }: { userId: string; exerciseId: string }) => {
