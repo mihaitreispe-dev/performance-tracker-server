@@ -4,6 +4,7 @@ import { Timestamp } from './timestamp';
 
 export interface WorkoutSchedulesTable {
   id: Generated<string>;
+  organisation_id: string | null;
   user_id: string;
   workout_id: string;
   scheduled_date: Date;

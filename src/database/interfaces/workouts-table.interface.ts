@@ -24,6 +24,7 @@ export enum WorkoutType {
 
 export interface WorkoutsTable {
   id: Generated<string>;
+  organisation_id: string | null;
   name: string;
   description: string | null;
   difficulty: WorkoutDifficulty;
