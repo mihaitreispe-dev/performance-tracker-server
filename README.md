@@ -164,6 +164,15 @@ docker build -t performance-tracker-server .
 docker-compose up
 ```
 
+### Local object storage (MinIO)
+
+`docker compose up` brings up a MinIO instance alongside the API:
+
+- **S3 API**: `http://localhost:9002`
+- **Web console**: `http://localhost:9003` (log in with `AWS_ACCESS_KEY` / `AWS_SECRET_KEY` from `.env`)
+
+The `minio-init` one-shot service creates the `uploads` and `content` buckets on first boot, and the `api` service waits for it before starting. Override host ports with `MINIO_API_PORT` / `MINIO_CONSOLE_PORT` in `.env` if they clash with another stack. Data persists in the `minio_data` volume; `docker compose down -v` wipes it.
+
 ## License
 
 Private project.

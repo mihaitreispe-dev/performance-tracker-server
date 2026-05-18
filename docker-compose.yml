@@ -65,6 +65,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - performance-tracker
     healthcheck:
@@ -136,6 +138,49 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: performance-tracker-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_KEY}
+    ports:
+      - "${MINIO_API_PORT:-9002}:9000"
+      - "${MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - performance-tracker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: performance-tracker-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${AWS_ACCESS_KEY} $${AWS_SECRET_KEY} &&
+        mc mb --ignore-existing local/$${S3_UPLOAD_BUCKET} &&
+        mc mb --ignore-existing local/$${S3_CONTENT_BUCKET} &&
+        echo 'MinIO buckets ready';
+      "
+    environment:
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY}
+      - S3_UPLOAD_BUCKET=${S3_UPLOAD_BUCKET}
+      - S3_CONTENT_BUCKET=${S3_CONTENT_BUCKET}
+    networks:
+      - performance-tracker
 
   openwearables:
     build:
@@ -218,6 +263,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:
 
 networks:
   performance-tracker:
