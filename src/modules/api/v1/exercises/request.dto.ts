@@ -136,6 +136,15 @@ export class UpdateExerciseBody {
   @IsUUID('4', { each: true })
   @IsOptional()
   secondaryMuscleGroupIds?: string[];
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Intro content_item ID (kind=exercise_intro). Pass null to clear.',
+  })
+  @IsUUID()
+  @IsOptional()
+  introContentItemId?: string | null;
 }
 
 export class ExerciseIdParam {

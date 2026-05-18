@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import {
+  ContentItemKind,
   Exercise,
   ExerciseImage,
   ExerciseLevel,
@@ -22,6 +23,7 @@ import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseChainMemberWithExercise, ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
+import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -56,6 +58,7 @@ export class ExercisesApiService {
     private readonly configService: AppConfigService,
     private readonly accessControlService: AppAccessControlService,
     private readonly mediaConvertService: MediaConvertService,
+    private readonly contentItemRepo: ContentItemRepository,
   ) {}
 
   async list(req: Request & { user: AuthUser }, query: ListExercisesQuery): Promise<ExerciseListResponse> {
@@ -170,6 +173,21 @@ export class ExercisesApiService {
       update.media_convert_job_id = null;
       update.picture_s3_bucket = null;
       update.picture_s3_key = null;
+    }
+
+    if (body.introContentItemId !== undefined) {
+      if (body.introContentItemId === null) {
+        update.intro_content_item_id = null;
+      } else {
+        const intro = await this.contentItemRepo.findByIdInOrg(body.introContentItemId, existing.organisation_id);
+        if (!intro) {
+          throw new NotFoundException('Intro content item not found in this organisation');
+        }
+        if (intro.kind !== ContentItemKind.EXERCISE_INTRO) {
+          throw new BadRequestException(`Intro content item must be of kind ${ContentItemKind.EXERCISE_INTRO}`);
+        }
+        update.intro_content_item_id = body.introContentItemId;
+      }
     }
 
     const exercise = await this.exerciseRepo.updateById(id, update);
