@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
@@ -46,6 +47,7 @@ export class MembershipsApiController {
   }
 
   @Post(':membershipId/accept')
+  @SkipActiveOrg()
   @ApiOperation({ summary: 'Accept a pending invitation (the invitee only)' })
   async acceptInvitation(
     @Req() req: Request & { user: AuthUser },

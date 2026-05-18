@@ -4,8 +4,10 @@ import { validationErrorFactory } from 'src/lib/errors/validation-error';
 import { AllExceptionsFilter } from 'src/lib/http/filters/all-exceptions-filter';
 import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.interceptor';
 import { AuthModule } from 'src/modules/auth/auth.module';
+import { ActiveOrgGuard } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
+import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-api.module';
@@ -84,6 +86,12 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
       useExisting: RolesGuard,
     },
     RolesGuard,
+    {
+      provide: APP_GUARD,
+      useExisting: ActiveOrgGuard,
+    },
+    ActiveOrgGuard,
+    OrganisationMembershipRepository,
     UserRepository,
     {
       provide: APP_PIPE,
