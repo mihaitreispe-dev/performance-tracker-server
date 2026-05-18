@@ -40,6 +40,7 @@ export interface ExercisesTable {
   level: ExerciseLevel | null;
   status: ExerciseStatus;
   media_convert_job_id: string | null;
+  intro_content_item_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

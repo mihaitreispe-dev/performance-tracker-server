@@ -77,3 +77,5 @@ export * from './organisations-table.interface';
 export * from './organisation-memberships-table.interface';
 export * from './organisation-themes-table.interface';
 export * from './modules-table.interface';
+export * from './content-items-table.interface';
+export * from './courses-table.interface';

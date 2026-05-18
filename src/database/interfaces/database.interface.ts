@@ -35,6 +35,12 @@ import { HistoricalRaceResultsTable } from './historical-race-results-table.inte
 import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
 import { IllnessLogsTable } from './illness-logs-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
+import { ContentItemsTable } from './content-items-table.interface';
+import {
+  CourseCompletionsTable,
+  CourseLessonsTable,
+  CoursesTable,
+} from './courses-table.interface';
 import {
   AthleteModuleOverridesTable,
   ModulesTable,
@@ -185,4 +191,10 @@ export interface Database {
   modules: ModulesTable;
   organisation_module_settings: OrganisationModuleSettingsTable;
   athlete_module_overrides: AthleteModuleOverridesTable;
+
+  // Content layer (snacks, courses, exercise intros)
+  content_items: ContentItemsTable;
+  courses: CoursesTable;
+  course_lessons: CourseLessonsTable;
+  course_completions: CourseCompletionsTable;
 }
