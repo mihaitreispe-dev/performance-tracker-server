@@ -431,6 +431,7 @@ export class ExercisesApiService {
       equipment,
       primaryMuscles: primaryMusclesDTOs,
       secondaryMuscles: secondaryMusclesDTOs,
+      introContentItemId: exercise.intro_content_item_id ?? null,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
     };

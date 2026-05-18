@@ -144,6 +144,11 @@ export class ExerciseDTO {
   @ValidateNested({ each: true })
   secondaryMuscles: MuscleGroupDTO[];
 
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsUUID()
+  @IsOptional()
+  introContentItemId?: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;
