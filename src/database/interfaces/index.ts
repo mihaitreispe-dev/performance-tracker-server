@@ -73,3 +73,5 @@ export * from './questionnaire-templates-table.interface';
 export * from './questionnaire-questions-table.interface';
 export * from './questionnaire-instances-table.interface';
 export * from './questionnaire-responses-table.interface';
+export * from './organisations-table.interface';
+export * from './organisation-memberships-table.interface';

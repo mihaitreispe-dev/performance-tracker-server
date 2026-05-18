@@ -39,6 +39,8 @@ import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.inter
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
+import { OrganisationMembershipsTable } from './organisation-memberships-table.interface';
+import { OrganisationsTable } from './organisations-table.interface';
 import { PainLogsTable } from './pain-logs-table.interface';
 import { PeriodizationPlansTable } from './periodization-plans-table.interface';
 import { PersonalRecordHistoryTable } from './personal-record-history-table.interface';
@@ -167,4 +169,8 @@ export interface Database {
   questionnaire_questions: QuestionnaireQuestionsTable;
   questionnaire_instances: QuestionnaireInstancesTable;
   questionnaire_responses: QuestionnaireResponsesTable;
+
+  // Organisations / multi-tenancy
+  organisations: OrganisationsTable;
+  organisation_memberships: OrganisationMembershipsTable;
 }
