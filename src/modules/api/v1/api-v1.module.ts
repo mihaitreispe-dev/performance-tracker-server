@@ -24,6 +24,7 @@ import { HealthApiModule } from './health/health-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
+import { ModulesApiModule } from './modules/modules-api.module';
 import { NotificationsApiModule } from './notifications/notifications-api.module';
 import { NutritionApiModule } from './nutrition/nutrition-api.module';
 import { OrganisationsApiModule } from './organisations/organisations-api.module';
@@ -74,6 +75,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     RacePredictionApiModule.register(),
     NutritionApiModule.register(),
     OrganisationsApiModule.register(),
+    ModulesApiModule.register(),
   ],
   providers: [
     {

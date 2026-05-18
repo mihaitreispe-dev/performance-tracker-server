@@ -35,6 +35,11 @@ import { HistoricalRaceResultsTable } from './historical-race-results-table.inte
 import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
 import { IllnessLogsTable } from './illness-logs-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
+import {
+  AthleteModuleOverridesTable,
+  ModulesTable,
+  OrganisationModuleSettingsTable,
+} from './modules-table.interface';
 import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
@@ -175,4 +180,9 @@ export interface Database {
   organisations: OrganisationsTable;
   organisation_memberships: OrganisationMembershipsTable;
   organisation_themes: OrganisationThemesTable;
+
+  // Modules registry
+  modules: ModulesTable;
+  organisation_module_settings: OrganisationModuleSettingsTable;
+  athlete_module_overrides: AthleteModuleOverridesTable;
 }
