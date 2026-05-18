@@ -2,7 +2,9 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { type Request } from 'express';
 import { Workout, WorkoutExecution, WorkoutSchedule } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
@@ -178,7 +180,8 @@ export class WorkoutSchedulesApiService {
     return { data: this.mapScheduleToDTO(schedule, workout) };
   }
 
-  async create(req: Request & { user: AuthUser }, body: CreateWorkoutScheduleBody): Promise<WorkoutScheduleResponse> {
+  async create(req: AuthedRequest, body: CreateWorkoutScheduleBody): Promise<WorkoutScheduleResponse> {
+    const organisationId = assertActiveOrg(req);
     // Verify workout exists and belongs to user
     const workout = await this.workoutRepository.findById(body.workoutId);
     if (!workout) {
@@ -189,6 +192,7 @@ export class WorkoutSchedulesApiService {
     }
 
     const schedule = await this.workoutScheduleRepository.create({
+      organisation_id: organisationId,
       user_id: req.user.id,
       workout_id: body.workoutId,
       scheduled_date: new Date(body.scheduledDate),

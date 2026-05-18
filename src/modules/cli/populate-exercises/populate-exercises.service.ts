@@ -8,6 +8,7 @@ import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
+import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -41,6 +42,7 @@ export class PopulateExercisesService {
     private readonly muscleGroupRepo: MuscleGroupRepository,
     private readonly exerciseImageRepo: ExerciseImageRepository,
     private readonly s3Service: S3Service,
+    private readonly organisationRepo: OrganisationRepository,
   ) {}
 
   @Command({
@@ -70,16 +72,21 @@ export class PopulateExercisesService {
         description: 'Visibility for imported exercises (private or public)',
         defaultValue: 'public',
       },
+      {
+        flags: '--organisation-id <value>',
+        description: 'Organisation ID to tag exercises with. Defaults to the System org if omitted.',
+      },
     ],
   })
   async populateExercises(opts: {
     userId: string;
+    organisationId?: string;
     dryRun?: boolean;
     limit?: string;
     skipImages?: boolean;
     visibility?: string;
   }) {
-    const { userId, dryRun, limit: limitStr, skipImages, visibility: visibilityStr } = opts;
+    const { userId, organisationId: organisationIdArg, dryRun, limit: limitStr, skipImages, visibility: visibilityStr } = opts;
     const limit = Number.parseInt(limitStr || '0', 10);
     const visibility = visibilityStr === 'private' ? ExerciseVisibility.PRIVATE : ExerciseVisibility.PUBLIC;
 
@@ -95,6 +102,20 @@ export class PopulateExercisesService {
       return;
     }
     this.logger.log(`User found: ${user.display_name} (${user.email})`);
+
+    // Resolve target organisation: explicit arg, otherwise the System org.
+    let organisationId = organisationIdArg ?? null;
+    if (!organisationId) {
+      const systemOrg = await this.organisationRepo.findBySlug('system');
+      if (!systemOrg) {
+        this.logger.error(
+          'No --organisation-id provided and the System org is missing. Run the orgs backfill migration first.',
+        );
+        return;
+      }
+      organisationId = systemOrg.id;
+    }
+    this.logger.log(`Target organisation: ${organisationId}`);
 
     // Fetch exercises from Free Exercise DB
     this.logger.log('Fetching exercises from Free Exercise DB...');
@@ -181,6 +202,7 @@ export class PopulateExercisesService {
         const category = exercise.category || null;
 
         const createdExercise = await this.exerciseRepo.create({
+          organisation_id: organisationId,
           name: exercise.name,
           description,
           cues,

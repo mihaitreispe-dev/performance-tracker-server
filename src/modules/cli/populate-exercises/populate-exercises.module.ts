@@ -7,6 +7,7 @@ import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
+import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { PopulateExercisesService } from './populate-exercises.service';
@@ -27,6 +28,7 @@ export class PopulateExercisesModule {
           EquipmentRepository,
           MuscleGroupRepository,
           ExerciseImageRepository,
+          OrganisationRepository,
         ],
         exports: [PopulateExercisesService],
       };

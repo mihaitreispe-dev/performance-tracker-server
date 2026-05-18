@@ -44,7 +44,7 @@ export enum WorkoutPlanGoal {
 
 export interface WorkoutPlansTable {
   id: Generated<string>;
-  organisation_id: string | null;
+  organisation_id: string;
   user_id: string;
   name: string;
   description: string | null;

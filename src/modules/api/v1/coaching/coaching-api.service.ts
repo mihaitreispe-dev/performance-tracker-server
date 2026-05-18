@@ -13,7 +13,9 @@ import {
   WorkoutSchedule,
 } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.repository';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
@@ -169,7 +171,8 @@ export class CoachingApiService {
   }
 
   // Invitations
-  async inviteAthlete(req: Request & { user: AuthUser }, body: InviteAthleteBody): Promise<InvitationResponse> {
+  async inviteAthlete(req: AuthedRequest, body: InviteAthleteBody): Promise<InvitationResponse> {
+    const organisationId = assertActiveOrg(req);
     const coach = await this.userRepo.findById(req.user.id);
     if (!coach || !coach.roles.includes(UserRole.COACH)) {
       throw new ForbiddenException('Only coaches can invite athletes');
@@ -204,6 +207,7 @@ export class CoachingApiService {
     }
 
     const relationship = await this.relationshipRepo.create({
+      organisation_id: organisationId,
       coach_id: req.user.id,
       athlete_id: athlete.id,
       status: CoachAthleteStatus.PENDING,
@@ -357,10 +361,11 @@ export class CoachingApiService {
 
   // Workout Assignment
   async assignWorkout(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     athleteId: string,
     body: AssignWorkoutBody,
   ): Promise<AssignedWorkoutResponse> {
+    const organisationId = assertActiveOrg(req);
     // Relationship is verified by guard
 
     // Verify workout exists and belongs to coach
@@ -370,6 +375,7 @@ export class CoachingApiService {
     }
 
     const assignment = await this.assignedWorkoutRepo.create({
+      organisation_id: organisationId,
       coach_id: req.user.id,
       athlete_id: athleteId,
       workout_id: body.workoutId,
@@ -869,10 +875,11 @@ export class CoachingApiService {
   }
 
   async createAthleteSchedule(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     athleteId: string,
     body: CreateAthleteScheduleBody,
   ): Promise<AthleteScheduleResponse> {
+    const organisationId = assertActiveOrg(req);
     // Verify workout exists - coach can assign their own workouts or athlete's workouts
     const workout = await this.workoutRepo.findById(body.workoutId);
     if (!workout) {
@@ -885,6 +892,7 @@ export class CoachingApiService {
     }
 
     const schedule = await this.scheduleRepo.create({
+      organisation_id: organisationId,
       user_id: athleteId,
       workout_id: body.workoutId,
       scheduled_date: new Date(body.scheduledDate),
@@ -1348,8 +1356,9 @@ export class CoachingApiService {
   async deployPlan(
     athleteId: string,
     body: DeployPlanBody,
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
   ): Promise<DeployPlanResponse> {
+    const organisationId = assertActiveOrg(req);
     // Verify active relationship exists
     const relationship = await this.relationshipRepo.findActiveByCoachAndAthlete(req.user.id, athleteId);
     if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
@@ -1392,6 +1401,7 @@ export class CoachingApiService {
       date.setDate(startDate.getDate() + daysOffset);
 
       return {
+        organisation_id: organisationId,
         user_id: athleteId,
         workout_id: item.workout_id,
         scheduled_date: date,

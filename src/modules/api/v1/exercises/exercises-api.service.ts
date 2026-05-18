@@ -9,9 +9,11 @@ import {
   UserRole,
 } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppAccessControlService } from 'src/modules/app-access-control/app-access-control.service';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -92,8 +94,9 @@ export class ExercisesApiService {
     return { data: await this.mapExerciseToDTO(exercise) };
   }
 
-  async create(req: Request & { user: AuthUser }, body: CreateExerciseBody): Promise<ExerciseResponse> {
+  async create(req: AuthedRequest, body: CreateExerciseBody): Promise<ExerciseResponse> {
     await this.requireAdmin(req.user.id);
+    const organisationId = assertActiveOrg(req);
 
     const videoFilename = body.videoMimeType
       ? `${uuidv4()}.${this.getExtensionFromMimeType(body.videoMimeType)}`
@@ -103,6 +106,7 @@ export class ExercisesApiService {
       : null;
 
     const exercise = await this.exerciseRepo.create({
+      organisation_id: organisationId,
       name: body.name,
       description: body.description ?? null,
       cues: body.cues ?? [],

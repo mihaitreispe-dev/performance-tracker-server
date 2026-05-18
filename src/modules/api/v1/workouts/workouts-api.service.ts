@@ -17,8 +17,10 @@ import {
 } from 'src/database/interfaces';
 import { CoachAthleteStatus } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
@@ -169,6 +171,7 @@ export class WorkoutsApiService {
 
     // Create the new workout (without cardio category - user can set their own)
     const newWorkout = await this.workoutRepo.create({
+      organisation_id: sourceWorkout.organisation_id,
       name: sourceWorkout.name,
       description: sourceWorkout.description,
       difficulty: sourceWorkout.difficulty,
@@ -420,8 +423,10 @@ export class WorkoutsApiService {
     }
   }
 
-  async create(req: Request & { user: AuthUser }, body: CreateWorkoutBody): Promise<WorkoutResponse> {
+  async create(req: AuthedRequest, body: CreateWorkoutBody): Promise<WorkoutResponse> {
+    const organisationId = assertActiveOrg(req);
     const workout = await this.workoutRepo.create({
+      organisation_id: organisationId,
       name: body.name,
       description: body.description ?? null,
       difficulty: body.difficulty,

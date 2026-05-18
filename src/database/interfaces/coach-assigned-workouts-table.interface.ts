@@ -4,7 +4,7 @@ import { Timestamp } from './timestamp';
 
 export interface CoachAssignedWorkoutsTable {
   id: Generated<string>;
-  organisation_id: string | null;
+  organisation_id: string;
   coach_id: string;
   athlete_id: string;
   workout_id: string;

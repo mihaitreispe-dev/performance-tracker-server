@@ -12,8 +12,10 @@ import {
   WorkoutFileImportStatus,
   WorkoutType,
 } from 'src/database/interfaces';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { WeatherService } from 'src/modules/weather/weather.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
@@ -389,10 +391,11 @@ export class WorkoutFileImportsApiService {
    * Confirm import and create workout with (possibly modified) data
    */
   async confirmImport(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     uploadId: string,
     body: ConfirmImportBody,
   ): Promise<WorkoutFileUploadResultResponse> {
+    const organisationId = assertActiveOrg(req);
     const importRecord = await this.importRepository.findById(uploadId);
 
     if (!importRecord) {
@@ -511,6 +514,7 @@ export class WorkoutFileImportsApiService {
 
       // Create workout and schedule using user-provided data
       const workoutAndSchedule = await this.createWorkoutFromUserData(
+        organisationId,
         req.user.id,
         body.workoutName,
         body.description,
@@ -568,6 +572,7 @@ export class WorkoutFileImportsApiService {
    * Create workout from user-provided data (from preview/edit flow)
    */
   private async createWorkoutFromUserData(
+    organisationId: string,
     userId: string,
     workoutName: string,
     description: string | undefined,
@@ -594,6 +599,7 @@ export class WorkoutFileImportsApiService {
 
     // Create the workout
     const workout = await this.workoutRepository.create({
+      organisation_id: organisationId,
       user_id: userId,
       name: workoutName,
       description: description || 'Imported activity.',
@@ -614,6 +620,7 @@ export class WorkoutFileImportsApiService {
     scheduledDate.setHours(0, 0, 0, 0);
 
     const schedule = await this.workoutScheduleRepository.create({
+      organisation_id: organisationId,
       user_id: userId,
       workout_id: workout.id,
       scheduled_date: scheduledDate,
@@ -773,6 +780,7 @@ export class WorkoutFileImportsApiService {
    * Create a workout with cardio steps from parsed file data
    */
   private async createWorkoutFromParsedData(
+    organisationId: string,
     userId: string,
     sportType: DetectedSportType,
     sportName: string | undefined,
@@ -806,6 +814,7 @@ export class WorkoutFileImportsApiService {
 
     // Create the workout
     const workout = await this.workoutRepository.create({
+      organisation_id: organisationId,
       user_id: userId,
       name: workoutName,
       description,
@@ -831,6 +840,7 @@ export class WorkoutFileImportsApiService {
     scheduledDate.setHours(0, 0, 0, 0);
 
     const schedule = await this.workoutScheduleRepository.create({
+      organisation_id: organisationId,
       user_id: userId,
       workout_id: workout.id,
       scheduled_date: scheduledDate,

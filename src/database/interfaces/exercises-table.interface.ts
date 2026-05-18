@@ -25,7 +25,7 @@ export enum ExerciseStatus {
 
 export interface ExercisesTable {
   id: Generated<string>;
-  organisation_id: string | null;
+  organisation_id: string;
   name: string;
   description: string | null;
   cues: ColumnType<string[], string[] | undefined, string[]>;

@@ -1,7 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { Workout, WorkoutPlan, WorkoutPlanItem } from 'src/database/interfaces';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutItemRepository } from 'src/repositories/workout-item.repository';
 import { WorkoutPlanRepository, WorkoutPlanSort } from 'src/repositories/workout-plan.repository';
@@ -200,8 +202,10 @@ export class WorkoutPlansApiService {
     return { data: this.mapPlanWithItemsToDTO(plan, itemDTOs) };
   }
 
-  async create(req: Request & { user: AuthUser }, body: CreateWorkoutPlanBody): Promise<WorkoutPlanResponse> {
+  async create(req: AuthedRequest, body: CreateWorkoutPlanBody): Promise<WorkoutPlanResponse> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.create({
+      organisation_id: organisationId,
       user_id: req.user.id,
       name: body.name,
       description: body.description ?? null,
@@ -350,8 +354,9 @@ export class WorkoutPlansApiService {
       workoutIdMapping.set(sourceWorkoutId, copiedWorkout.data.id);
     }
 
-    // Create the new plan for the target user
+    // Create the new plan for the target user, inheriting source org boundary.
     const newPlan = await this.workoutPlanRepo.create({
+      organisation_id: sourcePlan.organisation_id,
       user_id: targetUserId,
       name: sourcePlan.name,
       description: sourcePlan.description,
@@ -377,10 +382,11 @@ export class WorkoutPlansApiService {
   }
 
   async activate(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     planId: string,
     body: ActivatePlanBody,
   ): Promise<ActivatePlanResponse> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(planId);
     if (!plan) {
       throw new NotFoundException('Workout plan not found');
@@ -409,6 +415,7 @@ export class WorkoutPlansApiService {
       date.setDate(startDate.getDate() + daysOffset);
 
       return {
+        organisation_id: organisationId,
         user_id: req.user.id,
         workout_id: item.workout_id,
         scheduled_date: date,

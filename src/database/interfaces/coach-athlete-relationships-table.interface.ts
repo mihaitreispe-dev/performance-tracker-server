@@ -11,7 +11,7 @@ export enum CoachAthleteStatus {
 
 export interface CoachAthleteRelationshipsTable {
   id: Generated<string>;
-  organisation_id: string | null;
+  organisation_id: string;
   coach_id: string;
   athlete_id: string;
   status: CoachAthleteStatus;
