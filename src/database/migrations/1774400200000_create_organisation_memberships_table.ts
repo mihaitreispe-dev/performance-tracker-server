@@ -4,9 +4,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable('organisation_memberships')
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
-    .addColumn('organisation_id', 'uuid', (col) =>
-      col.notNull().references('organisations.id').onDelete('cascade'),
-    )
+    .addColumn('organisation_id', 'uuid', (col) => col.notNull().references('organisations.id').onDelete('cascade'))
     .addColumn('user_id', 'uuid', (col) => col.notNull().references('users.id').onDelete('cascade'))
     .addColumn('role', sql`organisation_role`, (col) => col.notNull())
     .addColumn('invited_by_user_id', 'uuid', (col) => col.references('users.id').onDelete('set null'))
@@ -23,11 +21,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
     .unique()
     .execute();
 
-  await db.schema
-    .createIndex('idx_org_memberships_user')
-    .on('organisation_memberships')
-    .column('user_id')
-    .execute();
+  await db.schema.createIndex('idx_org_memberships_user').on('organisation_memberships').column('user_id').execute();
 
   await db.schema
     .createIndex('idx_org_memberships_org')

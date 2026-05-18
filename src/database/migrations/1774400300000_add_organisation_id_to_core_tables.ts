@@ -16,11 +16,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       .addColumn('organisation_id', 'uuid', (col) => col.references('organisations.id').onDelete('cascade'))
       .execute();
 
-    await db.schema
-      .createIndex(`idx_${table}_organisation_id`)
-      .on(table)
-      .column('organisation_id')
-      .execute();
+    await db.schema.createIndex(`idx_${table}_organisation_id`).on(table).column('organisation_id').execute();
   }
 }
 
