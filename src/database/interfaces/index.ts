@@ -75,3 +75,4 @@ export * from './questionnaire-instances-table.interface';
 export * from './questionnaire-responses-table.interface';
 export * from './organisations-table.interface';
 export * from './organisation-memberships-table.interface';
+export * from './organisation-themes-table.interface';

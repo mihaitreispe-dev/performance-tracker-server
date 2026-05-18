@@ -40,6 +40,7 @@ import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
 import { OrganisationMembershipsTable } from './organisation-memberships-table.interface';
+import { OrganisationThemesTable } from './organisation-themes-table.interface';
 import { OrganisationsTable } from './organisations-table.interface';
 import { PainLogsTable } from './pain-logs-table.interface';
 import { PeriodizationPlansTable } from './periodization-plans-table.interface';
@@ -173,4 +174,5 @@ export interface Database {
   // Organisations / multi-tenancy
   organisations: OrganisationsTable;
   organisation_memberships: OrganisationMembershipsTable;
+  organisation_themes: OrganisationThemesTable;
 }

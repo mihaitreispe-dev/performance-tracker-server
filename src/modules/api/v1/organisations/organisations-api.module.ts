@@ -2,12 +2,15 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { MembershipsApiController } from './memberships/memberships-api.controller';
 import { MembershipsApiService } from './memberships/memberships-api.service';
 import { OrganisationsApiController } from './organisations-api.controller';
 import { OrganisationsApiService } from './organisations-api.service';
+import { ThemesApiController } from './themes/themes-api.controller';
+import { ThemesApiService } from './themes/themes-api.service';
 
 @Module({})
 export class OrganisationsApiModule {
@@ -21,11 +24,13 @@ export class OrganisationsApiModule {
         providers: [
           OrganisationsApiService,
           MembershipsApiService,
+          ThemesApiService,
           OrganisationRepository,
           OrganisationMembershipRepository,
+          OrganisationThemeRepository,
           UserRepository,
         ],
-        controllers: [OrganisationsApiController, MembershipsApiController],
+        controllers: [OrganisationsApiController, MembershipsApiController, ThemesApiController],
         exports: [OrganisationsApiService, OrganisationRepository, OrganisationMembershipRepository],
       };
     }
