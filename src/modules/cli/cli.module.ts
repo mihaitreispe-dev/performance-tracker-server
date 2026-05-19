@@ -5,6 +5,7 @@ import { BackfillWeatherModule } from './backfill-weather/backfill-weather.modul
 import { ImportFoodsModule } from './import-foods/import-foods.module';
 import { MigrateScheduleDatesModule } from './migrate-schedule-dates/migrate-schedule-dates.module';
 import { PopulateExercisesModule } from './populate-exercises/populate-exercises.module';
+import { ReclaimUserResourcesModule } from './reclaim-user-resources/reclaim-user-resources.module';
 import { SetDefaultSharingModule } from './set-default-sharing/set-default-sharing.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { SetDefaultSharingModule } from './set-default-sharing/set-default-shari
     MigrateScheduleDatesModule.register(),
     SetDefaultSharingModule.register(),
     ImportFoodsModule.register(),
+    ReclaimUserResourcesModule.register(),
   ],
 })
 export class CliModule {}
