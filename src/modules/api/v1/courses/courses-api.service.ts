@@ -42,9 +42,12 @@ export class CoursesApiService {
 
   async list(req: AuthedRequest, query: ListCoursesQuery): Promise<CoursesListResponse> {
     const organisationId = assertActiveOrg(req);
+    // Athletes only ever see published courses; coaches/admins/owners see everything (or
+    // honour an explicit ?status= filter).
+    const statusFilter = this.canSeeDrafts(req) ? query.status : CourseStatus.PUBLISHED;
     const courses = await this.courseRepo.list(
       organisationId,
-      { status: query.status },
+      { status: statusFilter },
       { limit: query.limit, offset: query.offset },
     );
     const data = await Promise.all(
@@ -57,6 +60,9 @@ export class CoursesApiService {
     const organisationId = assertActiveOrg(req);
     const course = await this.courseRepo.findById(id, organisationId);
     if (!course) throw new NotFoundException('Course not found');
+    if (!this.canSeeDrafts(req) && course.status !== CourseStatus.PUBLISHED) {
+      throw new NotFoundException('Course not found');
+    }
     const lessons = await this.courseRepo.listLessons(id);
     const contentItems = await this.contentRepo.findByIds(lessons.map((l) => l.content_item_id));
     const itemsById = new Map(contentItems.map((i) => [i.id, i]));
@@ -220,6 +226,12 @@ export class CoursesApiService {
     if (!role || !WRITE_ROLES.includes(role)) {
       throw new ForbiddenException('You need to be coach, admin or owner to manage courses in this organisation');
     }
+  }
+
+  /** Anyone with write privileges can see drafts; pure athletes cannot. */
+  private canSeeDrafts(req: AuthedRequest): boolean {
+    const role = req.activeOrg?.role;
+    return !!role && WRITE_ROLES.includes(role);
   }
 
   private async mapToDTO(course: Course, lessonCount: number): Promise<CourseDTO> {
