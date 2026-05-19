@@ -10,6 +10,11 @@ import {
 } from 'src/database/interfaces';
 
 export interface CoachAthleteRelationshipFilter {
+  /**
+   * Active organisation id. Required for list-style queries to enforce tenant boundary.
+   * A coach in org A and the same coach via a separate membership in org B have distinct rosters.
+   */
+  organisationId: string;
   coachId?: string;
   athleteId?: string;
   status?: CoachAthleteStatus | CoachAthleteStatus[];
@@ -52,8 +57,11 @@ export class CoachAthleteRelationshipRepository {
       .execute();
   }
 
-  async findMany(filter: CoachAthleteRelationshipFilter = {}): Promise<CoachAthleteRelationship[]> {
-    let query = this.db.selectFrom('coach_athlete_relationships').selectAll();
+  async findMany(filter: CoachAthleteRelationshipFilter): Promise<CoachAthleteRelationship[]> {
+    let query = this.db
+      .selectFrom('coach_athlete_relationships')
+      .where('organisation_id', '=', filter.organisationId)
+      .selectAll();
 
     if (filter.coachId) {
       query = query.where('coach_id', '=', filter.coachId);
@@ -72,10 +80,15 @@ export class CoachAthleteRelationshipRepository {
     return query.orderBy('invited_at', 'desc').execute();
   }
 
-  async countAthletesByCoach(coachId: string, status?: CoachAthleteStatus): Promise<number> {
+  async countAthletesByCoach(
+    organisationId: string,
+    coachId: string,
+    status?: CoachAthleteStatus,
+  ): Promise<number> {
     let query = this.db
       .selectFrom('coach_athlete_relationships')
       .select((eb) => eb.fn.countAll<number>().as('count'))
+      .where('organisation_id', '=', organisationId)
       .where('coach_id', '=', coachId);
 
     if (status) {
@@ -84,6 +97,31 @@ export class CoachAthleteRelationshipRepository {
 
     const result = await query.executeTakeFirstOrThrow();
     return Number(result.count);
+  }
+
+  /**
+   * System / cron path: query across all tenants. Do NOT use from request paths.
+   * Cron jobs that fan out per coach (e.g. coach alerts) call this because they don't
+   * have a single active org context.
+   */
+  async findManyAcrossOrgs(filter: Omit<CoachAthleteRelationshipFilter, 'organisationId'>): Promise<CoachAthleteRelationship[]> {
+    let query = this.db.selectFrom('coach_athlete_relationships').selectAll();
+
+    if (filter.coachId) {
+      query = query.where('coach_id', '=', filter.coachId);
+    }
+    if (filter.athleteId) {
+      query = query.where('athlete_id', '=', filter.athleteId);
+    }
+    if (filter.status) {
+      if (Array.isArray(filter.status)) {
+        query = query.where('status', 'in', filter.status);
+      } else {
+        query = query.where('status', '=', filter.status);
+      }
+    }
+
+    return query.orderBy('invited_at', 'desc').execute();
   }
 
   async create(data: NewCoachAthleteRelationship): Promise<CoachAthleteRelationship> {

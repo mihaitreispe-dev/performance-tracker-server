@@ -9,6 +9,8 @@ import {
 } from 'src/database/interfaces';
 
 export interface CoachAssignedWorkoutFilter {
+  /** Active organisation id. Assigned-workout listings are strictly tenant-scoped. */
+  organisationId: string;
   coachId?: string;
   athleteId?: string;
   workoutId?: string;
@@ -22,8 +24,11 @@ export class CoachAssignedWorkoutRepository {
     return this.db.selectFrom('coach_assigned_workouts').where('id', '=', id).selectAll().executeTakeFirst();
   }
 
-  async findMany(filter: CoachAssignedWorkoutFilter = {}): Promise<CoachAssignedWorkout[]> {
-    let query = this.db.selectFrom('coach_assigned_workouts').selectAll();
+  async findMany(filter: CoachAssignedWorkoutFilter): Promise<CoachAssignedWorkout[]> {
+    let query = this.db
+      .selectFrom('coach_assigned_workouts')
+      .where('organisation_id', '=', filter.organisationId)
+      .selectAll();
 
     if (filter.coachId) {
       query = query.where('coach_id', '=', filter.coachId);

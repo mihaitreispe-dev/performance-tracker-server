@@ -285,8 +285,10 @@ export class CoachingApiService {
   }
 
   // Coach's Athletes
-  async getAthletes(req: Request & { user: AuthUser }): Promise<AthleteListResponse> {
+  async getAthletes(req: AuthedRequest): Promise<AthleteListResponse> {
+    const organisationId = assertActiveOrg(req);
     const relationships = await this.relationshipRepo.findMany({
+      organisationId,
       coachId: req.user.id,
       status: [CoachAthleteStatus.ACTIVE, CoachAthleteStatus.PENDING],
     });
@@ -388,10 +390,12 @@ export class CoachingApiService {
   }
 
   async getAssignedWorkouts(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     athleteId: string,
   ): Promise<AssignedWorkoutListResponse> {
+    const organisationId = assertActiveOrg(req);
     const assignments = await this.assignedWorkoutRepo.findMany({
+      organisationId,
       coachId: req.user.id,
       athleteId,
     });
@@ -933,6 +937,7 @@ export class CoachingApiService {
     const organisationId = assertActiveOrg(req);
     // Get all active athletes for this coach
     const relationships = await this.relationshipRepo.findMany({
+      organisationId,
       coachId: req.user.id,
       status: [CoachAthleteStatus.ACTIVE],
     });
@@ -1994,11 +1999,13 @@ export class CoachingApiService {
 
   // ==================== COACH WELLNESS DASHBOARD ====================
 
-  async getTeamWellnessOverview(req: Request & { user: AuthUser }): Promise<TeamWellnessOverviewResponse> {
+  async getTeamWellnessOverview(req: AuthedRequest): Promise<TeamWellnessOverviewResponse> {
+    const organisationId = assertActiveOrg(req);
     const coachId = req.user.id;
 
     // Get all active athletes for this coach
     const relationships = await this.relationshipRepo.findMany({
+      organisationId,
       coachId,
       status: [CoachAthleteStatus.ACTIVE],
     });
@@ -2354,13 +2361,15 @@ export class CoachingApiService {
    * Get team correlation overview with athletes by alert level and those needing attention
    */
   async getTeamCorrelationOverview(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     query: CorrelationQuery,
   ): Promise<TeamCorrelationOverviewResponse> {
+    const organisationId = assertActiveOrg(req);
     const days = query.days ?? 30;
 
     // Get all active athletes for this coach
     const relationships = await this.relationshipRepo.findMany({
+      organisationId,
       coachId: req.user.id,
       status: CoachAthleteStatus.ACTIVE,
     });

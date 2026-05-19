@@ -352,8 +352,9 @@ export class ScheduledPromptsService {
       return [];
     }
 
-    // Get all active athletes for this coach
-    const relationships = await this.relationshipRepo.findMany({
+    // Get all active athletes for this coach. Scheduled prompts run from a cron worker
+    // without an active-org context, so we fan out across all orgs the coach belongs to.
+    const relationships = await this.relationshipRepo.findManyAcrossOrgs({
       coachId: prompt.coach_id,
       status: [CoachAthleteStatus.ACTIVE],
     });

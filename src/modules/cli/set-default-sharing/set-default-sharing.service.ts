@@ -41,8 +41,8 @@ export class SetDefaultSharingService {
     this.logger.log('Starting set-default-sharing command...');
     this.logger.log(`Options: dryRun=${!!dryRun}, athleteId=${athleteId || 'all'}, coachId=${coachId || 'all'}`);
 
-    // Find all active coach-athlete relationships
-    const relationships = await this.coachAthleteRelationshipRepository.findMany({
+    // Find all active coach-athlete relationships (CLI runs cross-tenant by design).
+    const relationships = await this.coachAthleteRelationshipRepository.findManyAcrossOrgs({
       status: CoachAthleteStatus.ACTIVE,
       ...(athleteId && { athleteId }),
       ...(coachId && { coachId }),

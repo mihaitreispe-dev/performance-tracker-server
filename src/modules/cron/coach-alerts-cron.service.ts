@@ -39,8 +39,8 @@ export class CoachAlertsCronService {
     this.logger.log('Processing coach alerts...');
 
     try {
-      // Get all active coach-athlete relationships grouped by coach
-      const relationships = await this.relationshipRepo.findMany({
+      // Get all active coach-athlete relationships grouped by coach (cron runs cross-tenant).
+      const relationships = await this.relationshipRepo.findManyAcrossOrgs({
         status: CoachAthleteStatus.ACTIVE,
       });
 
