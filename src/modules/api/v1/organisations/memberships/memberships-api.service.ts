@@ -153,6 +153,7 @@ export class MembershipsApiService {
       role: m.role,
       invitedByUserId: m.invited_by_user_id,
       invitationMessage: m.invitation_message,
+      metadata: (m.metadata ?? {}) as Record<string, unknown>,
       invitedAt: m.invited_at instanceof Date ? m.invited_at.toISOString() : String(m.invited_at),
       acceptedAt: m.accepted_at
         ? m.accepted_at instanceof Date

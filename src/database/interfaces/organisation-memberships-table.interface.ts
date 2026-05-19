@@ -1,6 +1,9 @@
-import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 import { Timestamp } from './timestamp';
+
+/** Arbitrary key/value bag the integrating app uses to stash external profile data. */
+export type MembershipMetadata = Record<string, unknown>;
 
 export enum OrganisationRole {
   OWNER = 'owner',
@@ -17,6 +20,8 @@ export interface OrganisationMembershipsTable {
   invited_by_user_id: string | null;
   /** Optional personal note from the inviter, shown alongside the pending invitation. */
   invitation_message: string | null;
+  /** External per-(user, org) profile data set by the integrating app. */
+  metadata: ColumnType<MembershipMetadata, MembershipMetadata | undefined, MembershipMetadata>;
   invited_at: Generated<Timestamp>;
   accepted_at: Timestamp | null;
   created_at: Generated<Timestamp>;

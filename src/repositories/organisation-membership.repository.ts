@@ -102,4 +102,41 @@ export class OrganisationMembershipRepository {
       .executeTakeFirst();
     return !!row;
   }
+
+  /**
+   * List members of an org filtered by role and an optional metadata equality
+   * filter (`metadata @> {...}` semantics, so partial matches against the JSONB
+   * column). Used by the public clients listing endpoint.
+   */
+  async listByOrgWithRole(opts: {
+    organisationId: string;
+    role: OrganisationRole;
+    metadataMatch?: Record<string, unknown>;
+    offset?: number;
+    limit?: number;
+  }): Promise<{ rows: OrganisationMembership[]; totalCount: number }> {
+    const { organisationId, role, metadataMatch, offset = 0, limit = 50 } = opts;
+    let query = this.db
+      .selectFrom('organisation_memberships')
+      .where('organisation_id', '=', organisationId)
+      .where('role', '=', role);
+
+    if (metadataMatch && Object.keys(metadataMatch).length > 0) {
+      // jsonb @> jsonb — partial containment match.
+      query = query.where(sql<boolean>`metadata @> ${JSON.stringify(metadataMatch)}::jsonb`);
+    }
+
+    const [rows, countRow] = await Promise.all([
+      query
+        .selectAll()
+        .orderBy('created_at', 'desc')
+        .offset(offset)
+        .limit(limit)
+        .execute(),
+      query
+        .select((eb) => eb.fn.countAll<string>().as('count'))
+        .executeTakeFirst(),
+    ]);
+    return { rows, totalCount: Number(countRow?.count ?? 0) };
+  }
 }

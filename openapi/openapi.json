@@ -20092,6 +20092,124 @@
         ]
       }
     },
+    "/v1/public/clients": {
+      "post": {
+        "operationId": "PublicClientsController_upsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePublicClientBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicClientResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upsert a client (athlete) into the organisation. Idempotent by email — repeat calls merge metadata. Until the user claims their account through the hosted auth flow, pendingClaim=true.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicClientsController_list",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "metadata",
+            "required": false,
+            "in": "query",
+            "description": "Filter by external metadata equality. Pass either a JSON object or a comma-separated `key=value` list (?metadata=crmId%3Dabc123).",
+            "schema": {
+              "$ref": "#/components/schemas/Object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicClientListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's clients (athletes). Supports pagination and a JSONB metadata equality filter.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}": {
+      "get": {
+        "operationId": "PublicClientsController_getById",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicClientResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single client by user id.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -38958,6 +39076,11 @@
             "nullable": true,
             "description": "Personal note included by the inviter"
           },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "External per-(user, org) profile data set by the integrating app."
+          },
           "invitedAt": {
             "type": "string"
           },
@@ -38972,6 +39095,7 @@
           "userId",
           "userEmail",
           "role",
+          "metadata",
           "invitedAt"
         ]
       },
@@ -40097,6 +40221,136 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "CreatePublicClientBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Defaults to the local part of the email if omitted.",
+            "maxLength": 200
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Arbitrary external profile data stored per-(user, org). Merged shallowly with any existing metadata on repeat calls."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "PublicClientMembershipDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "role"
+        ]
+      },
+      "PublicClientDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "External per-(user, org) profile data."
+          },
+          "pendingClaim": {
+            "type": "boolean",
+            "description": "True when the user was provisioned via API and has not yet claimed their account through the hosted auth flow."
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "membership": {
+            "$ref": "#/components/schemas/PublicClientMembershipDTO"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "metadata",
+          "pendingClaim",
+          "createdAt",
+          "membership"
+        ]
+      },
+      "PublicClientResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicClientDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "PublicListMeta": {
+        "type": "object",
+        "properties": {
+          "totalCount": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "totalCount",
+          "offset",
+          "limit"
+        ]
+      },
+      "PublicClientListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicClientDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
         ]
       },
       "CreateScheduledPromptBody": {

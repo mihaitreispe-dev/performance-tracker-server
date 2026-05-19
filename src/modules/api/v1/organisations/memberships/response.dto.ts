@@ -26,6 +26,13 @@ export class MembershipDTO {
   @ApiPropertyOptional({ nullable: true, description: 'Personal note included by the inviter' })
   invitationMessage: string | null;
 
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description: 'External per-(user, org) profile data set by the integrating app.',
+  })
+  metadata: Record<string, unknown>;
+
   @ApiProperty()
   invitedAt: string;
 
