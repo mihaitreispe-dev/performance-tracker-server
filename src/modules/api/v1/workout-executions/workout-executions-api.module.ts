@@ -4,6 +4,7 @@ import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-priva
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
+import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
@@ -37,6 +38,7 @@ export class WorkoutExecutionsApiModule {
           PersonalRecordsDetectionService,
           PersonalRecordRepository,
           ExerciseInstanceRepository,
+          ExerciseRepository,
           WeatherService,
           ExecutionWeatherRepository,
           CoachAthleteRelationshipRepository,

@@ -353,3 +353,104 @@ export class SessionRPEResponse extends ItemResponse<SessionRPEDTO> {
   @ValidateNested()
   declare data: SessionRPEDTO;
 }
+
+// ---- Completion summary (powers the player's end-of-workout screen) ----
+
+export class WorkoutExecutionExercisePerfDTO {
+  @ApiProperty()
+  exerciseId: string;
+
+  @ApiProperty()
+  exerciseName: string;
+
+  @ApiProperty({ description: 'Number of set_completions captured for this exercise (skipped + done).' })
+  setsCompleted: number;
+
+  @ApiProperty()
+  setsSkipped: number;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Total reps across all completed sets.' })
+  totalReps: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Total time-under-load across all completed time-based sets, in seconds.',
+  })
+  totalTimeSeconds: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Σ(actual_load × actual_reps) for strength sets; null otherwise.',
+  })
+  totalVolume: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Average RPE across the completed sets.' })
+  avgRpe: number | null;
+}
+
+export class WorkoutExecutionSummaryDTO {
+  @ApiProperty()
+  executionId: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  workoutId: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  workoutName: string | null;
+
+  @ApiProperty()
+  startedAt: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  completedAt: string | null;
+
+  @ApiProperty({ description: 'Wall-clock duration in seconds.' })
+  totalDurationSeconds: number;
+
+  @ApiProperty()
+  exercisesPlanned: number;
+
+  @ApiProperty({ description: 'Distinct exercises with at least one set completion.' })
+  exercisesCompleted: number;
+
+  @ApiProperty()
+  setsPlanned: number;
+
+  @ApiProperty()
+  setsCompleted: number;
+
+  @ApiProperty()
+  setsSkipped: number;
+
+  @ApiProperty({ description: 'setsCompleted / setsPlanned, [0..1].' })
+  completionRatio: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Coach-collected session RPE (1-10); null if not captured.',
+  })
+  sessionRpe: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Mean of all per-set RPEs captured.' })
+  avgRpe: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Σ(load × reps) across strength sets, null if no strength sets had a load.',
+  })
+  totalVolume: number | null;
+
+  @ApiProperty({ type: [WorkoutExecutionExercisePerfDTO] })
+  perExercise: WorkoutExecutionExercisePerfDTO[];
+}
+
+export class WorkoutExecutionSummaryResponse extends ItemResponse<WorkoutExecutionSummaryDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: WorkoutExecutionSummaryDTO;
+}

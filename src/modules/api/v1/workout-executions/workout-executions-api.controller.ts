@@ -37,6 +37,7 @@ import {
   SetCompletionResponse,
   WorkoutExecutionListResponse,
   WorkoutExecutionResponse,
+  WorkoutExecutionSummaryResponse,
   WorkoutRouteResponse,
 } from './response.dto';
 import { WorkoutExecutionsApiService } from './workout-executions-api.service';
@@ -72,6 +73,21 @@ export class WorkoutExecutionsApiController {
     @Param() params: WorkoutExecutionIdParam,
   ): Promise<WorkoutExecutionResponse> {
     return this.service.getById(req, params.id);
+  }
+
+  @Version('1')
+  @ApiOperation({
+    summary: 'Get the end-of-workout summary (aggregated time / sets / exercises / RPE for the player\'s completion screen)',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: WorkoutExecutionSummaryResponse })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Get(':id/summary')
+  async getSummary(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: WorkoutExecutionIdParam,
+  ): Promise<WorkoutExecutionSummaryResponse> {
+    return this.service.getSummary(req, params.id);
   }
 
   @Version('1')

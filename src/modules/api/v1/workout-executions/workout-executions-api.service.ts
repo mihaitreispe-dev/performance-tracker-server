@@ -18,6 +18,8 @@ import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-priva
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
+import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
+import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { TrainingStressRepository } from 'src/repositories/training-stress.repository';
@@ -54,8 +56,11 @@ import {
   SetCompletionListResponse,
   SetCompletionResponse,
   WorkoutExecutionDTO,
+  WorkoutExecutionExercisePerfDTO,
   WorkoutExecutionListResponse,
   WorkoutExecutionResponse,
+  WorkoutExecutionSummaryDTO,
+  WorkoutExecutionSummaryResponse,
   WorkoutRouteDTO,
   WorkoutRouteResponse,
 } from './response.dto';
@@ -78,6 +83,8 @@ export class WorkoutExecutionsApiService {
     private readonly privacySettingsRepository: AthletePrivacySettingsRepository,
     private readonly rpeTssTrackingRepository: RpeTssTrackingRepository,
     private readonly trainingStressRepository: TrainingStressRepository,
+    private readonly exerciseInstanceRepository: ExerciseInstanceRepository,
+    private readonly exerciseRepository: ExerciseRepository,
   ) {}
 
   // Workout Executions
@@ -179,6 +186,184 @@ export class WorkoutExecutionsApiService {
     }
 
     return { data: this.mapExecutionToDTO(execution, workout) };
+  }
+
+  /**
+   * Aggregates a workout execution into the shape the player's end-of-workout screen needs.
+   * Composed from the existing tables (no new schema); see WorkoutExecutionSummaryDTO for shape.
+   */
+  async getSummary(
+    req: Request & { user: AuthUser },
+    executionId: string,
+  ): Promise<WorkoutExecutionSummaryResponse> {
+    const execution = await this.workoutExecutionRepository.findById(executionId);
+    if (!execution) {
+      throw new NotFoundException('Workout execution not found');
+    }
+    if (execution.user_id !== req.user.id) {
+      // Coach-with-access path: same gate as getById.
+      const relationship = await this.relationshipRepository.findActiveByCoachAndAthlete(
+        req.user.id,
+        execution.user_id,
+      );
+      if (!relationship || relationship.status !== CoachAthleteStatus.ACTIVE) {
+        throw new ForbiddenException('Access denied');
+      }
+      const settings = await this.privacySettingsRepository.findByUserId(execution.user_id);
+      if (!settings?.share_analytics) {
+        throw new ForbiddenException('Athlete has not shared analytics with you');
+      }
+    }
+
+    // Walk the schedule → workout → workout_items chain to get planned counts. Out-of-the-box
+    // workout_items model holds either an exercise_instance_group or an exercise_instance.
+    // For the summary we care about *exercise instances* — that's where sets live.
+    let workout: Workout | undefined;
+    let plannedInstances: Array<{ id: string; exerciseId: string; setsPlanned: number }> = [];
+    if (execution.workout_schedule_id) {
+      const schedule = await this.workoutScheduleRepository.findById(execution.workout_schedule_id);
+      if (schedule) {
+        workout = await this.workoutRepository.findById(schedule.workout_id);
+      }
+    }
+
+    // Load set_completions for this execution.
+    const completions = await this.setCompletionRepository.findMany({
+      filter: { workoutExecutionId: executionId },
+      limit: 10_000,
+    });
+
+    // Resolve exercise_instance_id → exercise_id → exercise name for each completion's parent.
+    const instanceIds = Array.from(new Set(completions.map((c) => c.exercise_instance_id)));
+    const instances = instanceIds.length > 0 ? await this.exerciseInstanceRepository.findByIds(instanceIds) : [];
+    const instanceById = new Map(instances.map((i) => [i.id, i]));
+
+    const exerciseIds = Array.from(new Set(instances.map((i) => i.exercise_id)));
+    const exercises = exerciseIds.length > 0 ? await this.exerciseRepository.findByIds(exerciseIds) : [];
+    const exerciseById = new Map(exercises.map((e) => [e.id, e]));
+
+    // Build per-exercise aggregates by walking the completions once.
+    const perExerciseAcc = new Map<
+      string,
+      {
+        exerciseId: string;
+        exerciseName: string;
+        setsCompleted: number;
+        setsSkipped: number;
+        repsSum: number;
+        timeSecSum: number;
+        volumeSum: number;
+        rpeSum: number;
+        rpeCount: number;
+        hasReps: boolean;
+        hasTime: boolean;
+        hasVolume: boolean;
+      }
+    >();
+
+    for (const c of completions) {
+      const inst = instanceById.get(c.exercise_instance_id);
+      if (!inst) continue;
+      const ex = exerciseById.get(inst.exercise_id);
+      const key = inst.exercise_id;
+      const slot = perExerciseAcc.get(key) ?? {
+        exerciseId: key,
+        exerciseName: ex?.name ?? 'Unknown exercise',
+        setsCompleted: 0,
+        setsSkipped: 0,
+        repsSum: 0,
+        timeSecSum: 0,
+        volumeSum: 0,
+        rpeSum: 0,
+        rpeCount: 0,
+        hasReps: false,
+        hasTime: false,
+        hasVolume: false,
+      };
+      if (c.skipped) {
+        slot.setsSkipped += 1;
+      } else {
+        slot.setsCompleted += 1;
+        if (c.actual_reps !== null && c.actual_reps !== undefined) {
+          slot.repsSum += c.actual_reps;
+          slot.hasReps = true;
+        }
+        if (c.actual_time_seconds !== null && c.actual_time_seconds !== undefined) {
+          slot.timeSecSum += c.actual_time_seconds;
+          slot.hasTime = true;
+        }
+        if (
+          c.actual_reps !== null &&
+          c.actual_reps !== undefined &&
+          c.actual_load !== null &&
+          c.actual_load !== undefined
+        ) {
+          slot.volumeSum += Number(c.actual_load) * c.actual_reps;
+          slot.hasVolume = true;
+        }
+      }
+      if (c.rpe !== null && c.rpe !== undefined) {
+        slot.rpeSum += c.rpe;
+        slot.rpeCount += 1;
+      }
+      perExerciseAcc.set(key, slot);
+    }
+
+    const perExercise: WorkoutExecutionExercisePerfDTO[] = Array.from(perExerciseAcc.values()).map((s) => ({
+      exerciseId: s.exerciseId,
+      exerciseName: s.exerciseName,
+      setsCompleted: s.setsCompleted,
+      setsSkipped: s.setsSkipped,
+      totalReps: s.hasReps ? s.repsSum : null,
+      totalTimeSeconds: s.hasTime ? s.timeSecSum : null,
+      totalVolume: s.hasVolume ? s.volumeSum : null,
+      avgRpe: s.rpeCount > 0 ? s.rpeSum / s.rpeCount : null,
+    }));
+
+    const setsCompleted = completions.filter((c) => !c.skipped).length;
+    const setsSkipped = completions.length - setsCompleted;
+    const setsPlanned = plannedInstances.reduce((sum, i) => sum + i.setsPlanned, 0) || completions.length;
+    const exercisesPlanned = plannedInstances.length || perExerciseAcc.size;
+    const exercisesCompleted = perExerciseAcc.size;
+
+    const rpeCompletions = completions.filter((c) => c.rpe !== null && c.rpe !== undefined);
+    const avgRpe =
+      rpeCompletions.length > 0
+        ? rpeCompletions.reduce((sum, c) => sum + (c.rpe ?? 0), 0) / rpeCompletions.length
+        : null;
+    const totalVolume = perExercise
+      .map((p) => p.totalVolume ?? 0)
+      .reduce((a, b) => a + b, 0) || null;
+
+    const startedAt =
+      execution.started_at instanceof Date
+        ? execution.started_at.toISOString()
+        : String(execution.started_at);
+    const completedAt = execution.completed_at
+      ? execution.completed_at instanceof Date
+        ? execution.completed_at.toISOString()
+        : String(execution.completed_at)
+      : null;
+
+    const data: WorkoutExecutionSummaryDTO = {
+      executionId: execution.id,
+      workoutId: workout?.id ?? null,
+      workoutName: workout?.name ?? null,
+      startedAt,
+      completedAt,
+      totalDurationSeconds: execution.duration_seconds ?? 0,
+      exercisesPlanned,
+      exercisesCompleted,
+      setsPlanned,
+      setsCompleted,
+      setsSkipped,
+      completionRatio: setsPlanned > 0 ? setsCompleted / setsPlanned : 0,
+      sessionRpe: execution.session_rpe ?? null,
+      avgRpe,
+      totalVolume,
+      perExercise,
+    };
+    return { data };
   }
 
   async start(req: Request & { user: AuthUser }, body: StartWorkoutExecutionBody): Promise<WorkoutExecutionResponse> {

@@ -877,6 +877,73 @@
         ]
       }
     },
+    "/v1/exercises/from-vimeo": {
+      "post": {
+        "operationId": "ExercisesApiController_importFromVimeo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportExerciseFromVimeoBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Vimeo error (bad URL, no access, no progressive renditions)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Create exercise from a Vimeo source (admin only). Returns immediately; status moves through UPLOAD_PENDING → UPLOAD_DONE asynchronously.",
+        "tags": [
+          "exercises"
+        ]
+      }
+    },
     "/v1/exercises/{id}/upload-url": {
       "get": {
         "operationId": "ExercisesApiController_getUploadUrl",
@@ -2270,6 +2337,63 @@
           }
         ],
         "summary": "Delete/cancel a workout execution",
+        "tags": [
+          "workout-executions"
+        ]
+      }
+    },
+    "/v1/workout-executions/{id}/summary": {
+      "get": {
+        "operationId": "WorkoutExecutionsApiController_getSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Workout execution ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkoutExecutionSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Get the end-of-workout summary (aggregated time / sets / exercises / RPE for the player's completion screen)",
         "tags": [
           "workout-executions"
         ]
@@ -22431,6 +22555,21 @@
             "type": "string",
             "nullable": true
           },
+          "introStartSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Inline intro start marker (seconds)."
+          },
+          "introEndSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Inline intro end marker (seconds)."
+          },
+          "vimeoVideoId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Vimeo source video id, if imported from Vimeo."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -22566,6 +22705,34 @@
           "name"
         ]
       },
+      "ImportExerciseFromVimeoBody": {
+        "type": "object",
+        "properties": {
+          "vimeoUrl": {
+            "type": "string",
+            "description": "A vimeo.com/{id}, player.vimeo.com/video/{id}, or just the numeric Vimeo id.",
+            "example": "https://vimeo.com/76979871"
+          },
+          "name": {
+            "type": "string",
+            "description": "Override the exercise name (defaults to the Vimeo video title)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Override the description (defaults to the Vimeo video description)."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public"
+            ]
+          }
+        },
+        "required": [
+          "vimeoUrl"
+        ]
+      },
       "UpdateExerciseBody": {
         "type": "object",
         "properties": {
@@ -22634,6 +22801,16 @@
             "type": "string",
             "nullable": true,
             "description": "Intro content_item ID (kind=exercise_intro). Pass null to clear."
+          },
+          "introStartSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Inline intro start marker (seconds into the main video). Pass null to clear."
+          },
+          "introEndSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Inline intro end marker (seconds into the main video). The Skip-intro button skips to this point."
           }
         }
       },
@@ -23831,6 +24008,141 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/WorkoutExecutionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "WorkoutExecutionExercisePerfDTO": {
+        "type": "object",
+        "properties": {
+          "exerciseId": {
+            "type": "string"
+          },
+          "exerciseName": {
+            "type": "string"
+          },
+          "setsCompleted": {
+            "type": "number",
+            "description": "Number of set_completions captured for this exercise (skipped + done)."
+          },
+          "setsSkipped": {
+            "type": "number"
+          },
+          "totalReps": {
+            "type": "number",
+            "nullable": true,
+            "description": "Total reps across all completed sets."
+          },
+          "totalTimeSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Total time-under-load across all completed time-based sets, in seconds."
+          },
+          "totalVolume": {
+            "type": "number",
+            "nullable": true,
+            "description": "Σ(actual_load × actual_reps) for strength sets; null otherwise."
+          },
+          "avgRpe": {
+            "type": "number",
+            "nullable": true,
+            "description": "Average RPE across the completed sets."
+          }
+        },
+        "required": [
+          "exerciseId",
+          "exerciseName",
+          "setsCompleted",
+          "setsSkipped"
+        ]
+      },
+      "WorkoutExecutionSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string"
+          },
+          "workoutId": {
+            "type": "string",
+            "nullable": true
+          },
+          "workoutName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalDurationSeconds": {
+            "type": "number",
+            "description": "Wall-clock duration in seconds."
+          },
+          "exercisesPlanned": {
+            "type": "number"
+          },
+          "exercisesCompleted": {
+            "type": "number",
+            "description": "Distinct exercises with at least one set completion."
+          },
+          "setsPlanned": {
+            "type": "number"
+          },
+          "setsCompleted": {
+            "type": "number"
+          },
+          "setsSkipped": {
+            "type": "number"
+          },
+          "completionRatio": {
+            "type": "number",
+            "description": "setsCompleted / setsPlanned, [0..1]."
+          },
+          "sessionRpe": {
+            "type": "number",
+            "nullable": true,
+            "description": "Coach-collected session RPE (1-10); null if not captured."
+          },
+          "avgRpe": {
+            "type": "number",
+            "nullable": true,
+            "description": "Mean of all per-set RPEs captured."
+          },
+          "totalVolume": {
+            "type": "number",
+            "nullable": true,
+            "description": "Σ(load × reps) across strength sets, null if no strength sets had a load."
+          },
+          "perExercise": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkoutExecutionExercisePerfDTO"
+            }
+          }
+        },
+        "required": [
+          "executionId",
+          "startedAt",
+          "totalDurationSeconds",
+          "exercisesPlanned",
+          "exercisesCompleted",
+          "setsPlanned",
+          "setsCompleted",
+          "setsSkipped",
+          "completionRatio",
+          "perExercise"
+        ]
+      },
+      "WorkoutExecutionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/WorkoutExecutionSummaryDTO"
           }
         },
         "required": [
@@ -26425,62 +26737,6 @@
         },
         "required": [
           "data"
-        ]
-      },
-      "WorkoutExecutionSummaryDTO": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "workoutId": {
-            "type": "string"
-          },
-          "workoutName": {
-            "type": "string"
-          },
-          "workoutType": {
-            "type": "string",
-            "enum": [
-              "strength",
-              "cardio",
-              "flexibility",
-              "hiit",
-              "circuit",
-              "custom",
-              "run",
-              "cycling",
-              "swimming",
-              "walking"
-            ]
-          },
-          "startedAt": {
-            "type": "string"
-          },
-          "completedAt": {
-            "type": "string"
-          },
-          "durationSeconds": {
-            "type": "number"
-          },
-          "distanceMeters": {
-            "type": "number"
-          },
-          "paceSecondsPerKm": {
-            "type": "number"
-          },
-          "avgHeartRate": {
-            "type": "number"
-          },
-          "elevationGainMeters": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "id",
-          "workoutName",
-          "workoutType",
-          "startedAt"
         ]
       },
       "MatchCriteriaDTO": {
