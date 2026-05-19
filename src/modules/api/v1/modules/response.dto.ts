@@ -46,3 +46,8 @@ export class ResolvedModulesResponse {
   @ApiProperty({ type: [ResolvedModuleDTO] })
   data: ResolvedModuleDTO[];
 }
+
+export class OkResponse {
+  @ApiProperty({ enum: [true] })
+  ok: true;
+}

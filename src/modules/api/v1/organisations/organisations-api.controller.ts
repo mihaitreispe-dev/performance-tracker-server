@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -30,6 +30,7 @@ export class OrganisationsApiController {
   @Post()
   @SkipActiveOrg()
   @ApiOperation({ summary: 'Create an organisation (self-serve). The caller becomes ORG_OWNER.' })
+  @ApiOkResponse({ type: OrganisationResponse })
   async createOrganisation(
     @Req() req: Request & { user: AuthUser },
     @Body() dto: CreateOrganisationDto,
@@ -40,6 +41,7 @@ export class OrganisationsApiController {
   @Get('me')
   @SkipActiveOrg()
   @ApiOperation({ summary: 'List organisations the current user is a member of' })
+  @ApiOkResponse({ type: MyOrganisationsListResponse })
   async listMyOrganisations(@Req() req: Request & { user: AuthUser }): Promise<MyOrganisationsListResponse> {
     return this.orgsService.listMyOrganisations(req);
   }
@@ -47,6 +49,7 @@ export class OrganisationsApiController {
   @Get('invitations')
   @SkipActiveOrg()
   @ApiOperation({ summary: 'List pending invitations addressed to the current user (un-accepted memberships)' })
+  @ApiOkResponse({ type: PendingInvitationsListResponse })
   async listPendingInvitations(
     @Req() req: Request & { user: AuthUser },
   ): Promise<PendingInvitationsListResponse> {
@@ -55,6 +58,7 @@ export class OrganisationsApiController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Fetch a single organisation by id (member-only)' })
+  @ApiOkResponse({ type: OrganisationResponse })
   async getOrganisation(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -64,6 +68,7 @@ export class OrganisationsApiController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update organisation metadata (owner/admin only)' })
+  @ApiOkResponse({ type: OrganisationResponse })
   async updateOrganisation(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -76,6 +81,7 @@ export class OrganisationsApiController {
   @ApiOperation({
     summary: 'Request a presigned PUT URL to upload a new organisation logo (owner/admin only)',
   })
+  @ApiOkResponse({ type: LogoUploadResponse })
   async requestLogoUpload(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -88,6 +94,7 @@ export class OrganisationsApiController {
   @ApiOperation({
     summary: 'Confirm the logo upload (verifies the S3 object, persists bucket/key on the org)',
   })
+  @ApiOkResponse({ type: OrganisationResponse })
   async confirmLogoUpload(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -98,6 +105,7 @@ export class OrganisationsApiController {
 
   @Delete(':id/logo')
   @ApiOperation({ summary: 'Remove the organisation logo (owner/admin only)' })
+  @ApiOkResponse({ type: OrganisationResponse })
   async clearLogo(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,

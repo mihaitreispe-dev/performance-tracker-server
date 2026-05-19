@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 
@@ -30,12 +30,14 @@ export class CoursesApiController {
 
   @Get()
   @ApiOperation({ summary: 'List courses in the active organisation' })
+  @ApiOkResponse({ type: CoursesListResponse })
   async list(@Req() req: AuthedRequest, @Query() query: ListCoursesQuery): Promise<CoursesListResponse> {
     return this.coursesService.list(req, query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Fetch a course with its ordered lessons' })
+  @ApiOkResponse({ type: CourseWithLessonsResponse })
   async getById(
     @Req() req: AuthedRequest,
     @Param() params: CourseIdParam,
@@ -45,12 +47,14 @@ export class CoursesApiController {
 
   @Post()
   @ApiOperation({ summary: 'Create a course (coach/admin/owner)' })
+  @ApiOkResponse({ type: CourseResponse })
   async create(@Req() req: AuthedRequest, @Body() dto: CreateCourseDto): Promise<CourseResponse> {
     return this.coursesService.create(req, dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update course metadata or status (coach/admin/owner)' })
+  @ApiOkResponse({ type: CourseResponse })
   async update(
     @Req() req: AuthedRequest,
     @Param() params: CourseIdParam,
@@ -61,6 +65,7 @@ export class CoursesApiController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a course (coach/admin/owner)' })
+  @ApiNoContentResponse()
   async delete(@Req() req: AuthedRequest, @Param() params: CourseIdParam): Promise<void> {
     return this.coursesService.delete(req, params.id);
   }
@@ -69,6 +74,7 @@ export class CoursesApiController {
 
   @Post(':id/lessons')
   @ApiOperation({ summary: 'Append a content item as a lesson at the end of the course' })
+  @ApiOkResponse({ type: CourseLessonResponse })
   async addLesson(
     @Req() req: AuthedRequest,
     @Param() params: CourseIdParam,
@@ -79,6 +85,7 @@ export class CoursesApiController {
 
   @Patch(':id/lessons/reorder')
   @ApiOperation({ summary: 'Reorder all lessons. Body must list every existing lesson id in the new order.' })
+  @ApiNoContentResponse()
   async reorderLessons(
     @Req() req: AuthedRequest,
     @Param() params: CourseIdParam,
@@ -89,6 +96,7 @@ export class CoursesApiController {
 
   @Delete(':id/lessons/:lessonId')
   @ApiOperation({ summary: 'Remove a lesson from a course (does not delete the content item)' })
+  @ApiNoContentResponse()
   async removeLesson(
     @Req() req: AuthedRequest,
     @Param() params: CourseLessonIdParams,
@@ -100,6 +108,7 @@ export class CoursesApiController {
 
   @Post(':id/lessons/:lessonId/complete')
   @ApiOperation({ summary: 'Mark a lesson complete for the current user (idempotent)' })
+  @ApiNoContentResponse()
   async markLessonComplete(
     @Req() req: AuthedRequest,
     @Param() params: CourseLessonIdParams,
@@ -109,6 +118,7 @@ export class CoursesApiController {
 
   @Get(':id/progress')
   @ApiOperation({ summary: 'Get the current user’s progress through this course' })
+  @ApiOkResponse({ type: CourseProgressResponse })
   async getProgress(
     @Req() req: AuthedRequest,
     @Param() params: CourseIdParam,

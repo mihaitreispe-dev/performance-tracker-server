@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
@@ -18,6 +18,7 @@ export class ThemesApiController {
 
   @Get()
   @ApiOperation({ summary: 'Fetch the active theme for an organisation (members only)' })
+  @ApiOkResponse({ type: ThemeResponse })
   async getTheme(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -27,6 +28,7 @@ export class ThemesApiController {
 
   @Put()
   @ApiOperation({ summary: 'Upsert the theme for an organisation (admin/owner only)' })
+  @ApiOkResponse({ type: ThemeResponse })
   async updateTheme(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -37,6 +39,7 @@ export class ThemesApiController {
 
   @Post('favicon')
   @ApiOperation({ summary: 'Request a presigned PUT URL to upload a new favicon (owner/admin only)' })
+  @ApiOkResponse({ type: FaviconUploadResponse })
   async requestFaviconUpload(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -47,6 +50,7 @@ export class ThemesApiController {
 
   @Post('favicon/complete')
   @ApiOperation({ summary: 'Confirm the favicon upload (verifies S3 object, persists bucket/key)' })
+  @ApiOkResponse({ type: ThemeResponse })
   async confirmFaviconUpload(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -57,6 +61,7 @@ export class ThemesApiController {
 
   @Delete('favicon')
   @ApiOperation({ summary: 'Remove the organisation favicon (owner/admin only)' })
+  @ApiOkResponse({ type: ThemeResponse })
   async clearFavicon(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,

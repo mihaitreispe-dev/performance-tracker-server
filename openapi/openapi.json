@@ -17794,8 +17794,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17815,7 +17822,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyOrganisationsListResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17824,6 +17838,33 @@
           }
         ],
         "summary": "List organisations the current user is a member of",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/invitations": {
+      "get": {
+        "operationId": "OrganisationsApiController_listPendingInvitations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingInvitationsListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List pending invitations addressed to the current user (un-accepted memberships)",
         "tags": [
           "Organisations"
         ]
@@ -17845,7 +17886,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17883,7 +17931,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17922,8 +17977,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoUploadResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17951,7 +18013,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -17990,8 +18059,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18021,7 +18097,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipsListResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18058,8 +18141,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18106,7 +18196,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18140,7 +18237,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -18177,8 +18274,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18187,6 +18291,36 @@
           }
         ],
         "summary": "Accept a pending invitation (the invitee only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/memberships/leave": {
+      "post": {
+        "operationId": "MembershipsApiController_leaveOrganisation",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Leave the organisation (self-service). Owners must hand off ownership first.",
         "tags": [
           "Organisations"
         ]
@@ -18208,7 +18342,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18246,7 +18387,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18260,13 +18408,149 @@
         ]
       }
     },
+    "/v1/organisations/{id}/theme/favicon": {
+      "post": {
+        "operationId": "ThemesApiController_requestFaviconUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestFaviconUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaviconUploadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request a presigned PUT URL to upload a new favicon (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "delete": {
+        "operationId": "ThemesApiController_clearFavicon",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the organisation favicon (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/theme/favicon/complete": {
+      "post": {
+        "operationId": "ThemesApiController_confirmFaviconUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmFaviconUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirm the favicon upload (verifies S3 object, persists bucket/key)",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModulesListResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18305,7 +18589,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedModulesResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18344,8 +18635,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18384,8 +18682,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18431,7 +18736,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18503,7 +18815,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemsListResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18530,8 +18849,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateContentItemResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18560,7 +18886,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18597,7 +18930,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18623,7 +18963,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -18652,8 +18992,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18703,7 +19050,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoursesListResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18730,8 +19084,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18760,7 +19121,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseWithLessonsResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18797,7 +19165,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18823,7 +19198,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -18862,8 +19237,15 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseLessonResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -18901,7 +19283,7 @@
           }
         },
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -18938,7 +19320,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "204": {
             "description": ""
           }
         },
@@ -18975,7 +19357,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "204": {
             "description": ""
           }
         },
@@ -19005,7 +19387,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseProgressResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -37504,6 +37893,143 @@
           "name"
         ]
       },
+      "OrganisationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "createdAt"
+        ]
+      },
+      "OrganisationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OrganisationDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MyOrganisationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "myRole": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "createdAt",
+          "myRole"
+        ]
+      },
+      "MyOrganisationsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyOrganisationDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PendingInvitationDTO": {
+        "type": "object",
+        "properties": {
+          "membershipId": {
+            "type": "string",
+            "description": "The membership row id; pass to POST /:id/memberships/:membershipId/accept"
+          },
+          "organisation": {
+            "$ref": "#/components/schemas/OrganisationDTO"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ]
+          },
+          "invitedAt": {
+            "type": "string"
+          },
+          "invitedByUserId": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "membershipId",
+          "organisation",
+          "role",
+          "invitedAt"
+        ]
+      },
+      "PendingInvitationsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingInvitationDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "UpdateOrganisationDto": {
         "type": "object",
         "properties": {
@@ -37528,6 +38054,37 @@
           "mimeType"
         ]
       },
+      "LogoUploadDTO": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned PUT URL valid for 1 hour"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "bucket",
+          "key"
+        ]
+      },
+      "LogoUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LogoUploadDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "ConfirmLogoUploadDto": {
         "type": "object",
         "properties": {
@@ -37541,6 +38098,69 @@
         "required": [
           "bucket",
           "key"
+        ]
+      },
+      "MembershipDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userEmail": {
+            "type": "string"
+          },
+          "userDisplayName": {
+            "type": "object",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ]
+          },
+          "invitedByUserId": {
+            "type": "object",
+            "nullable": true
+          },
+          "invitedAt": {
+            "type": "string"
+          },
+          "acceptedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "userId",
+          "userEmail",
+          "role",
+          "invitedAt"
+        ]
+      },
+      "MembershipsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MembershipDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "InviteMemberDto": {
@@ -37566,6 +38186,17 @@
           "role"
         ]
       },
+      "MembershipResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MembershipDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "UpdateMembershipRoleDto": {
         "type": "object",
         "properties": {
@@ -37581,6 +38212,46 @@
         },
         "required": [
           "role"
+        ]
+      },
+      "ThemeDTO": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string"
+          },
+          "themeTokens": {
+            "type": "object",
+            "description": "Theme tokens map. Empty object if no theme set."
+          },
+          "copyOverrides": {
+            "type": "object",
+            "description": "Copy override map. Empty object if none set."
+          },
+          "fontFamily": {
+            "type": "object",
+            "nullable": true
+          },
+          "faviconUrl": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "organisationId",
+          "themeTokens",
+          "copyOverrides"
+        ]
+      },
+      "ThemeResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ThemeDTO"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "UpdateThemeDto": {
@@ -37609,6 +38280,160 @@
           }
         }
       },
+      "RequestFaviconUploadDto": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "description": "Mime type of the favicon image",
+            "example": "image/png"
+          }
+        },
+        "required": [
+          "mimeType"
+        ]
+      },
+      "FaviconUploadDTO": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned PUT URL valid for 1 hour"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "bucket",
+          "key"
+        ]
+      },
+      "FaviconUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FaviconUploadDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ConfirmFaviconUploadDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bucket",
+          "key"
+        ]
+      },
+      "ModuleDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "defaultEnabled": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "description",
+          "defaultEnabled",
+          "sortOrder"
+        ]
+      },
+      "ModulesListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ResolvedModuleDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Effective enabled state for this org (and athlete if athleteId was supplied)"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "default",
+              "org",
+              "athlete"
+            ],
+            "description": "Where the enabled state came from"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "description",
+          "sortOrder",
+          "enabled",
+          "source"
+        ]
+      },
+      "ResolvedModulesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedModuleDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "SetOrgModuleDto": {
         "type": "object",
         "properties": {
@@ -37630,6 +38455,20 @@
         "required": [
           "moduleKey",
           "enabled"
+        ]
+      },
+      "OkResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
         ]
       },
       "SetAthleteOverrideDto": {
@@ -37657,6 +38496,104 @@
           "athleteUserId",
           "moduleKey",
           "enabled"
+        ]
+      },
+      "ContentItemDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "snack",
+              "course_lesson",
+              "exercise_intro"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "ownerUserId": {
+            "type": "object",
+            "nullable": true
+          },
+          "videoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "durationSeconds": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "upload_pending",
+              "ready",
+              "failed"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "kind",
+          "title",
+          "status",
+          "tags",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ContentItemsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentItemDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ContentItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentItemDTO"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "CreateContentItemDto": {
@@ -37696,6 +38633,95 @@
           "title"
         ]
       },
+      "ContentItemWithUploadDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "snack",
+              "course_lesson",
+              "exercise_intro"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "ownerUserId": {
+            "type": "object",
+            "nullable": true
+          },
+          "videoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "thumbnailUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "durationSeconds": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "upload_pending",
+              "ready",
+              "failed"
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "uploadUrl": {
+            "type": "object",
+            "nullable": true,
+            "description": "Presigned PUT URL for the video upload. Null if no videoMimeType was supplied."
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "kind",
+          "title",
+          "status",
+          "tags",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateContentItemResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ContentItemWithUploadDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "UpdateContentItemDto": {
         "type": "object",
         "properties": {
@@ -37725,6 +38751,165 @@
           }
         }
       },
+      "CourseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "ownerUserId": {
+            "type": "object",
+            "nullable": true
+          },
+          "coverUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          "lessonCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "title",
+          "status",
+          "lessonCount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CoursesListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CourseLessonDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "courseId": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "contentItem": {
+            "$ref": "#/components/schemas/ContentItemDTO"
+          }
+        },
+        "required": [
+          "id",
+          "courseId",
+          "sortOrder",
+          "contentItem"
+        ]
+      },
+      "CourseWithLessonsDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "ownerUserId": {
+            "type": "object",
+            "nullable": true
+          },
+          "coverUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          "lessonCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CourseLessonDTO"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "title",
+          "status",
+          "lessonCount",
+          "createdAt",
+          "updatedAt",
+          "lessons"
+        ]
+      },
+      "CourseWithLessonsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CourseWithLessonsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "CreateCourseDto": {
         "type": "object",
         "properties": {
@@ -37737,6 +38922,17 @@
         },
         "required": [
           "title"
+        ]
+      },
+      "CourseResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CourseDTO"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "UpdateCourseDto": {
@@ -37770,6 +38966,17 @@
           "contentItemId"
         ]
       },
+      "CourseLessonResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CourseLessonDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "ReorderLessonsDto": {
         "type": "object",
         "properties": {
@@ -37783,6 +38990,52 @@
         },
         "required": [
           "lessonIds"
+        ]
+      },
+      "CourseProgressDTO": {
+        "type": "object",
+        "properties": {
+          "courseId": {
+            "type": "string"
+          },
+          "athleteUserId": {
+            "type": "string"
+          },
+          "totalLessons": {
+            "type": "number"
+          },
+          "completedLessons": {
+            "type": "number"
+          },
+          "completionRatio": {
+            "type": "number"
+          },
+          "completedLessonIds": {
+            "description": "IDs of lessons the athlete has completed",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "courseId",
+          "athleteUserId",
+          "totalLessons",
+          "completedLessons",
+          "completionRatio",
+          "completedLessonIds"
+        ]
+      },
+      "CourseProgressResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CourseProgressDTO"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "CreateScheduledPromptBody": {

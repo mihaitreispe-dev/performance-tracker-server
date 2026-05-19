@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
@@ -19,6 +19,7 @@ export class MembershipsApiController {
 
   @Get()
   @ApiOperation({ summary: 'List members of an organisation' })
+  @ApiOkResponse({ type: MembershipsListResponse })
   async listMembers(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -28,6 +29,7 @@ export class MembershipsApiController {
 
   @Post()
   @ApiOperation({ summary: 'Invite an existing user into this organisation (admin/owner only)' })
+  @ApiOkResponse({ type: MembershipResponse })
   async inviteMember(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
@@ -38,6 +40,7 @@ export class MembershipsApiController {
 
   @Patch(':membershipId')
   @ApiOperation({ summary: 'Change a member\'s role (admin/owner only)' })
+  @ApiOkResponse({ type: MembershipResponse })
   async updateRole(
     @Req() req: Request & { user: AuthUser },
     @Param() params: MembershipIdParams,
@@ -49,6 +52,7 @@ export class MembershipsApiController {
   @Post(':membershipId/accept')
   @SkipActiveOrg()
   @ApiOperation({ summary: 'Accept a pending invitation (the invitee only)' })
+  @ApiOkResponse({ type: MembershipResponse })
   async acceptInvitation(
     @Req() req: Request & { user: AuthUser },
     @Param() params: MembershipIdParams,
@@ -58,6 +62,7 @@ export class MembershipsApiController {
 
   @Delete(':membershipId')
   @ApiOperation({ summary: 'Remove a member (admin/owner only)' })
+  @ApiNoContentResponse()
   async removeMember(
     @Req() req: Request & { user: AuthUser },
     @Param() params: MembershipIdParams,
@@ -70,6 +75,7 @@ export class MembershipsApiController {
   @ApiOperation({
     summary: "Leave the organisation (self-service). Owners must hand off ownership first.",
   })
+  @ApiNoContentResponse()
   async leaveOrganisation(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,
