@@ -173,6 +173,8 @@ docker-compose up
 
 The `minio-init` one-shot service creates the `uploads` and `content` buckets on first boot, and the `api` service waits for it before starting. Override host ports with `MINIO_API_PORT` / `MINIO_CONSOLE_PORT` in `.env` if they clash with another stack. Data persists in the `minio_data` volume; `docker compose down -v` wipes it.
 
+CORS is open (`*`) by default so the browser can `PUT` directly to presigned upload URLs (snack videos, course lessons, exercise intros, org logos). Restrict it in production by setting `MINIO_CORS_ALLOW_ORIGIN` to your client origin(s).
+
 ## License
 
 Private project.
