@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
@@ -19,6 +20,10 @@ import { AuthSessionResponse, AuthUserResponse, PictureUploadUrlResponse, UserSe
 @ApiTags('auth')
 @ApiBearerAuth('JWT')
 @Controller('auth')
+// Every route on this controller is tenant-agnostic — they describe *who* the user is
+// and what their account looks like, independent of the active organisation. Skipping
+// the ActiveOrgGuard here keeps fresh logins working before any X-Organisation-Id is set.
+@SkipActiveOrg()
 export class AuthApiController {
   constructor(private readonly service: AuthApiService) {}
 
