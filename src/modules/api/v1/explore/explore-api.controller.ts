@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { ExploreApiService } from './explore-api.service';
 import { MetricHistoryQuery, MetricIdParam, PeriodComparisonQuery } from './request.dto';
@@ -11,6 +12,7 @@ import { AvailableMetricsResponse, MetricHistoryResponse, PeriodComparisonRespon
 @ApiTags('explore')
 @ApiBearerAuth('JWT')
 @Controller('explore')
+@SkipActiveOrg()
 export class ExploreApiController {
   constructor(private readonly exploreService: ExploreApiService) {}
 

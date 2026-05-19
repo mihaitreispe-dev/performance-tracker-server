@@ -18,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { RaceCalendarApiService } from './race-calendar-api.service';
 import {
@@ -39,6 +40,7 @@ import {
 @ApiTags('Race Calendar')
 @ApiBearerAuth('JWT')
 @Controller()
+@SkipActiveOrg()
 export class RaceCalendarApiController {
   constructor(private readonly service: RaceCalendarApiService) {}
 

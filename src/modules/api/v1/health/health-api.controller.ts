@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiExcludeController } from '@nestjs/swagger';
 import { DiskHealthIndicator, HealthCheck, HealthCheckService, HttpHealthIndicator } from '@nestjs/terminus';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 @Controller('health')
 @ApiBearerAuth('JWT')

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { CardioCategoriesApiService } from './cardio-categories-api.service';
 import { CardioCategoryIdParam, CreateCardioCategoryBody, ListCardioCategoriesQuery } from './request.dto';
@@ -11,6 +12,7 @@ import { CardioCategoryListResponse, CardioCategoryResponse } from './response.d
 @ApiTags('cardio-categories')
 @ApiBearerAuth('JWT')
 @Controller('cardio-categories')
+@SkipActiveOrg()
 export class CardioCategoriesApiController {
   constructor(private readonly service: CardioCategoriesApiService) {}
 

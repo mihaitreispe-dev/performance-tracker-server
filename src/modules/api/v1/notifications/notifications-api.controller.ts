@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { filter, map, Observable } from 'rxjs';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { NotificationEvent, NotificationsApiService } from './notifications-api.service';

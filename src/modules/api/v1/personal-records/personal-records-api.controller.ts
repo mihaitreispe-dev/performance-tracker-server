@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { PersonalRecordsApiService } from './personal-records-api.service';
 import {
@@ -25,6 +26,7 @@ import {
 @ApiTags('personal-records')
 @ApiBearerAuth('JWT')
 @Controller('personal-records')
+@SkipActiveOrg()
 export class PersonalRecordsApiController {
   constructor(private readonly service: PersonalRecordsApiService) {}
 

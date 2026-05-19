@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import {
   CreateQuickWellnessCheckinBody,
@@ -41,6 +42,7 @@ import { WellnessService } from './wellness.service';
 @ApiTags('wellness')
 @ApiBearerAuth('JWT')
 @Controller('wellness')
+@SkipActiveOrg()
 export class WellnessController {
   constructor(private readonly service: WellnessService) {}
 

@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import {
   CreateSleepLogBody,
@@ -31,6 +32,7 @@ import { SleepApiService } from './sleep-api.service';
 @ApiTags('sleep-logs')
 @ApiBearerAuth('JWT')
 @Controller('sleep-logs')
+@SkipActiveOrg()
 export class SleepApiController {
   constructor(private readonly service: SleepApiService) {}
 

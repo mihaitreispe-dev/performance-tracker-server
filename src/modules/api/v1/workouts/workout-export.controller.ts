@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiProduces, ApiResponse, ApiTags } from '
 import { type Request, type Response } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { CardioStepGroupRepository } from 'src/repositories/cardio-step-group.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -13,6 +14,7 @@ import { WorkoutIdParam } from './request.dto';
 @ApiTags('workouts')
 @ApiBearerAuth('JWT')
 @Controller('workouts')
+@SkipActiveOrg()
 export class WorkoutExportController {
   constructor(
     private readonly workoutRepo: WorkoutRepository,

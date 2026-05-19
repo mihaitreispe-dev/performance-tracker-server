@@ -4,6 +4,7 @@ import { type Request } from 'express';
 import { UserRole } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { Roles } from 'src/modules/auth/decorators/roles.decorator';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { CoachAthleteRelationshipGuard } from '../../coaching/guards/coach-athlete-relationship.guard';
@@ -21,6 +22,7 @@ import { PowerCurveService } from './power-curve.service';
 @ApiTags('advanced-metrics')
 @ApiBearerAuth('JWT')
 @Controller('advanced-metrics')
+@SkipActiveOrg()
 export class PowerCurveController {
   constructor(private readonly service: PowerCurveService) {}
 

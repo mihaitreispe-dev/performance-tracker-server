@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import {
   BatchUploadMetricsBody,
@@ -45,6 +46,7 @@ import { WorkoutExecutionsApiService } from './workout-executions-api.service';
 @ApiTags('workout-executions')
 @ApiBearerAuth('JWT')
 @Controller('workout-executions')
+@SkipActiveOrg()
 export class WorkoutExecutionsApiController {
   constructor(private readonly service: WorkoutExecutionsApiService) {}
 

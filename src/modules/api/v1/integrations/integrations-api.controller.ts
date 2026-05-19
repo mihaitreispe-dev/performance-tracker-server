@@ -4,6 +4,7 @@ import { type Request } from 'express';
 import { IntegrationProvider } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { IntegrationsApiService } from './integrations-api.service';
@@ -19,6 +20,7 @@ import { TrainingPeaksService } from './trainingpeaks.service';
 
 @ApiTags('integrations')
 @Controller('integrations')
+@SkipActiveOrg()
 export class IntegrationsApiController {
   constructor(
     private readonly service: IntegrationsApiService,

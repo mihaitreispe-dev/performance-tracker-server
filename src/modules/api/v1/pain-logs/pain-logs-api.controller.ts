@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { PainLogsApiService } from './pain-logs-api.service';
 import {
@@ -32,6 +33,7 @@ import { PainLogListResponse, PainLogResponse } from './response.dto';
 @ApiTags('pain-logs')
 @ApiBearerAuth('JWT')
 @Controller('pain-logs')
+@SkipActiveOrg()
 export class PainLogsApiController {
   constructor(private readonly service: PainLogsApiService) {}
 

@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { RecoveryJournalService } from './recovery-journal.service';
 import {
@@ -31,6 +32,7 @@ import { RecoveryCorrelationsResponse, RecoveryHistoryResponse, RecoveryJournalE
 @ApiTags('recovery-journal')
 @ApiBearerAuth('JWT')
 @Controller('recovery-journal')
+@SkipActiveOrg()
 export class RecoveryJournalController {
   constructor(private readonly service: RecoveryJournalService) {}
 

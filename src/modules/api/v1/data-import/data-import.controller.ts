@@ -16,6 +16,7 @@ import { type Request } from 'express';
 import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { DataImportService } from './data-import.service';
 import { ConfirmUploadBody, RequestUploadUrlBody, StartProcessingBody } from './request.dto';
@@ -23,6 +24,7 @@ import { DataImportJobListResponse, DataImportJobResponse, RequestUploadUrlRespo
 
 @ApiTags('data-import')
 @Controller('data-import')
+@SkipActiveOrg()
 export class DataImportController {
   constructor(private readonly service: DataImportService) {}
 

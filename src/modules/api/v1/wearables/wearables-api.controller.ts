@@ -17,6 +17,7 @@ import { type Request } from 'express';
 import { WearableProvider } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
 import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import {
@@ -41,6 +42,7 @@ import { WearablesApiService } from './wearables-api.service';
 
 @ApiTags('wearables')
 @Controller('wearables')
+@SkipActiveOrg()
 export class WearablesApiController {
   constructor(private readonly service: WearablesApiService) {}
 
