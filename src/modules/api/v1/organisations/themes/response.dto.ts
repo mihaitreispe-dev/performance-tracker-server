@@ -21,3 +21,19 @@ export class ThemeResponse {
   @ApiProperty({ type: ThemeDTO })
   data: ThemeDTO;
 }
+
+export class FaviconUploadDTO {
+  @ApiProperty({ description: 'Presigned PUT URL valid for 1 hour' })
+  uploadUrl: string;
+
+  @ApiProperty()
+  bucket: string;
+
+  @ApiProperty()
+  key: string;
+}
+
+export class FaviconUploadResponse {
+  @ApiProperty({ type: FaviconUploadDTO })
+  data: FaviconUploadDTO;
+}
