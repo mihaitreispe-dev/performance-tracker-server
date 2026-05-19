@@ -21,9 +21,14 @@ import {
   MyOrganisationsListResponse,
   OrganisationDTO,
   OrganisationResponse,
+  PendingInvitationDTO,
+  PendingInvitationsListResponse,
 } from './response.dto';
 
 const ADMIN_ROLES: OrganisationRole[] = [OrganisationRole.OWNER, OrganisationRole.ADMIN];
+
+/** Backfill helper orgs that should not appear in the end-user org switcher. */
+const HIDDEN_ORG_SLUGS = new Set(['personal-athletes', 'system']);
 
 const LOGO_EXT: Record<string, string> = {
   'image/png': 'png',
@@ -70,7 +75,7 @@ export class OrganisationsApiService {
 
   async listMyOrganisations(req: Request & { user: AuthUser }): Promise<MyOrganisationsListResponse> {
     const userId = req.user.id;
-    const memberships = await this.membershipRepo.listByUser(userId);
+    const memberships = await this.membershipRepo.listAcceptedByUser(userId);
     if (memberships.length === 0) {
       return { data: [] };
     }
@@ -80,11 +85,37 @@ export class OrganisationsApiService {
       await Promise.all(
         memberships.map(async (m, idx) => {
           const org = orgs[idx];
-          if (!org) return null;
+          if (!org || HIDDEN_ORG_SLUGS.has(org.slug)) return null;
           return { ...(await this.mapToDTO(org)), myRole: m.role } satisfies MyOrganisationDTO;
         }),
       )
     ).filter((x): x is MyOrganisationDTO => x !== null);
+
+    return { data };
+  }
+
+  async listPendingInvitations(req: Request & { user: AuthUser }): Promise<PendingInvitationsListResponse> {
+    const memberships = await this.membershipRepo.listPendingByUser(req.user.id);
+    if (memberships.length === 0) {
+      return { data: [] };
+    }
+    const orgs = await Promise.all(memberships.map((m) => this.orgRepo.findById(m.organisation_id)));
+
+    const data: PendingInvitationDTO[] = (
+      await Promise.all(
+        memberships.map(async (m, idx) => {
+          const org = orgs[idx];
+          if (!org || HIDDEN_ORG_SLUGS.has(org.slug)) return null;
+          return {
+            membershipId: m.id,
+            organisation: await this.mapToDTO(org),
+            role: m.role,
+            invitedAt: m.invited_at instanceof Date ? m.invited_at.toISOString() : String(m.invited_at),
+            invitedByUserId: m.invited_by_user_id,
+          } satisfies PendingInvitationDTO;
+        }),
+      )
+    ).filter((x): x is PendingInvitationDTO => x !== null);
 
     return { data };
   }

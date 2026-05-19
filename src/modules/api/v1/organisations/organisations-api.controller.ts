@@ -13,7 +13,12 @@ import {
   RequestLogoUploadDto,
   UpdateOrganisationDto,
 } from './request.dto';
-import { LogoUploadResponse, MyOrganisationsListResponse, OrganisationResponse } from './response.dto';
+import {
+  LogoUploadResponse,
+  MyOrganisationsListResponse,
+  OrganisationResponse,
+  PendingInvitationsListResponse,
+} from './response.dto';
 
 @ApiTags('Organisations')
 @ApiBearerAuth()
@@ -37,6 +42,15 @@ export class OrganisationsApiController {
   @ApiOperation({ summary: 'List organisations the current user is a member of' })
   async listMyOrganisations(@Req() req: Request & { user: AuthUser }): Promise<MyOrganisationsListResponse> {
     return this.orgsService.listMyOrganisations(req);
+  }
+
+  @Get('invitations')
+  @SkipActiveOrg()
+  @ApiOperation({ summary: 'List pending invitations addressed to the current user (un-accepted memberships)' })
+  async listPendingInvitations(
+    @Req() req: Request & { user: AuthUser },
+  ): Promise<PendingInvitationsListResponse> {
+    return this.orgsService.listPendingInvitations(req);
   }
 
   @Get(':id')

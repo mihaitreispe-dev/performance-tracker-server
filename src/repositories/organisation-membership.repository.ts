@@ -44,6 +44,28 @@ export class OrganisationMembershipRepository {
       .execute();
   }
 
+  /** Memberships the user has actually accepted (joined). */
+  async listAcceptedByUser(userId: string): Promise<OrganisationMembership[]> {
+    return this.db
+      .selectFrom('organisation_memberships')
+      .where('user_id', '=', userId)
+      .where('accepted_at', 'is not', null)
+      .selectAll()
+      .orderBy('created_at', 'asc')
+      .execute();
+  }
+
+  /** Pending invitations the user has received but not yet accepted. */
+  async listPendingByUser(userId: string): Promise<OrganisationMembership[]> {
+    return this.db
+      .selectFrom('organisation_memberships')
+      .where('user_id', '=', userId)
+      .where('accepted_at', 'is', null)
+      .selectAll()
+      .orderBy('invited_at', 'desc')
+      .execute();
+  }
+
   async create(data: NewOrganisationMembership): Promise<OrganisationMembership> {
     return this.db.insertInto('organisation_memberships').values(data).returningAll().executeTakeFirstOrThrow();
   }

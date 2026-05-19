@@ -48,3 +48,25 @@ export class LogoUploadResponse {
   @ApiProperty({ type: LogoUploadDTO })
   data: LogoUploadDTO;
 }
+
+export class PendingInvitationDTO {
+  @ApiProperty({ description: 'The membership row id; pass to POST /:id/memberships/:membershipId/accept' })
+  membershipId: string;
+
+  @ApiProperty({ type: OrganisationDTO })
+  organisation: OrganisationDTO;
+
+  @ApiProperty({ enum: OrganisationRole })
+  role: OrganisationRole;
+
+  @ApiProperty()
+  invitedAt: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  invitedByUserId: string | null;
+}
+
+export class PendingInvitationsListResponse {
+  @ApiProperty({ type: [PendingInvitationDTO] })
+  data: PendingInvitationDTO[];
+}
