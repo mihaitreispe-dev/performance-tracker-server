@@ -64,4 +64,16 @@ export class MembershipsApiController {
   ): Promise<void> {
     return this.membershipsService.removeMember(req, params.id, params.membershipId);
   }
+
+  @Post('leave')
+  @SkipActiveOrg()
+  @ApiOperation({
+    summary: "Leave the organisation (self-service). Owners must hand off ownership first.",
+  })
+  async leaveOrganisation(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: OrganisationIdParam,
+  ): Promise<void> {
+    return this.membershipsService.leaveOrganisation(req, params.id);
+  }
 }

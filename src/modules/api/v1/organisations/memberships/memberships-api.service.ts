@@ -112,6 +112,22 @@ export class MembershipsApiService {
     return { data: this.mapToDTO(accepted, user ?? undefined) };
   }
 
+  /**
+   * Self-service leave-org. Owners must hand off ownership first to avoid orphan orgs.
+   */
+  async leaveOrganisation(req: Request & { user: AuthUser }, orgId: string): Promise<void> {
+    const membership = await this.membershipRepo.findByUserAndOrg(req.user.id, orgId);
+    if (!membership) {
+      throw new NotFoundException('You are not a member of this organisation');
+    }
+    if (membership.role === OrganisationRole.OWNER) {
+      throw new BadRequestException(
+        'Owners must transfer ownership to another member before leaving the organisation',
+      );
+    }
+    await this.membershipRepo.deleteById(membership.id);
+  }
+
   private async ensureMember(userId: string, orgId: string): Promise<void> {
     const membership = await this.membershipRepo.findByUserAndOrg(userId, orgId);
     if (!membership) {
