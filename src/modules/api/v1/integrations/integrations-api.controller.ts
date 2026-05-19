@@ -7,11 +7,7 @@ import { DisableJwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { IntegrationsApiService } from './integrations-api.service';
-import {
-  GarminWebhookBody,
-  OAuthCallbackQuery,
-  TrainingPeaksSyncQuery,
-} from './request.dto';
+import { GarminWebhookBody, OAuthCallbackQuery, TrainingPeaksSyncQuery } from './request.dto';
 import {
   OAuthUrlResponse,
   TrainingPeaksSyncResponse,

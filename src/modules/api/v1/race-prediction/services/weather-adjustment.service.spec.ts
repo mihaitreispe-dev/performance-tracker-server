@@ -134,15 +134,7 @@ describe('WeatherAdjustmentService', () => {
     it('gives a (smaller) speed boost for a tailwind', () => {
       // Use unknown-direction mode vs a known tailwind at same speed:
       // tailwind benefit coefficient is 0.0005 vs 0.001 for the 50%-effective case.
-      const tailwind = service.calculateWeatherImpact(
-        MARATHON_SECONDS,
-        MARATHON_METERS,
-        12.5,
-        50,
-        20,
-        0,
-        180,
-      );
+      const tailwind = service.calculateWeatherImpact(MARATHON_SECONDS, MARATHON_METERS, 12.5, 50, 20, 0, 180);
       const unknown = service.calculateWeatherImpact(MARATHON_SECONDS, MARATHON_METERS, 12.5, 50, 20);
       // Tailwind net improvement should show up as a negative impact; unknown
       // direction always penalises. So tailwind < unknown.
@@ -220,15 +212,7 @@ describe('WeatherAdjustmentService', () => {
       // Temp impact is positive even for cold; only a real tailwind produces
       // negative total_impact_percent that trips the "Favorable" branch.
       // Course 0° / wind 180° = pure tailwind at 60 km/h → -3% of marathon time.
-      const result = service.calculateWeatherImpact(
-        MARATHON_SECONDS,
-        MARATHON_METERS,
-        12.5,
-        50,
-        60,
-        0,
-        180,
-      );
+      const result = service.calculateWeatherImpact(MARATHON_SECONDS, MARATHON_METERS, 12.5, 50, 60, 0, 180);
       expect(result.total_impact_percent).toBeLessThan(-2);
       expect(result.pacing_advice).toMatch(/Favorable|PR/);
     });

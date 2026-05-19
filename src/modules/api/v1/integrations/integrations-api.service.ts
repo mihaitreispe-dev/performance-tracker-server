@@ -10,11 +10,7 @@ import { UserIntegrationRepository } from 'src/repositories/user-integration.rep
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 
-import {
-  GarminSleepSummary,
-  GarminWebhookBody,
-  OAuthCallbackQuery,
-} from './request.dto';
+import { GarminSleepSummary, GarminWebhookBody, OAuthCallbackQuery } from './request.dto';
 import {
   OAuthUrlResponse,
   UserIntegrationDTO,
@@ -49,7 +45,6 @@ export class IntegrationsApiService {
     };
   }
 
-
   // Garmin OAuth
   // NOTE: Garmin uses OAuth 1.0a which requires a proper implementation.
   // This integration is currently disabled pending proper OAuth 1.0a implementation.
@@ -57,16 +52,12 @@ export class IntegrationsApiService {
   async getGarminAuthUrl(_req: Request & { user: AuthUser }): Promise<OAuthUrlResponse> {
     // Garmin OAuth 1.0a is not yet properly implemented
     // Returning an error to prevent users from attempting to connect
-    throw new BadRequestException(
-      'Garmin integration is not yet available. Please check back later.',
-    );
+    throw new BadRequestException('Garmin integration is not yet available. Please check back later.');
   }
 
   async handleGarminCallback(_query: OAuthCallbackQuery): Promise<UserIntegrationResponse> {
     // Garmin OAuth 1.0a callback handling not implemented
-    throw new BadRequestException(
-      'Garmin integration is not yet available. Please check back later.',
-    );
+    throw new BadRequestException('Garmin integration is not yet available. Please check back later.');
   }
 
   async handleGarminWebhook(body: GarminWebhookBody): Promise<WebhookAckResponse> {
