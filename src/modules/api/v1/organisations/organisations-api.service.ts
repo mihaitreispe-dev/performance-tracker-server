@@ -14,6 +14,8 @@ import { OrganisationRepository } from 'src/repositories/organisation.repository
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { v4 as uuidv4 } from 'uuid';
 
+import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
+
 import { CreateOrganisationDto, RequestLogoUploadDto, UpdateOrganisationDto } from './request.dto';
 import {
   LogoUploadResponse,
@@ -30,6 +32,16 @@ const ADMIN_ROLES: OrganisationRole[] = [OrganisationRole.OWNER, OrganisationRol
 /** Backfill helper orgs that should not appear in the end-user org switcher. */
 const HIDDEN_ORG_SLUGS = new Set(['personal-athletes', 'system']);
 
+/**
+ * Seeded onto every freshly-created org so the brand experience is non-blank from minute one.
+ * Owners overwrite any of these on the Branding page. Keep the keys aligned with `OrgThemeOverride`
+ * on the client (primary/secondary/background/surface/text).
+ */
+const DEFAULT_THEME_TOKENS: Record<string, string> = {
+  primary: '#5b6cff',
+  secondary: '#22c1c3',
+};
+
 const LOGO_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
@@ -42,6 +54,7 @@ export class OrganisationsApiService {
   constructor(
     private readonly orgRepo: OrganisationRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly themeRepo: OrganisationThemeRepository,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -68,6 +81,12 @@ export class OrganisationsApiService {
       user_id: userId,
       role: OrganisationRole.OWNER,
       accepted_at: new Date(),
+    });
+
+    await this.themeRepo.upsert({
+      organisation_id: organisation.id,
+      theme_tokens: DEFAULT_THEME_TOKENS,
+      copy_overrides: {},
     });
 
     return { data: await this.mapToDTO(organisation) };
