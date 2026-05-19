@@ -43,9 +43,10 @@ export class WorkoutPlansApiService {
   ) {}
 
   async list(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     query: ListWorkoutPlansQuery,
   ): Promise<WorkoutPlanListResponse | WorkoutPlanWithItemsListResponse> {
+    const organisationId = assertActiveOrg(req);
     const filter = {
       userId: req.user.id,
       q: query.q,
@@ -59,12 +60,13 @@ export class WorkoutPlansApiService {
 
     const [plans, totalCount] = await Promise.all([
       this.workoutPlanRepo.findMany({
+        organisationId,
         filter,
         sort,
         offset: query.offset,
         limit: query.limit ?? 50,
       }),
-      this.workoutPlanRepo.countMany(filter),
+      this.workoutPlanRepo.countMany(organisationId, filter),
     ]);
 
     // If includeItems is requested, fetch items for each plan
@@ -123,9 +125,10 @@ export class WorkoutPlansApiService {
     };
   }
 
-  async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutPlanWithItemsResponse> {
+  async getById(req: AuthedRequest, id: string): Promise<WorkoutPlanWithItemsResponse> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(id);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {
@@ -217,12 +220,13 @@ export class WorkoutPlansApiService {
   }
 
   async update(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     id: string,
     body: UpdateWorkoutPlanBody,
   ): Promise<WorkoutPlanResponse> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(id);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {
@@ -248,9 +252,10 @@ export class WorkoutPlansApiService {
     return { data: this.mapPlanToDTO(updatedPlan) };
   }
 
-  async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
+  async delete(req: AuthedRequest, id: string): Promise<void> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(id);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {
@@ -262,12 +267,13 @@ export class WorkoutPlansApiService {
   }
 
   async addItem(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     planId: string,
     body: AddWorkoutPlanItemBody,
   ): Promise<WorkoutPlanItemResponse> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(planId);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {
@@ -302,9 +308,10 @@ export class WorkoutPlansApiService {
     return { data: this.mapItemToDTO(item, workout, exerciseCount) };
   }
 
-  async removeItem(req: Request & { user: AuthUser }, planId: string, itemId: string): Promise<void> {
+  async removeItem(req: AuthedRequest, planId: string, itemId: string): Promise<void> {
+    const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(planId);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {
@@ -329,8 +336,10 @@ export class WorkoutPlansApiService {
       throw new NotFoundException('Workout plan not found');
     }
 
-    // Check if user already has a plan with the same name
+    // Check if user already has a plan with the same name (scoped to the source org;
+    // the copy inherits the source's org boundary).
     const existingPlans = await this.workoutPlanRepo.findMany({
+      organisationId: sourcePlan.organisation_id,
       filter: { userId: targetUserId, q: sourcePlan.name },
       limit: 100,
     });
@@ -388,7 +397,7 @@ export class WorkoutPlansApiService {
   ): Promise<ActivatePlanResponse> {
     const organisationId = assertActiveOrg(req);
     const plan = await this.workoutPlanRepo.findById(planId);
-    if (!plan) {
+    if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
     if (plan.user_id !== req.user.id) {

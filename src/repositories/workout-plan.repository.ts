@@ -15,6 +15,8 @@ export interface WorkoutPlanSort {
 }
 
 export interface WorkoutPlanFindManyOptions {
+  /** Active organisation id. Plans are strictly tenant-scoped. */
+  organisationId: string;
   filter?: WorkoutPlanFilter;
   sort?: WorkoutPlanSort[];
   offset?: number;
@@ -38,9 +40,12 @@ export class WorkoutPlanRepository {
     return this.db.selectFrom('workout_plans').where('id', 'in', ids).selectAll().execute();
   }
 
-  async findMany(options: WorkoutPlanFindManyOptions = {}): Promise<WorkoutPlan[]> {
-    const { filter, sort, offset, limit } = options;
-    let query = this.db.selectFrom('workout_plans').selectAll();
+  async findMany(options: WorkoutPlanFindManyOptions): Promise<WorkoutPlan[]> {
+    const { organisationId, filter, sort, offset, limit } = options;
+    let query = this.db
+      .selectFrom('workout_plans')
+      .where('organisation_id', '=', organisationId)
+      .selectAll();
 
     if (filter?.userId) {
       query = query.where('user_id', '=', filter.userId);
@@ -73,8 +78,11 @@ export class WorkoutPlanRepository {
     return query.execute();
   }
 
-  async countMany(filter?: WorkoutPlanFilter): Promise<number> {
-    let query = this.db.selectFrom('workout_plans').select((eb) => eb.fn.countAll<number>().as('count'));
+  async countMany(organisationId: string, filter?: WorkoutPlanFilter): Promise<number> {
+    let query = this.db
+      .selectFrom('workout_plans')
+      .where('organisation_id', '=', organisationId)
+      .select((eb) => eb.fn.countAll<number>().as('count'));
 
     if (filter?.userId) {
       query = query.where('user_id', '=', filter.userId);
