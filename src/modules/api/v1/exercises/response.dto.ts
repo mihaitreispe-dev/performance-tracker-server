@@ -149,6 +149,22 @@ export class ExerciseDTO {
   @IsOptional()
   introContentItemId?: string | null;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Inline intro start marker (seconds).' })
+  @IsOptional()
+  introStartSeconds?: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'Inline intro end marker (seconds).' })
+  @IsOptional()
+  introEndSeconds?: number | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Vimeo source video id, if imported from Vimeo.',
+  })
+  @IsOptional()
+  vimeoVideoId?: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;

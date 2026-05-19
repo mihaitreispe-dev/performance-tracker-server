@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { ExerciseLevel, ExerciseVisibility } from 'src/database/interfaces';
 import { type SortOptions, SortParam } from 'src/lib/http/decorators/sort-param';
 import { SearchableQuery } from 'src/lib/http/dto/page-request.dto';
@@ -145,6 +145,50 @@ export class UpdateExerciseBody {
   @IsUUID()
   @IsOptional()
   introContentItemId?: string | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Inline intro start marker (seconds into the main video). Pass null to clear.',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  introStartSeconds?: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Inline intro end marker (seconds into the main video). The Skip-intro button skips to this point.',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  introEndSeconds?: number | null;
+}
+
+export class ImportExerciseFromVimeoBody {
+  @ApiProperty({
+    description: 'A vimeo.com/{id}, player.vimeo.com/video/{id}, or just the numeric Vimeo id.',
+    example: 'https://vimeo.com/76979871',
+  })
+  @IsString()
+  vimeoUrl: string;
+
+  @ApiPropertyOptional({ description: 'Override the exercise name (defaults to the Vimeo video title).' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Override the description (defaults to the Vimeo video description).' })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({ enum: ExerciseVisibility })
+  @IsEnumString(ExerciseVisibility)
+  @IsOptional()
+  visibility?: ExerciseVisibility;
 }
 
 export class ExerciseIdParam {

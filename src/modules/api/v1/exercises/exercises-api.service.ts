@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import {
   ContentItemKind,
@@ -18,6 +18,7 @@ import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { VimeoService, type VimeoProgressiveRendition } from 'src/modules/vimeo/vimeo.service';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseChainMemberWithExercise, ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
@@ -29,6 +30,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   CreateExerciseBody,
   ExerciseIdParam,
+  ImportExerciseFromVimeoBody,
   ListExercisesQuery,
   UpdateExerciseBody,
   UpdateExerciseChainBody,
@@ -59,7 +61,10 @@ export class ExercisesApiService {
     private readonly accessControlService: AppAccessControlService,
     private readonly mediaConvertService: MediaConvertService,
     private readonly contentItemRepo: ContentItemRepository,
+    private readonly vimeoService: VimeoService,
   ) {}
+
+  private readonly importLogger = new Logger('VimeoImporter');
 
   async list(req: AuthedRequest, query: ListExercisesQuery): Promise<ExerciseListResponse> {
     const organisationId = assertActiveOrg(req);
@@ -165,6 +170,78 @@ export class ExercisesApiService {
     return { data: await this.mapExerciseToDTO(exercise) };
   }
 
+  /**
+   * Creates an exercise from a Vimeo source. Returns immediately with the exercise in
+   * UPLOAD_PENDING; a fire-and-forget background task streams the MP4 from Vimeo into
+   * MinIO and flips status to UPLOAD_DONE (after which the existing MediaConvert flow
+   * can run on demand via markUploadComplete).
+   */
+  async importFromVimeo(req: AuthedRequest, body: ImportExerciseFromVimeoBody): Promise<ExerciseResponse> {
+    await this.requireAdmin(req.user.id);
+    const organisationId = assertActiveOrg(req);
+
+    const videoId = this.vimeoService.parseVideoId(body.vimeoUrl);
+    const meta = await this.vimeoService.fetchMetadata(videoId);
+    const rendition = this.vimeoService.pickRendition(meta);
+
+    const filename = `${uuidv4()}.mp4`;
+    const videoS3Key = s3Keys.upload.exercise({ visitorId: req.user.id, filename }).video;
+    const videoS3Bucket = this.s3Service.uploadBucket;
+
+    const exercise = await this.exerciseRepo.create({
+      organisation_id: organisationId,
+      name: (body.name ?? meta.name).trim() || `Vimeo ${videoId}`,
+      description: body.description ?? meta.description ?? null,
+      cues: [],
+      category: null,
+      level: null,
+      visibility: body.visibility ?? ExerciseVisibility.PRIVATE,
+      user_id: req.user.id,
+      video_s3_bucket: videoS3Bucket,
+      video_s3_key: videoS3Key,
+      video_mime_type: 'video/mp4',
+      status: ExerciseStatus.UPLOAD_PENDING,
+      vimeo_video_id: videoId,
+    });
+
+    // Fire-and-forget — caller gets an immediate response with a pending exercise.
+    void this.runVimeoImport(exercise.id, rendition, videoS3Bucket, videoS3Key);
+
+    return { data: await this.mapExerciseToDTO(exercise) };
+  }
+
+  private async runVimeoImport(
+    exerciseId: string,
+    rendition: VimeoProgressiveRendition,
+    bucket: string,
+    key: string,
+  ): Promise<void> {
+    try {
+      this.importLogger.log(`Streaming Vimeo rendition ${rendition.rendition} into s3://${bucket}/${key} for exercise ${exerciseId}`);
+      const sourceRes = await this.vimeoService.openSourceStream(rendition);
+      if (!sourceRes.body) {
+        throw new Error('Vimeo response had no body');
+      }
+      // Node's fetch returns a Web ReadableStream — convert to Node Readable for the AWS SDK upload.
+      const nodeStream = (await import('node:stream')).Readable.fromWeb(
+        sourceRes.body as unknown as import('node:stream/web').ReadableStream<Uint8Array>,
+      );
+      await this.s3Service.uploadFile({ bucket, key, data: nodeStream });
+      await this.exerciseRepo.updateById(exerciseId, { status: ExerciseStatus.UPLOAD_DONE });
+      this.importLogger.log(`Vimeo import complete for exercise ${exerciseId}`);
+    } catch (err) {
+      this.importLogger.error(
+        `Vimeo import failed for exercise ${exerciseId}: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      try {
+        await this.exerciseRepo.updateById(exerciseId, { status: ExerciseStatus.ASSETS_FAILED });
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
   async update(req: AuthedRequest, id: string, body: UpdateExerciseBody): Promise<ExerciseResponse> {
     await this.requireAdmin(req.user.id);
     const organisationId = assertActiveOrg(req);
@@ -203,6 +280,23 @@ export class ExercisesApiService {
         }
         update.intro_content_item_id = body.introContentItemId;
       }
+    }
+
+    if (body.introStartSeconds !== undefined) {
+      update.intro_start_seconds = body.introStartSeconds;
+    }
+    if (body.introEndSeconds !== undefined) {
+      update.intro_end_seconds = body.introEndSeconds;
+    }
+    // Defensive: if both are set, start must be < end.
+    if (
+      update.intro_start_seconds !== undefined &&
+      update.intro_end_seconds !== undefined &&
+      update.intro_start_seconds !== null &&
+      update.intro_end_seconds !== null &&
+      update.intro_start_seconds >= update.intro_end_seconds
+    ) {
+      throw new BadRequestException('introStartSeconds must be less than introEndSeconds');
     }
 
     const exercise = await this.exerciseRepo.updateById(id, update);
@@ -436,6 +530,9 @@ export class ExercisesApiService {
       primaryMuscles: primaryMusclesDTOs,
       secondaryMuscles: secondaryMusclesDTOs,
       introContentItemId: exercise.intro_content_item_id ?? null,
+      introStartSeconds: exercise.intro_start_seconds ?? null,
+      introEndSeconds: exercise.intro_end_seconds ?? null,
+      vimeoVideoId: exercise.vimeo_video_id ?? null,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
     };

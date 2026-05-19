@@ -23,6 +23,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ExercisesApiService } from './exercises-api.service';
 import {
   CreateExerciseBody,
+  ImportExerciseFromVimeoBody,
   ExerciseIdParam,
   ListExercisesQuery,
   UpdateExerciseBody,
@@ -74,6 +75,23 @@ export class ExercisesApiController {
   @Post()
   async create(@Req() req: Request & { user: AuthUser }, @Body() body: CreateExerciseBody): Promise<ExerciseResponse> {
     return this.service.create(req, body);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Create exercise from a Vimeo source (admin only). Returns immediately; status moves through UPLOAD_PENDING → UPLOAD_DONE asynchronously.',
+  })
+  @ApiResponse({ status: HttpStatus.CREATED, type: ExerciseResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.UNPROCESSABLE_ENTITY, type: ErrorResponse, description: 'Vimeo error (bad URL, no access, no progressive renditions)' })
+  @Post('from-vimeo')
+  async importFromVimeo(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: ImportExerciseFromVimeoBody,
+  ): Promise<ExerciseResponse> {
+    return this.service.importFromVimeo(req, body);
   }
 
   @Version('1')
