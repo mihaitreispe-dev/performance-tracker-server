@@ -17,6 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { RacePredictionApiService } from './race-prediction-api.service';
@@ -43,6 +44,10 @@ import {
 @ApiTags('Race Predictions')
 @ApiBearerAuth('JWT')
 @Controller()
+// All routes here are scoped by req.user.id (the athlete's own predictions / races /
+// profile). No organisation_id is read or written, so the global ActiveOrgGuard is
+// pure overhead and breaks users who haven't selected an active org yet.
+@SkipActiveOrg()
 export class RacePredictionApiController {
   constructor(private readonly service: RacePredictionApiService) {}
 
