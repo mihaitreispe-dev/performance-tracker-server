@@ -31,7 +31,7 @@ describe('ModulesApiService.resolveModules', () => {
       default_enabled: true,
       sort_order: 10,
       created_at: new Date(),
-    } as ModuleRow,
+    } as unknown as ModuleRow,
     {
       key: ModuleKey.MOVEMENT_SNACKS,
       name: 'Movement Snacks',
@@ -39,7 +39,7 @@ describe('ModulesApiService.resolveModules', () => {
       default_enabled: false,
       sort_order: 50,
       created_at: new Date(),
-    } as ModuleRow,
+    } as unknown as ModuleRow,
     {
       key: ModuleKey.COURSES,
       name: 'Courses',
@@ -47,7 +47,7 @@ describe('ModulesApiService.resolveModules', () => {
       default_enabled: true,
       sort_order: 60,
       created_at: new Date(),
-    } as ModuleRow,
+    } as unknown as ModuleRow,
   ];
 
   function makeRequest(): Request & { user: AuthUser } {

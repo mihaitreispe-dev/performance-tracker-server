@@ -31,6 +31,9 @@ export interface ContentItemsTable {
   status: ContentItemStatus;
   tags: ColumnType<string[], string[] | undefined, string[]>;
   media_convert_job_id: string | null;
+  /** Inline intro markers — used by content-item players (course lessons, snacks) to offer Skip-intro. */
+  intro_start_seconds: number | null;
+  intro_end_seconds: number | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

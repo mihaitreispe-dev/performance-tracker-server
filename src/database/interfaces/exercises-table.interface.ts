@@ -41,6 +41,11 @@ export interface ExercisesTable {
   status: ExerciseStatus;
   media_convert_job_id: string | null;
   intro_content_item_id: string | null;
+  /** Inline intro markers on the exercise's main demo video — used by the player's Skip-intro affordance. */
+  intro_start_seconds: number | null;
+  intro_end_seconds: number | null;
+  /** Vimeo source video id, when this exercise was imported via the Vimeo flow. */
+  vimeo_video_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
