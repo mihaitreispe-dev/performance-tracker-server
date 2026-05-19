@@ -84,6 +84,12 @@ export class AppConfigService {
     return this.configService.get('S3_CONTENT_BUCKET')!;
   }
 
+  // Vimeo
+
+  get vimeoAccessToken(): string | undefined {
+    return this.configService.get('VIMEO_ACCESS_TOKEN');
+  }
+
   // Swagger
 
   get swaggerUsername(): string | undefined {

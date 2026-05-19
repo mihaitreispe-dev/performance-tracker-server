@@ -93,6 +93,12 @@ export class Env extends BoostrapEnv {
   @IsString()
   S3_CONTENT_BUCKET: string;
 
+  // Vimeo (optional — only required for the import-from-Vimeo flow)
+
+  @IsString()
+  @IsOptional()
+  VIMEO_ACCESS_TOKEN?: string;
+
   // Swagger
 
   @IsString()
