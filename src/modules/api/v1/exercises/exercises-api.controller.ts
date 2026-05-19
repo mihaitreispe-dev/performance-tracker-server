@@ -96,6 +96,28 @@ export class ExercisesApiController {
 
   @Version('1')
   @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Retry a previously-failed Vimeo import (admin only). Re-fetches rendition links and restarts the background streaming task.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    type: ErrorResponse,
+    description: 'Exercise was not imported from Vimeo or Vimeo fetch failed',
+  })
+  @Post(':id/retry-vimeo')
+  async retryVimeoImport(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+  ): Promise<ExerciseResponse> {
+    return this.service.retryVimeoImport(req, params.id);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update exercise (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })

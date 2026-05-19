@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import {
   ContentItemKind,
@@ -208,6 +214,36 @@ export class ExercisesApiService {
     void this.runVimeoImport(exercise.id, rendition, videoS3Bucket, videoS3Key);
 
     return { data: await this.mapExerciseToDTO(exercise) };
+  }
+
+  /**
+   * Re-run the Vimeo MP4 streaming for an exercise that was previously imported via Vimeo.
+   * Vimeo's progressive rendition links expire, so we re-fetch metadata and pick a fresh
+   * rendition. The S3 bucket/key are reused (the prior failed upload either never wrote
+   * anything or wrote a partial blob that the new stream will overwrite).
+   */
+  async retryVimeoImport(req: AuthedRequest, exerciseId: string): Promise<ExerciseResponse> {
+    await this.requireAdmin(req.user.id);
+    const organisationId = assertActiveOrg(req);
+    const existing = await this.loadEditable(exerciseId, organisationId);
+
+    if (!existing.vimeo_video_id) {
+      throw new UnprocessableEntityException('Exercise was not imported from Vimeo — nothing to retry');
+    }
+    if (!existing.video_s3_bucket || !existing.video_s3_key) {
+      throw new UnprocessableEntityException('Exercise is missing the video S3 destination — cannot retry');
+    }
+
+    const meta = await this.vimeoService.fetchMetadata(existing.vimeo_video_id);
+    const rendition = this.vimeoService.pickRendition(meta);
+
+    const updated = await this.exerciseRepo.updateById(exerciseId, {
+      status: ExerciseStatus.UPLOAD_PENDING,
+    });
+
+    void this.runVimeoImport(exerciseId, rendition, existing.video_s3_bucket, existing.video_s3_key);
+
+    return { data: await this.mapExerciseToDTO(updated) };
   }
 
   private async runVimeoImport(
