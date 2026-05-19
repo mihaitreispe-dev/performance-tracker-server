@@ -61,7 +61,8 @@ export class ExercisesApiService {
     private readonly contentItemRepo: ContentItemRepository,
   ) {}
 
-  async list(req: Request & { user: AuthUser }, query: ListExercisesQuery): Promise<ExerciseListResponse> {
+  async list(req: AuthedRequest, query: ListExercisesQuery): Promise<ExerciseListResponse> {
+    const organisationId = assertActiveOrg(req);
     const { q, offset = 0, limit = 20, visibility, sort } = query;
 
     const filter = {
@@ -70,8 +71,8 @@ export class ExercisesApiService {
     };
 
     const [exercises, totalCount] = await Promise.all([
-      this.exerciseRepo.findMany({ filter, sort, offset, limit }),
-      this.exerciseRepo.countMany(filter),
+      this.exerciseRepo.findMany({ organisationId, filter, sort, offset, limit }),
+      this.exerciseRepo.countMany(organisationId, filter),
     ]);
 
     const data = await Promise.all(exercises.map((e) => this.mapExerciseToDTO(e)));
@@ -86,15 +87,32 @@ export class ExercisesApiService {
     return { data, links, offset, limit, totalCount };
   }
 
-  async getById(req: Request & { user: AuthUser }, id: string): Promise<ExerciseResponse> {
+  async getById(req: AuthedRequest, id: string): Promise<ExerciseResponse> {
     await this.requireAdmin(req.user.id);
+    const organisationId = assertActiveOrg(req);
+    const exercise = await this.loadReadable(id, organisationId);
+    return { data: await this.mapExerciseToDTO(exercise) };
+  }
 
+  /** Load an exercise the caller can read: own org rows or any PUBLIC row. */
+  private async loadReadable(id: string, organisationId: string): Promise<Exercise> {
     const exercise = await this.exerciseRepo.findById(id);
-    if (!exercise) {
+    if (
+      !exercise ||
+      (exercise.organisation_id !== organisationId && exercise.visibility !== ExerciseVisibility.PUBLIC)
+    ) {
       throw new NotFoundException();
     }
+    return exercise;
+  }
 
-    return { data: await this.mapExerciseToDTO(exercise) };
+  /** Load an exercise the caller can edit: own org rows only (public rows owned elsewhere are read-only). */
+  private async loadEditable(id: string, organisationId: string): Promise<Exercise> {
+    const exercise = await this.exerciseRepo.findById(id);
+    if (!exercise || exercise.organisation_id !== organisationId) {
+      throw new NotFoundException();
+    }
+    return exercise;
   }
 
   async create(req: AuthedRequest, body: CreateExerciseBody): Promise<ExerciseResponse> {
@@ -147,13 +165,10 @@ export class ExercisesApiService {
     return { data: await this.mapExerciseToDTO(exercise) };
   }
 
-  async update(req: Request & { user: AuthUser }, id: string, body: UpdateExerciseBody): Promise<ExerciseResponse> {
+  async update(req: AuthedRequest, id: string, body: UpdateExerciseBody): Promise<ExerciseResponse> {
     await this.requireAdmin(req.user.id);
-
-    const existing = await this.exerciseRepo.findById(id);
-    if (!existing) {
-      throw new NotFoundException();
-    }
+    const organisationId = assertActiveOrg(req);
+    const existing = await this.loadEditable(id, organisationId);
 
     const update: Record<string, any> = {};
     if (body.name !== undefined) update.name = body.name;
@@ -230,24 +245,17 @@ export class ExercisesApiService {
     return { data: await this.mapExerciseToDTO(exercise) };
   }
 
-  async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
+  async delete(req: AuthedRequest, id: string): Promise<void> {
     await this.requireAdmin(req.user.id);
-
-    const existing = await this.exerciseRepo.findById(id);
-    if (!existing) {
-      throw new NotFoundException();
-    }
-
+    const organisationId = assertActiveOrg(req);
+    await this.loadEditable(id, organisationId);
     await this.exerciseRepo.deleteById(id);
   }
 
-  async getUploadUrl(req: Request & { user: AuthUser }, params: ExerciseIdParam): Promise<ExerciseUploadUrlResponse> {
+  async getUploadUrl(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseUploadUrlResponse> {
     await this.requireAdmin(req.user.id);
-
-    const exercise = await this.exerciseRepo.findById(params.id);
-    if (!exercise) {
-      throw new NotFoundException();
-    }
+    const organisationId = assertActiveOrg(req);
+    const exercise = await this.loadEditable(params.id, organisationId);
 
     if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
       throw new NotFoundException('Exercise has no video configured');
@@ -262,13 +270,10 @@ export class ExercisesApiService {
     return { data: { video: videoUploadUrl } };
   }
 
-  async markUploadComplete(req: Request & { user: AuthUser }, params: ExerciseIdParam): Promise<ExerciseResponse> {
+  async markUploadComplete(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
     await this.requireAdmin(req.user.id);
-
-    const exercise = await this.exerciseRepo.findById(params.id);
-    if (!exercise) {
-      throw new NotFoundException();
-    }
+    const organisationId = assertActiveOrg(req);
+    const exercise = await this.loadEditable(params.id, organisationId);
 
     if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
       throw new NotFoundException('Exercise has no video configured');
@@ -293,13 +298,10 @@ export class ExercisesApiService {
     return { data: await this.mapExerciseToDTO(updated!) };
   }
 
-  async getExerciseChain(req: Request & { user: AuthUser }, id: string): Promise<ExerciseChainResponse | null> {
+  async getExerciseChain(req: AuthedRequest, id: string): Promise<ExerciseChainResponse | null> {
     await this.requireAdmin(req.user.id);
-
-    const exercise = await this.exerciseRepo.findById(id);
-    if (!exercise) {
-      throw new NotFoundException();
-    }
+    const organisationId = assertActiveOrg(req);
+    await this.loadReadable(id, organisationId);
 
     const chain = await this.exerciseChainRepo.findByExerciseId(id);
     if (!chain) {
@@ -316,26 +318,28 @@ export class ExercisesApiService {
   }
 
   async updateExerciseChain(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     id: string,
     body: UpdateExerciseChainBody,
   ): Promise<ExerciseChainResponse> {
     await this.requireAdmin(req.user.id);
-
-    const exercise = await this.exerciseRepo.findById(id);
-    if (!exercise) {
-      throw new NotFoundException();
-    }
+    const organisationId = assertActiveOrg(req);
+    await this.loadEditable(id, organisationId);
 
     // Ensure the current exercise is included in the chain
     if (!body.memberIds.includes(id)) {
       body.memberIds.push(id);
     }
 
-    // Validate all exercises exist
+    // Validate all exercises exist AND every chain member belongs to this org (no cross-tenant chains).
     const exercises = await this.exerciseRepo.findByIds(body.memberIds);
     if (exercises.length !== body.memberIds.length) {
       throw new NotFoundException('One or more exercises not found');
+    }
+    for (const ex of exercises) {
+      if (ex.organisation_id !== organisationId && ex.visibility !== ExerciseVisibility.PUBLIC) {
+        throw new NotFoundException('One or more exercises not found');
+      }
     }
 
     // Check if any of the exercises already belong to other chains

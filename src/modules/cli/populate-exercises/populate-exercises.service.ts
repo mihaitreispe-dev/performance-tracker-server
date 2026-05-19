@@ -135,8 +135,8 @@ export class PopulateExercisesService {
       this.logger.log(`Limited to ${exercises.length} exercises`);
     }
 
-    // Check for existing exercises to avoid duplicates
-    const existingExercises = await this.exerciseRepo.findMany({ filter: { userId } });
+    // Check for existing exercises to avoid duplicates (scoped to the target org).
+    const existingExercises = await this.exerciseRepo.findMany({ organisationId, filter: { userId } });
     const existingNames = new Set(existingExercises.map((e) => e.name.toLowerCase()));
     this.logger.log(`Found ${existingExercises.length} existing exercises for this user`);
 

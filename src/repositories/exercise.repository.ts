@@ -23,6 +23,11 @@ export interface ExerciseSort {
 }
 
 export interface ExerciseFindManyOptions {
+  /**
+   * Active organisation id. Tenant-scoped queries return rows owned by this org plus
+   * any row marked PUBLIC (the cross-tenant exercise library).
+   */
+  organisationId: string;
   filter?: ExerciseFilter;
   sort?: ExerciseSort[];
   offset?: number;
@@ -42,7 +47,8 @@ export class ExerciseRepository {
   }
 
   /**
-   * Bulk fetch exercises by IDs - more efficient than multiple findById calls
+   * Bulk fetch exercises by IDs - more efficient than multiple findById calls.
+   * Caller is responsible for tenant-checking the results.
    */
   async findByIds(ids: string[]): Promise<Exercise[]> {
     if (ids.length === 0) return [];
@@ -52,10 +58,18 @@ export class ExerciseRepository {
     return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
   }
 
-  async findMany(options: ExerciseFindManyOptions = {}): Promise<Exercise[]> {
-    const { filter, sort, offset, limit } = options;
+  async findMany(options: ExerciseFindManyOptions): Promise<Exercise[]> {
+    const { organisationId, filter, sort, offset, limit } = options;
 
-    let query = this.db.selectFrom('exercises').selectAll();
+    let query = this.db
+      .selectFrom('exercises')
+      .where((eb) =>
+        eb.or([
+          eb('organisation_id', '=', organisationId),
+          eb('visibility', '=', ExerciseVisibility.PUBLIC),
+        ]),
+      )
+      .selectAll();
 
     if (filter?.visibility) {
       query = query.where('visibility', '=', filter.visibility);
@@ -86,8 +100,16 @@ export class ExerciseRepository {
     return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
   }
 
-  async countMany(filter?: ExerciseFilter): Promise<number> {
-    let query = this.db.selectFrom('exercises').select((eb) => eb.fn.countAll<number>().as('count'));
+  async countMany(organisationId: string, filter?: ExerciseFilter): Promise<number> {
+    let query = this.db
+      .selectFrom('exercises')
+      .where((eb) =>
+        eb.or([
+          eb('organisation_id', '=', organisationId),
+          eb('visibility', '=', ExerciseVisibility.PUBLIC),
+        ]),
+      )
+      .select((eb) => eb.fn.countAll<number>().as('count'));
 
     if (filter?.visibility) {
       query = query.where('visibility', '=', filter.visibility);
@@ -122,6 +144,10 @@ export class ExerciseRepository {
     await this.db.deleteFrom('exercises').where('id', '=', id).execute();
   }
 
+  /**
+   * System / background-worker path: returns rows across all tenants whose assets are still
+   * being processed. Do NOT use from request paths.
+   */
   async findManyWithPendingAssets(): Promise<Exercise[]> {
     const results = await this.db
       .selectFrom('exercises')
