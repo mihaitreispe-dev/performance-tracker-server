@@ -131,6 +131,7 @@ export class OrganisationsApiService {
             role: m.role,
             invitedAt: m.invited_at instanceof Date ? m.invited_at.toISOString() : String(m.invited_at),
             invitedByUserId: m.invited_by_user_id,
+            invitationMessage: m.invitation_message,
           } satisfies PendingInvitationDTO;
         }),
       )

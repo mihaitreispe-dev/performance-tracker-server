@@ -56,6 +56,7 @@ export class MembershipsApiService {
       user_id: invitee.id,
       role: dto.role,
       invited_by_user_id: req.user.id,
+      invitation_message: dto.invitationMessage?.trim() || null,
     });
     return { data: this.mapToDTO(membership, invitee) };
   }
@@ -151,6 +152,7 @@ export class MembershipsApiService {
       userDisplayName: user?.display_name ?? null,
       role: m.role,
       invitedByUserId: m.invited_by_user_id,
+      invitationMessage: m.invitation_message,
       invitedAt: m.invited_at instanceof Date ? m.invited_at.toISOString() : String(m.invited_at),
       acceptedAt: m.accepted_at
         ? m.accepted_at instanceof Date

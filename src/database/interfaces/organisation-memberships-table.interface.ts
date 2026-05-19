@@ -15,6 +15,8 @@ export interface OrganisationMembershipsTable {
   user_id: string;
   role: OrganisationRole;
   invited_by_user_id: string | null;
+  /** Optional personal note from the inviter, shown alongside the pending invitation. */
+  invitation_message: string | null;
   invited_at: Generated<Timestamp>;
   accepted_at: Timestamp | null;
   created_at: Generated<Timestamp>;

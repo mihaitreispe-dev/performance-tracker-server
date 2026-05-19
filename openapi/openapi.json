@@ -944,6 +944,83 @@
         ]
       }
     },
+    "/v1/exercises/{id}/retry-vimeo": {
+      "post": {
+        "operationId": "ExercisesApiController_retryVimeoImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Exercise ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Exercise was not imported from Vimeo or Vimeo fetch failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Retry a previously-failed Vimeo import (admin only). Re-fetches rendition links and restarts the background streaming task.",
+        "tags": [
+          "exercises"
+        ]
+      }
+    },
     "/v1/exercises/{id}/upload-url": {
       "get": {
         "operationId": "ExercisesApiController_getUploadUrl",
@@ -38263,6 +38340,11 @@
           "invitedByUserId": {
             "type": "object",
             "nullable": true
+          },
+          "invitationMessage": {
+            "type": "object",
+            "nullable": true,
+            "description": "Personal note from the inviter"
           }
         },
         "required": [
@@ -38388,6 +38470,11 @@
             "type": "object",
             "nullable": true
           },
+          "invitationMessage": {
+            "type": "object",
+            "nullable": true,
+            "description": "Personal note included by the inviter"
+          },
           "invitedAt": {
             "type": "string"
           },
@@ -38435,6 +38522,11 @@
               "athlete"
             ],
             "description": "Role to grant in this organisation"
+          },
+          "invitationMessage": {
+            "type": "string",
+            "description": "Optional personal note (max 500 chars) shown to the invitee alongside the pending invitation.",
+            "maxLength": 500
           }
         },
         "required": [

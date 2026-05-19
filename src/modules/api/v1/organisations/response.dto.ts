@@ -64,6 +64,9 @@ export class PendingInvitationDTO {
 
   @ApiPropertyOptional({ nullable: true })
   invitedByUserId: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Personal note from the inviter' })
+  invitationMessage: string | null;
 }
 
 export class PendingInvitationsListResponse {

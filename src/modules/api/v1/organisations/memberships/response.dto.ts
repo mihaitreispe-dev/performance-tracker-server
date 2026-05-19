@@ -23,6 +23,9 @@ export class MembershipDTO {
   @ApiPropertyOptional({ nullable: true })
   invitedByUserId: string | null;
 
+  @ApiPropertyOptional({ nullable: true, description: 'Personal note included by the inviter' })
+  invitationMessage: string | null;
+
   @ApiProperty()
   invitedAt: string;
 
