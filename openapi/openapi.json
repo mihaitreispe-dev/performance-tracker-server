@@ -18738,6 +18738,177 @@
         ]
       }
     },
+    "/v1/organisations/{id}/api-keys": {
+      "get": {
+        "operationId": "ApiKeysApiController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List API keys for an organisation (owner/admin only)",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "post": {
+        "operationId": "ApiKeysApiController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedApiKeyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new API key (owner/admin only). The response includes the full key — copy it immediately, it cannot be retrieved later.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/api-keys/{keyId}": {
+      "delete": {
+        "operationId": "ApiKeysApiController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke an API key (owner/admin only). Idempotent.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/api-keys/usage": {
+      "get": {
+        "operationId": "ApiKeysApiController_usage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyUsageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Daily usage rollup for the API keys of an organisation. Returns up to the last 90 days; defaults to 30.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
@@ -19606,6 +19777,318 @@
         "summary": "Get the current user’s progress through this course",
         "tags": [
           "Courses"
+        ]
+      }
+    },
+    "/v1/public/workouts": {
+      "get": {
+        "operationId": "PublicApiController_listWorkouts",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on the resource name/title.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Tag filter (movement snacks only).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's workouts.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workouts/{id}": {
+      "get": {
+        "operationId": "PublicApiController_getWorkout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single workout.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/courses": {
+      "get": {
+        "operationId": "PublicApiController_listCourses",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on the resource name/title.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Tag filter (movement snacks only).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's published courses.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/courses/{id}": {
+      "get": {
+        "operationId": "PublicApiController_getCourse",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single published course.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/movement-snacks": {
+      "get": {
+        "operationId": "PublicApiController_listMovementSnacks",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on the resource name/title.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Tag filter (movement snacks only).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's movement snacks.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/movement-snacks/{id}": {
+      "get": {
+        "operationId": "PublicApiController_getMovementSnack",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single movement snack.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/exercises": {
+      "get": {
+        "operationId": "PublicApiController_listExercises",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Substring match on the resource name/title.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "required": false,
+            "in": "query",
+            "description": "Tag filter (movement snacks only).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List exercises available to this organisation.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/exercises/{id}": {
+      "get": {
+        "operationId": "PublicApiController_getExercise",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single exercise.",
+        "tags": [
+          "Public"
         ]
       }
     },
@@ -38685,6 +39168,236 @@
         "required": [
           "bucket",
           "key"
+        ]
+      },
+      "ApiKeyDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string",
+            "description": "Visible prefix (e.g. \"sz_live_a1b2c3d4\"). Safe to display."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastUsedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdByUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "name",
+          "keyPrefix",
+          "scopes",
+          "createdByUserId",
+          "createdAt"
+        ]
+      },
+      "ApiKeyListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateApiKeyDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable label shown to org admins"
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "default": "live",
+            "description": "`live` for production traffic, `test` for non-billed staging traffic."
+          },
+          "scopes": {
+            "type": "array",
+            "description": "Permissions this key holds. Must be a non-empty subset of the scope catalogue.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "workouts:read",
+                "courses:read",
+                "movement_snacks:read",
+                "exercises:read",
+                "clients:read",
+                "clients:create",
+                "questionnaires:read",
+                "questionnaires:write",
+                "responses:write",
+                "workouts:generate"
+              ]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "ISO timestamp. Key is rejected after this point."
+          }
+        },
+        "required": [
+          "name",
+          "band",
+          "scopes"
+        ]
+      },
+      "CreatedApiKeyDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string",
+            "description": "Visible prefix (e.g. \"sz_live_a1b2c3d4\"). Safe to display."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastUsedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdByUserId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "fullKey": {
+            "type": "string",
+            "description": "The full key — copy it now, it will never be shown again. Pass as `Authorization: Bearer <fullKey>` or `X-API-Key`."
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "name",
+          "keyPrefix",
+          "scopes",
+          "createdByUserId",
+          "createdAt",
+          "fullKey"
+        ]
+      },
+      "CreatedApiKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreatedApiKeyDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ApiKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ApiKeyDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ApiKeyUsageDailyDTO": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "requestCount": {
+            "type": "number"
+          },
+          "errorCount": {
+            "type": "number"
+          },
+          "p95ResponseMs": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "date",
+          "endpoint",
+          "requestCount",
+          "errorCount"
+        ]
+      },
+      "ApiKeyUsageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyUsageDailyDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "ModuleDTO": {

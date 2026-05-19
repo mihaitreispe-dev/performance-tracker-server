@@ -50,6 +50,11 @@ import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.inter
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
+import { OrganisationApiKeysTable } from './organisation-api-keys-table.interface';
+import {
+  OrganisationApiUsageDailyTable,
+  OrganisationApiUsageTable,
+} from './organisation-api-usage-table.interface';
 import { OrganisationMembershipsTable } from './organisation-memberships-table.interface';
 import { OrganisationThemesTable } from './organisation-themes-table.interface';
 import { OrganisationsTable } from './organisations-table.interface';
@@ -186,6 +191,9 @@ export interface Database {
   organisations: OrganisationsTable;
   organisation_memberships: OrganisationMembershipsTable;
   organisation_themes: OrganisationThemesTable;
+  organisation_api_keys: OrganisationApiKeysTable;
+  organisation_api_usage: OrganisationApiUsageTable;
+  organisation_api_usage_daily: OrganisationApiUsageDailyTable;
 
   // Modules registry
   modules: ModulesTable;

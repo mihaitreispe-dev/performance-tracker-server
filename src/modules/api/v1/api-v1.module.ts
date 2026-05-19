@@ -4,9 +4,12 @@ import { validationErrorFactory } from 'src/lib/errors/validation-error';
 import { AllExceptionsFilter } from 'src/lib/http/filters/all-exceptions-filter';
 import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.interceptor';
 import { AuthModule } from 'src/modules/auth/auth.module';
+import { ApiKeyAuthGuard, ApiKeyUsageInterceptor } from 'src/modules/auth/api-key';
 import { ActiveOrgGuard } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/modules/auth/guards/roles.guard';
+import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
+import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
@@ -32,6 +35,7 @@ import { NutritionApiModule } from './nutrition/nutrition-api.module';
 import { OrganisationsApiModule } from './organisations/organisations-api.module';
 import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
+import { PublicApiModule } from './public/public-api.module';
 import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
 import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
 import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
@@ -80,6 +84,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     ModulesApiModule.register(),
     ContentItemsApiModule.register(),
     CoursesApiModule.register(),
+    PublicApiModule.register(),
   ],
   providers: [
     {
@@ -97,6 +102,17 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
       useExisting: ActiveOrgGuard,
     },
     ActiveOrgGuard,
+    {
+      provide: APP_GUARD,
+      useExisting: ApiKeyAuthGuard,
+    },
+    ApiKeyAuthGuard,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ApiKeyUsageInterceptor,
+    },
+    OrganisationApiKeyRepository,
+    OrganisationApiUsageRepository,
     OrganisationMembershipRepository,
     UserRepository,
     {
