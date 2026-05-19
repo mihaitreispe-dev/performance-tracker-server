@@ -71,7 +71,8 @@ export class WorkoutsApiService {
     private readonly configService: AppConfigService,
   ) {}
 
-  async list(req: Request & { user: AuthUser }, query: ListWorkoutsQuery): Promise<WorkoutListResponse> {
+  async list(req: AuthedRequest, query: ListWorkoutsQuery): Promise<WorkoutListResponse> {
+    const organisationId = assertActiveOrg(req);
     const { q, offset = 0, limit = 20, type, difficulty, sort } = query;
 
     const filter = {
@@ -82,8 +83,8 @@ export class WorkoutsApiService {
     };
 
     const [workouts, totalCount] = await Promise.all([
-      this.workoutRepo.findMany({ filter, sort, offset, limit }),
-      this.workoutRepo.countMany(filter),
+      this.workoutRepo.findMany({ organisationId, filter, sort, offset, limit }),
+      this.workoutRepo.countMany(organisationId, filter),
     ]);
 
     const data = await Promise.all(workouts.map((w) => this.mapWorkoutToDTO(w)));
@@ -98,9 +99,10 @@ export class WorkoutsApiService {
     return { data, links, offset, limit, totalCount };
   }
 
-  async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutResponse> {
+  async getById(req: AuthedRequest, id: string): Promise<WorkoutResponse> {
+    const organisationId = assertActiveOrg(req);
     const workout = await this.workoutRepo.findById(id);
-    if (!workout) {
+    if (!workout || workout.organisation_id !== organisationId) {
       throw new NotFoundException();
     }
 
@@ -158,8 +160,10 @@ export class WorkoutsApiService {
       throw new NotFoundException('Source workout not found');
     }
 
-    // Check if the user already has a workout with this exact name
+    // Check if the user already has a workout with this exact name (scoped to the source org;
+    // copies inherit the source's org boundary, see the create() below).
     const existingWorkouts = await this.workoutRepo.findMany({
+      organisationId: sourceWorkout.organisation_id,
       filter: { userId: targetUserId, search: sourceWorkout.name },
       limit: 100,
     });

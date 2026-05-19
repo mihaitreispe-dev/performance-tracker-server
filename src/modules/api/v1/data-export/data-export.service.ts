@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { DataExportCategory, DataExportFormat, DataExportJob, DataExportJobStatus } from 'src/database/interfaces';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
@@ -47,7 +49,8 @@ export class DataExportService {
     private readonly jsonExporter: JsonExporter,
   ) {}
 
-  async requestExport(req: Request & { user: AuthUser }, body: RequestExportBody): Promise<DataExportJobResponse> {
+  async requestExport(req: AuthedRequest, body: RequestExportBody): Promise<DataExportJobResponse> {
+    const organisationId = assertActiveOrg(req);
     // Check rate limit (max 1 export per hour)
     const recentExports = await this.dataExportJobRepo.countByUserInPeriod(req.user.id, 1);
     if (recentExports >= 1) {
@@ -57,7 +60,8 @@ export class DataExportService {
     // Default to all categories if none specified
     const categories = body.categories ?? Object.values(DataExportCategory);
 
-    // Create export job record
+    // Create export job record. The job is rebuilt asynchronously, scoped to the
+    // organisation the request came from (passed through processExportAsync).
     const job = await this.dataExportJobRepo.create({
       user_id: req.user.id,
       format: body.format,
@@ -66,17 +70,17 @@ export class DataExportService {
     });
 
     // Start async processing
-    this.processExportAsync(job);
+    this.processExportAsync(job, organisationId);
 
     return { data: this.mapJobToDTO(job) };
   }
 
-  private async processExportAsync(job: DataExportJob): Promise<void> {
+  private async processExportAsync(job: DataExportJob, organisationId: string): Promise<void> {
     try {
       await this.dataExportJobRepo.markStarted(job.id);
 
-      // Gather data based on categories
-      const data = await this.gatherExportData(job.user_id, job.categories);
+      // Gather data based on categories (scoped to the org the export was requested from).
+      const data = await this.gatherExportData(job.user_id, organisationId, job.categories);
 
       // Calculate total items
       const totalItems = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
@@ -144,7 +148,11 @@ export class DataExportService {
     }
   }
 
-  private async gatherExportData(userId: string, categories: DataExportCategory[]): Promise<ExportData> {
+  private async gatherExportData(
+    userId: string,
+    organisationId: string,
+    categories: DataExportCategory[],
+  ): Promise<ExportData> {
     const data: ExportData = {
       workouts: [],
       workoutExecutions: [],
@@ -161,6 +169,7 @@ export class DataExportService {
       switch (category) {
         case DataExportCategory.WORKOUTS:
           data.workouts = await this.workoutRepo.findMany({
+            organisationId,
             filter: { userId },
             limit: 10000,
           });

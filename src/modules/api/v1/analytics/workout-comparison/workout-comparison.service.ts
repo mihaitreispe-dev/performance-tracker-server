@@ -1,7 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
 import { CardioMetricType, CoachAthleteStatus, WorkoutType } from 'src/database/interfaces';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
@@ -50,10 +52,11 @@ export class WorkoutComparisonService {
   ) {}
 
   async getSimilarExecutions(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     executionId: string,
     query: SimilarExecutionsQuery,
   ): Promise<SimilarExecutionsResponse> {
+    const organisationId = assertActiveOrg(req);
     // Fetch the reference execution
     const execution = await this.workoutExecutionRepository.findById(executionId);
     if (!execution) {
@@ -133,6 +136,7 @@ export class WorkoutComparisonService {
 
       // Find all workouts with this name
       const workouts = await this.workoutRepository.findMany({
+        organisationId,
         filter: { userId: req.user.id },
       });
       const matchingWorkoutIds = workouts.filter((w) => w.name === workoutName).map((w) => w.id);
@@ -166,6 +170,7 @@ export class WorkoutComparisonService {
 
       // Find all workouts of this type
       const workouts = await this.workoutRepository.findMany({
+        organisationId,
         filter: { userId: req.user.id, type: workoutType },
       });
       const matchingWorkoutIds = workouts.map((w) => w.id);
