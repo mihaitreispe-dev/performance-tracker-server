@@ -17,6 +17,8 @@ export interface WorkoutScheduleSort {
 }
 
 export interface WorkoutScheduleFindManyOptions {
+  /** Active organisation id. Schedules are strictly tenant-scoped. */
+  organisationId: string;
   filter?: WorkoutScheduleFilter;
   sort?: WorkoutScheduleSort[];
   offset?: number;
@@ -40,9 +42,12 @@ export class WorkoutScheduleRepository {
     return this.db.selectFrom('workout_schedules').where('id', 'in', ids).selectAll().execute();
   }
 
-  async findMany(options: WorkoutScheduleFindManyOptions = {}): Promise<WorkoutSchedule[]> {
-    const { filter, sort, offset, limit } = options;
-    let query = this.db.selectFrom('workout_schedules').selectAll();
+  async findMany(options: WorkoutScheduleFindManyOptions): Promise<WorkoutSchedule[]> {
+    const { organisationId, filter, sort, offset, limit } = options;
+    let query = this.db
+      .selectFrom('workout_schedules')
+      .where('organisation_id', '=', organisationId)
+      .selectAll();
 
     if (filter?.userId) {
       query = query.where('user_id', '=', filter.userId);
@@ -82,10 +87,84 @@ export class WorkoutScheduleRepository {
     return query.execute();
   }
 
-  async countMany(filter?: WorkoutScheduleFilter): Promise<number> {
-    let query = this.db.selectFrom('workout_schedules').select((eb) => eb.fn.countAll<number>().as('count'));
+  async countMany(organisationId: string, filter?: WorkoutScheduleFilter): Promise<number> {
+    let query = this.db
+      .selectFrom('workout_schedules')
+      .where('organisation_id', '=', organisationId)
+      .select((eb) => eb.fn.countAll<number>().as('count'));
 
     if (filter?.userId) {
+      query = query.where('user_id', '=', filter.userId);
+    }
+    if (filter?.workoutId) {
+      query = query.where('workout_id', '=', filter.workoutId);
+    }
+    if (filter?.dateFrom) {
+      query = query.where('scheduled_date', '>=', filter.dateFrom);
+    }
+    if (filter?.dateTo) {
+      query = query.where('scheduled_date', '<=', filter.dateTo);
+    }
+    if (filter?.completed !== undefined) {
+      if (filter.completed) {
+        query = query.where('completed_at', 'is not', null);
+      } else {
+        query = query.where('completed_at', 'is', null);
+      }
+    }
+
+    const result = await query.executeTakeFirstOrThrow();
+    return Number(result.count);
+  }
+
+  /**
+   * System / cron path: query across all tenants. Do NOT use from request paths.
+   * Cron jobs that fan out per user (e.g. coach alerts, prediction backfill) call this
+   * because they don't have a single active org context.
+   */
+  async findManyAcrossOrgs(
+    filter: WorkoutScheduleFilter,
+    opts?: { sort?: WorkoutScheduleSort[]; offset?: number; limit?: number },
+  ): Promise<WorkoutSchedule[]> {
+    let query = this.db.selectFrom('workout_schedules').selectAll();
+
+    if (filter.userId) {
+      query = query.where('user_id', '=', filter.userId);
+    }
+    if (filter.workoutId) {
+      query = query.where('workout_id', '=', filter.workoutId);
+    }
+    if (filter.dateFrom) {
+      query = query.where('scheduled_date', '>=', filter.dateFrom);
+    }
+    if (filter.dateTo) {
+      query = query.where('scheduled_date', '<=', filter.dateTo);
+    }
+    if (filter.completed !== undefined) {
+      if (filter.completed) {
+        query = query.where('completed_at', 'is not', null);
+      } else {
+        query = query.where('completed_at', 'is', null);
+      }
+    }
+
+    if (opts?.sort && opts.sort.length > 0) {
+      for (const s of opts.sort) {
+        query = query.orderBy(s.field, s.direction ?? 'asc');
+      }
+    } else {
+      query = query.orderBy('scheduled_date', 'asc');
+    }
+    if (opts?.offset !== undefined) query = query.offset(opts.offset);
+    if (opts?.limit !== undefined) query = query.limit(opts.limit);
+
+    return query.execute();
+  }
+
+  async countManyAcrossOrgs(filter: WorkoutScheduleFilter): Promise<number> {
+    let query = this.db.selectFrom('workout_schedules').select((eb) => eb.fn.countAll<number>().as('count'));
+
+    if (filter.userId) {
       query = query.where('user_id', '=', filter.userId);
     }
     if (filter?.workoutId) {

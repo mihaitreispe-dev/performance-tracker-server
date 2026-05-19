@@ -33,9 +33,10 @@ export class WorkoutSchedulesApiService {
   ) {}
 
   async list(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     query: ListWorkoutSchedulesQuery,
   ): Promise<WorkoutScheduleListResponse> {
+    const organisationId = assertActiveOrg(req);
     const filter: WorkoutScheduleFilter = {
       userId: req.user.id,
       workoutId: query.workoutId,
@@ -51,12 +52,13 @@ export class WorkoutSchedulesApiService {
 
     const [schedules, totalCount] = await Promise.all([
       this.workoutScheduleRepository.findMany({
+        organisationId,
         filter,
         sort,
         offset: query.offset,
         limit: query.limit ?? 50,
       }),
-      this.workoutScheduleRepository.countMany(filter),
+      this.workoutScheduleRepository.countMany(organisationId, filter),
     ]);
 
     // Fetch all workouts for the schedules

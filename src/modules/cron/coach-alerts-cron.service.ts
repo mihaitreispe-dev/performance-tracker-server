@@ -178,15 +178,15 @@ export class CoachAlertsCronService {
     const endOfYesterday = new Date(yesterday);
     endOfYesterday.setHours(23, 59, 59, 999);
 
-    const missedSchedules = await this.scheduleRepo.findMany({
-      filter: {
+    const missedSchedules = await this.scheduleRepo.findManyAcrossOrgs(
+      {
         userId: athlete.id,
         dateFrom: yesterday,
         dateTo: endOfYesterday,
         completed: false,
       },
-      limit: 1,
-    });
+      { limit: 1 },
+    );
 
     if (missedSchedules.length > 0) {
       this.markAlertSent(alertKey);
@@ -247,12 +247,12 @@ export class CoachAlertsCronService {
     yesterday.setHours(23, 59, 59, 999);
 
     const [totalScheduled, totalCompleted] = await Promise.all([
-      this.scheduleRepo.countMany({
+      this.scheduleRepo.countManyAcrossOrgs({
         userId: athlete.id,
         dateFrom: weekAgo,
         dateTo: yesterday,
       }),
-      this.scheduleRepo.countMany({
+      this.scheduleRepo.countManyAcrossOrgs({
         userId: athlete.id,
         dateFrom: weekAgo,
         dateTo: yesterday,

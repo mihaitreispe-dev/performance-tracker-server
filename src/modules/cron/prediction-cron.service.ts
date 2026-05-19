@@ -206,15 +206,15 @@ export class PredictionCronService {
    * Get unique dates when user had workouts
    */
   private async getWorkoutDatesForUser(userId: string): Promise<Date[]> {
-    // Get completed workout schedules for this user
-    const workouts = await this.workoutScheduleRepository.findMany({
-      filter: {
+    // Get completed workout schedules for this user (cross-org for the user, since this is a system cron).
+    const workouts = await this.workoutScheduleRepository.findManyAcrossOrgs(
+      {
         userId,
         dateFrom: new Date('2020-01-01'),
         dateTo: new Date(),
         completed: true,
       },
-    });
+    );
 
     // Extract unique dates
     const dateSet = new Set<string>();

@@ -829,10 +829,11 @@ export class CoachingApiService {
 
   // Athlete Schedules (coach viewing/managing athlete calendars)
   async getAthleteSchedules(
-    _req: Request & { user: AuthUser },
+    req: AuthedRequest,
     athleteId: string,
     query: ListAthleteSchedulesQuery,
   ): Promise<AthleteScheduleListResponse> {
+    const organisationId = assertActiveOrg(req);
     // Verify privacy settings allow calendar access
     const privacySettings = await this.privacySettingsRepo.findByUserId(athleteId);
     if (privacySettings && !privacySettings.share_calendar) {
@@ -843,6 +844,7 @@ export class CoachingApiService {
     const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
 
     const schedules = await this.scheduleRepo.findMany({
+      organisationId,
       filter: {
         userId: athleteId,
         dateFrom,
@@ -925,9 +927,10 @@ export class CoachingApiService {
 
   // Compliance
   async getComplianceOverview(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     query: ComplianceQuery,
   ): Promise<ComplianceOverviewResponse> {
+    const organisationId = assertActiveOrg(req);
     // Get all active athletes for this coach
     const relationships = await this.relationshipRepo.findMany({
       coachId: req.user.id,
@@ -953,7 +956,7 @@ export class CoachingApiService {
         continue;
       }
 
-      const compliance = await this.calculateAthleteCompliance(rel.athlete_id, dateFrom, dateTo);
+      const compliance = await this.calculateAthleteCompliance(organisationId, rel.athlete_id, dateFrom, dateTo);
       athleteCompliances.push({
         athleteId: rel.athlete_id,
         user: this.mapToUserBasicDTO(user),
@@ -976,10 +979,11 @@ export class CoachingApiService {
   }
 
   async getAthleteCompliance(
-    _req: Request & { user: AuthUser },
+    req: AuthedRequest,
     athleteId: string,
     query: ComplianceQuery,
   ): Promise<AthleteComplianceResponse> {
+    const organisationId = assertActiveOrg(req);
     // Check privacy settings
     const privacySettings = await this.privacySettingsRepo.findByUserId(athleteId);
     if (privacySettings && !privacySettings.share_calendar) {
@@ -995,7 +999,7 @@ export class CoachingApiService {
     const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
     const dateFrom = query.dateFrom ? new Date(query.dateFrom) : new Date(dateTo.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const compliance = await this.calculateAthleteCompliance(athleteId, dateFrom, dateTo);
+    const compliance = await this.calculateAthleteCompliance(organisationId, athleteId, dateFrom, dateTo);
 
     return {
       data: {
@@ -1007,6 +1011,7 @@ export class CoachingApiService {
   }
 
   private async calculateAthleteCompliance(
+    organisationId: string,
     athleteId: string,
     dateFrom: Date,
     dateTo: Date,
@@ -1018,6 +1023,7 @@ export class CoachingApiService {
     compliancePercentage: number;
   }> {
     const schedules = await this.scheduleRepo.findMany({
+      organisationId,
       filter: {
         userId: athleteId,
         dateFrom,

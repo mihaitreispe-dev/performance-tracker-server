@@ -106,6 +106,7 @@ export class WorkoutComparisonService {
     if (matchType === MatchType.EXACT && workoutId) {
       // Match by exact workoutId through schedule
       const schedules = await this.workoutScheduleRepository.findMany({
+        organisationId,
         filter: {
           userId: req.user.id,
           workoutId,
@@ -143,6 +144,7 @@ export class WorkoutComparisonService {
 
       if (matchingWorkoutIds.length > 0) {
         const schedules = await this.workoutScheduleRepository.findMany({
+          organisationId,
           filter: { userId: req.user.id },
         });
         const matchingScheduleIds = schedules.filter((s) => matchingWorkoutIds.includes(s.workout_id)).map((s) => s.id);
@@ -176,6 +178,7 @@ export class WorkoutComparisonService {
       const matchingWorkoutIds = workouts.map((w) => w.id);
 
       const schedules = await this.workoutScheduleRepository.findMany({
+        organisationId,
         filter: { userId: req.user.id },
       });
       const matchingScheduleIds = schedules.filter((s) => matchingWorkoutIds.includes(s.workout_id)).map((s) => s.id);
@@ -265,14 +268,15 @@ export class WorkoutComparisonService {
   }
 
   async compareAthletes(
-    req: Request & { user: AuthUser },
+    req: AuthedRequest,
     body: CompareAthletesBody,
   ): Promise<CoachAthleteComparisonResponse> {
+    const organisationId = assertActiveOrg(req);
     const { workoutId, athleteIds, dateFrom, dateTo } = body;
 
-    // Verify workout exists
+    // Verify workout exists in the active org
     const workout = await this.workoutRepository.findById(workoutId);
-    if (!workout) {
+    if (!workout || workout.organisation_id !== organisationId) {
       throw new NotFoundException('Workout not found');
     }
 
@@ -303,8 +307,9 @@ export class WorkoutComparisonService {
       const user = await this.userRepository.findById(athleteId);
       const athleteName = user?.display_name ?? 'Unknown Athlete';
 
-      // Get schedules for this workout
+      // Get schedules for this workout (within the active coaching org).
       const schedules = await this.workoutScheduleRepository.findMany({
+        organisationId,
         filter: {
           userId: athleteId,
           workoutId,

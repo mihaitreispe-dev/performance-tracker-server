@@ -8,7 +8,9 @@ import {
   WorkoutType,
 } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
+import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
@@ -103,7 +105,8 @@ export class AnalyticsApiService {
     private readonly privacySettingsRepository: AthletePrivacySettingsRepository,
   ) {}
 
-  async getWeeklySummary(req: Request & { user: AuthUser }, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
+  async getWeeklySummary(req: AuthedRequest, query: WeeklySummaryQuery): Promise<WeeklySummaryResponse> {
+    const organisationId = assertActiveOrg(req);
     const referenceDate = query.date ? new Date(query.date) : new Date();
 
     // Get Monday of the week
@@ -120,6 +123,7 @@ export class AnalyticsApiService {
 
     // Fetch schedules for the week
     const schedules = await this.workoutScheduleRepository.findMany({
+      organisationId,
       filter: {
         userId: req.user.id,
         dateFrom: weekStart,
