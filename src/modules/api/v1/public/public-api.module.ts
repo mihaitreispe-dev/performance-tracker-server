@@ -2,6 +2,7 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { StripeModule } from 'src/modules/stripe/stripe.module';
 import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
@@ -22,6 +23,7 @@ import { RecoveryJournalRepository } from 'src/repositories/recovery-journal.rep
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
 import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
+import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
@@ -30,6 +32,8 @@ import { WorkoutRouteRepository } from 'src/repositories/workout-route.repositor
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { PublicAthletesController } from './athletes/public-athletes.controller';
+import { PublicBillingController } from './billing/public-billing.controller';
+import { PublicBillingService } from './billing/public-billing.service';
 import { PublicCardioController } from './cardio/public-cardio.controller';
 import { PublicCardioService } from './cardio/public-cardio.service';
 import { PublicAthletesService } from './athletes/public-athletes.service';
@@ -53,7 +57,7 @@ export class PublicApiModule {
     if (!this.instance) {
       this.instance = {
         module: PublicApiModule,
-        imports: [S3Module.register(), AuthModule.register(), FirebaseModule.register()],
+        imports: [S3Module.register(), AuthModule.register(), FirebaseModule.register(), StripeModule.register()],
         providers: [
           PublicApiService,
           PublicClientsService,
@@ -62,6 +66,8 @@ export class PublicApiModule {
           PublicAthletesService,
           PublicWellnessService,
           PublicCardioService,
+          PublicBillingService,
+          StripeBillingRepository,
           WorkoutGeneratorService,
           WorkoutRepository,
           WorkoutScheduleRepository,
@@ -98,6 +104,7 @@ export class PublicApiModule {
           PublicAthletesController,
           PublicWellnessController,
           PublicCardioController,
+          PublicBillingController,
         ],
       };
     }

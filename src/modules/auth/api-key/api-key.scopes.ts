@@ -29,6 +29,9 @@ export const API_KEY_SCOPES = [
   // Phase 7 — cardio routes + GPS metric streams + weather
   'cardio:read',
   'cardio:write',
+  // Phase 9 — billing / subscriptions for the org's clients
+  'billing:read',
+  'billing:write',
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
