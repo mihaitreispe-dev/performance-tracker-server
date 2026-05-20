@@ -1,15 +1,19 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { StripeModule } from 'src/modules/stripe/stripe.module';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
 import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
+import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { ApiKeysApiController } from './api-keys/api-keys-api.controller';
 import { ApiKeysApiService } from './api-keys/api-keys-api.service';
+import { BillingApiController } from './billing/billing-api.controller';
+import { BillingApiService } from './billing/billing-api.service';
 import { MembershipsApiController } from './memberships/memberships-api.controller';
 import { MembershipsApiService } from './memberships/memberships-api.service';
 import { OrganisationsApiController } from './organisations-api.controller';
@@ -25,17 +29,19 @@ export class OrganisationsApiModule {
     if (!this.instance) {
       this.instance = {
         module: OrganisationsApiModule,
-        imports: [AuthModule.register(), S3Module.register()],
+        imports: [AuthModule.register(), S3Module.register(), StripeModule.register()],
         providers: [
           OrganisationsApiService,
           MembershipsApiService,
           ThemesApiService,
           ApiKeysApiService,
+          BillingApiService,
           OrganisationRepository,
           OrganisationMembershipRepository,
           OrganisationThemeRepository,
           OrganisationApiKeyRepository,
           OrganisationApiUsageRepository,
+          StripeBillingRepository,
           UserRepository,
         ],
         controllers: [
@@ -43,6 +49,7 @@ export class OrganisationsApiModule {
           MembershipsApiController,
           ThemesApiController,
           ApiKeysApiController,
+          BillingApiController,
         ],
         exports: [
           OrganisationsApiService,
@@ -50,6 +57,7 @@ export class OrganisationsApiModule {
           OrganisationMembershipRepository,
           OrganisationApiKeyRepository,
           OrganisationApiUsageRepository,
+          StripeBillingRepository,
         ],
       };
     }
