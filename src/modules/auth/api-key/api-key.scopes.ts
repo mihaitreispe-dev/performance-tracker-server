@@ -19,6 +19,10 @@ export const API_KEY_SCOPES = [
   'workouts:generate',
   // Phase 4 — hosted auth code grant
   'auth:exchange',
+  // Phase 5 — athlete consumption + tracking
+  'schedules:read',
+  'executions:read',
+  'executions:write',
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

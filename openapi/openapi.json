@@ -20523,6 +20523,317 @@
         ]
       }
     },
+    "/v1/public/clients/{id}/scheduled-workouts": {
+      "get": {
+        "operationId": "PublicAthletesController_listScheduledWorkouts",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date — only return schedules on/after.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date — only return schedules on/before.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "completed",
+            "required": false,
+            "in": "query",
+            "description": "When set, filters to completed or not-yet-completed schedules.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicScheduledWorkoutListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a client's scheduled workouts. Supports date-range filtering and a completed flag for splitting upcoming vs done.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/workout-executions": {
+      "post": {
+        "operationId": "PublicAthletesController_startExecution",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExecutionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWorkoutExecutionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Start a workout execution. Pass workoutScheduleId to link the execution to a calendar slot; omit for ad-hoc.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/sets": {
+      "post": {
+        "operationId": "PublicAthletesController_completeSet",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletePublicSetBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSetCompletionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Record (or update) one set within an active execution. Idempotent on (exerciseInstanceId, setNumber).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/finish": {
+      "patch": {
+        "operationId": "PublicAthletesController_finishExecution",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinishExecutionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWorkoutExecutionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Mark an execution as finished. Idempotent — a second call returns the existing row without mutating completed_at.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/summary": {
+      "get": {
+        "operationId": "PublicAthletesController_getExecutionSummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicExecutionSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Aggregated stats for an execution: time, sets, exercises, completion ratio, RPE, volume, per-exercise breakdown.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/workout-history": {
+      "get": {
+        "operationId": "PublicAthletesController_listExecutionHistory",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "completed",
+            "required": false,
+            "in": "query",
+            "description": "true = only finished executions; false = only in-flight.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicExecutionHistoryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a client's workout executions, newest first.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/personal-records": {
+      "get": {
+        "operationId": "PublicAthletesController_listPersonalRecords",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPersonalRecordListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a client's personal records across exercise types.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -39711,7 +40022,10 @@
                 "questionnaires:write",
                 "responses:write",
                 "workouts:generate",
-                "auth:exchange"
+                "auth:exchange",
+                "schedules:read",
+                "executions:read",
+                "executions:write"
               ]
             }
           },
@@ -41099,6 +41413,400 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PublicAuthSessionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicScheduledWorkoutDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workoutId": {
+            "type": "string"
+          },
+          "workoutName": {
+            "type": "object",
+            "nullable": true
+          },
+          "workoutType": {
+            "type": "object",
+            "nullable": true
+          },
+          "difficulty": {
+            "type": "object",
+            "nullable": true
+          },
+          "scheduledDate": {
+            "type": "string",
+            "description": "ISO date (date-only)."
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "workoutId",
+          "scheduledDate"
+        ]
+      },
+      "PublicScheduledWorkoutListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicScheduledWorkoutDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "StartExecutionBody": {
+        "type": "object",
+        "properties": {
+          "workoutScheduleId": {
+            "type": "string",
+            "description": "Schedule the execution is for. If omitted, the execution is treated as ad-hoc (no calendar link)."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "ISO timestamp. Defaults to now."
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicWorkoutExecutionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "workoutScheduleId": {
+            "type": "object",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "durationSeconds": {
+            "type": "object",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "object",
+            "nullable": true
+          },
+          "sessionRpe": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "startedAt",
+          "source"
+        ]
+      },
+      "PublicWorkoutExecutionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicWorkoutExecutionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CompletePublicSetBody": {
+        "type": "object",
+        "properties": {
+          "exerciseInstanceId": {
+            "type": "string",
+            "description": "The exercise_instance this set belongs to."
+          },
+          "setNumber": {
+            "type": "number",
+            "description": "1-indexed set ordinal within the exercise."
+          },
+          "actualReps": {
+            "type": "number"
+          },
+          "actualLoad": {
+            "type": "number"
+          },
+          "actualTimeSeconds": {
+            "type": "number"
+          },
+          "rpe": {
+            "type": "number",
+            "description": "Rate of perceived exertion, 1–10."
+          },
+          "skipped": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicSetCompletionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "exerciseInstanceId": {
+            "type": "string"
+          },
+          "setNumber": {
+            "type": "number"
+          },
+          "actualReps": {
+            "type": "object",
+            "nullable": true
+          },
+          "actualLoad": {
+            "type": "object",
+            "nullable": true
+          },
+          "actualTimeSeconds": {
+            "type": "object",
+            "nullable": true
+          },
+          "rpe": {
+            "type": "object",
+            "nullable": true
+          },
+          "skipped": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "object",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workoutExecutionId",
+          "exerciseInstanceId",
+          "setNumber",
+          "skipped",
+          "completedAt"
+        ]
+      },
+      "PublicSetCompletionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicSetCompletionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "FinishExecutionBody": {
+        "type": "object",
+        "properties": {
+          "completedAt": {
+            "type": "string",
+            "description": "ISO timestamp. Defaults to now."
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "Override the computed duration in seconds."
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicExecutionSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string"
+          },
+          "workoutId": {
+            "type": "object",
+            "nullable": true
+          },
+          "workoutName": {
+            "type": "object",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "totalDurationSeconds": {
+            "type": "number"
+          },
+          "exercisesPlanned": {
+            "type": "number"
+          },
+          "exercisesCompleted": {
+            "type": "number"
+          },
+          "setsPlanned": {
+            "type": "number"
+          },
+          "setsCompleted": {
+            "type": "number"
+          },
+          "setsSkipped": {
+            "type": "number"
+          },
+          "completionRatio": {
+            "type": "number"
+          },
+          "sessionRpe": {
+            "type": "object",
+            "nullable": true
+          },
+          "avgRpe": {
+            "type": "object",
+            "nullable": true
+          },
+          "totalVolume": {
+            "type": "object",
+            "nullable": true
+          },
+          "perExercise": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "executionId",
+          "startedAt",
+          "totalDurationSeconds",
+          "exercisesPlanned",
+          "exercisesCompleted",
+          "setsPlanned",
+          "setsCompleted",
+          "setsSkipped",
+          "completionRatio",
+          "perExercise"
+        ]
+      },
+      "PublicExecutionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicExecutionSummaryDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicExecutionHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicWorkoutExecutionDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "PublicPersonalRecordDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "recordType": {
+            "type": "string"
+          },
+          "exerciseId": {
+            "type": "object",
+            "nullable": true
+          },
+          "workoutType": {
+            "type": "object",
+            "nullable": true
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "achievedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "recordType",
+          "value",
+          "unit",
+          "workoutExecutionId",
+          "achievedAt"
+        ]
+      },
+      "PublicPersonalRecordListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPersonalRecordDTO"
+            }
           }
         },
         "required": [
