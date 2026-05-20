@@ -4,6 +4,7 @@ import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { StripeModule } from 'src/modules/stripe/stripe.module';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
+import { ModuleRepository } from 'src/repositories/module.repository';
 import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
 import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
@@ -15,6 +16,9 @@ import { ApiKeysApiController } from './api-keys/api-keys-api.controller';
 import { ApiKeysApiService } from './api-keys/api-keys-api.service';
 import { BillingApiController } from './billing/billing-api.controller';
 import { BillingApiService } from './billing/billing-api.service';
+import { ClientProfilesApiController } from './client-profiles/client-profiles-api.controller';
+import { ClientProfilesApiService } from './client-profiles/client-profiles-api.service';
+import { ClientProvisioningService } from './client-profiles/client-provisioning.service';
 import { MembershipsApiController } from './memberships/memberships-api.controller';
 import { MembershipsApiService } from './memberships/memberships-api.service';
 import { OrganisationsApiController } from './organisations-api.controller';
@@ -37,12 +41,15 @@ export class OrganisationsApiModule {
           ThemesApiService,
           ApiKeysApiService,
           BillingApiService,
+          ClientProfilesApiService,
+          ClientProvisioningService,
           OrganisationRepository,
           OrganisationMembershipRepository,
           OrganisationThemeRepository,
           OrganisationApiKeyRepository,
           OrganisationApiUsageRepository,
           StripeBillingRepository,
+          ModuleRepository,
           UserRepository,
         ],
         controllers: [
@@ -51,6 +58,7 @@ export class OrganisationsApiModule {
           ThemesApiController,
           ApiKeysApiController,
           BillingApiController,
+          ClientProfilesApiController,
         ],
         exports: [
           OrganisationsApiService,

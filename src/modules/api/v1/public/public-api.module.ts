@@ -11,6 +11,7 @@ import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutritio
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
+import { ModuleRepository } from 'src/repositories/module.repository';
 import { OAuthAuthorizationCodeRepository } from 'src/repositories/oauth-authorization-code.repository';
 import { OnboardingQuestionnaireRepository } from 'src/repositories/onboarding-questionnaire.repository';
 import { OnboardingResponseRepository } from 'src/repositories/onboarding-response.repository';
@@ -31,6 +32,7 @@ import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.r
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
+import { ClientProvisioningService } from '../organisations/client-profiles/client-provisioning.service';
 import { PublicAthletesController } from './athletes/public-athletes.controller';
 import { PublicBillingController } from './billing/public-billing.controller';
 import { PublicBillingService } from './billing/public-billing.service';
@@ -67,6 +69,8 @@ export class PublicApiModule {
           PublicWellnessService,
           PublicCardioService,
           PublicBillingService,
+          ClientProvisioningService,
+          ModuleRepository,
           StripeBillingRepository,
           WorkoutGeneratorService,
           WorkoutRepository,

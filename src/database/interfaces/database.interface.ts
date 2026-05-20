@@ -44,6 +44,7 @@ import {
 import {
   AthleteModuleOverridesTable,
   ModulesTable,
+  OrganisationClientTypeModuleDefaultsTable,
   OrganisationModuleSettingsTable,
 } from './modules-table.interface';
 import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.interface';
@@ -227,6 +228,7 @@ export interface Database {
   modules: ModulesTable;
   organisation_module_settings: OrganisationModuleSettingsTable;
   athlete_module_overrides: AthleteModuleOverridesTable;
+  organisation_client_type_module_defaults: OrganisationClientTypeModuleDefaultsTable;
 
   // Content layer (snacks, courses, exercise intros)
   content_items: ContentItemsTable;

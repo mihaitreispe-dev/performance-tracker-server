@@ -6,11 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { OrganisationMembership, OrganisationRole, User } from 'src/database/interfaces';
+import { ClientType, OrganisationMembership, OrganisationRole, User } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
+import { ClientProvisioningService } from '../client-profiles/client-provisioning.service';
 import { InviteMemberDto, UpdateMembershipRoleDto } from './request.dto';
 import { MembershipDTO, MembershipResponse, MembershipsListResponse } from './response.dto';
 
@@ -21,6 +22,7 @@ export class MembershipsApiService {
   constructor(
     private readonly membershipRepo: OrganisationMembershipRepository,
     private readonly userRepo: UserRepository,
+    private readonly provisioningService: ClientProvisioningService,
   ) {}
 
   async listMembers(req: Request & { user: AuthUser }, orgId: string): Promise<MembershipsListResponse> {
@@ -51,13 +53,31 @@ export class MembershipsApiService {
       throw new ConflictException('User is already a member of this organisation');
     }
 
+    // client_type only applies to ATHLETE-roled memberships — DB CHECK enforces
+    // null elsewhere. Default to 'general' (the lighter-touch track); admins
+    // pick 'athlete' for full one-to-one coaching clients on the Members tab.
+    const clientType: ClientType | null =
+      dto.role === OrganisationRole.ATHLETE ? dto.clientType ?? ClientType.GENERAL : null;
+
     const membership = await this.membershipRepo.create({
       organisation_id: orgId,
       user_id: invitee.id,
       role: dto.role,
+      client_type: clientType,
       invited_by_user_id: req.user.id,
       invitation_message: dto.invitationMessage?.trim() || null,
     });
+
+    if (clientType) {
+      // Same fire-and-forget pattern as the API-key path — provisioning errors
+      // don't block the invite from succeeding.
+      await this.provisioningService.applyClientTypeDefaults({
+        organisationId: orgId,
+        athleteUserId: invitee.id,
+        clientType,
+      });
+    }
+
     return { data: this.mapToDTO(membership, invitee) };
   }
 
@@ -151,6 +171,7 @@ export class MembershipsApiService {
       userEmail: user?.email ?? '',
       userDisplayName: user?.display_name ?? null,
       role: m.role,
+      clientType: m.client_type,
       invitedByUserId: m.invited_by_user_id,
       invitationMessage: m.invitation_message,
       metadata: (m.metadata ?? {}) as Record<string, unknown>,

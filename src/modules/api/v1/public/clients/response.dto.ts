@@ -9,6 +9,13 @@ export class PublicClientMembershipDTO {
   @ApiProperty()
   role: string;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      "Athlete sub-track: 'general' | 'athlete'. Null for non-athlete roles (owner/admin/coach).",
+  })
+  clientType: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   acceptedAt: string | null;
 }

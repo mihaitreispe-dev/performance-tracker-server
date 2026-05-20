@@ -48,3 +48,23 @@ export interface AthleteModuleOverridesTable {
 export type AthleteModuleOverride = Selectable<AthleteModuleOverridesTable>;
 export type NewAthleteModuleOverride = Insertable<AthleteModuleOverridesTable>;
 export type AthleteModuleOverrideUpdate = Updateable<AthleteModuleOverridesTable>;
+
+/**
+ * Per-org, per-client-type default module toggles. Applied at provisioning
+ * (athlete invite / public client upsert): for every module where this row
+ * disagrees with the org-wide setting, a matching `athlete_module_overrides`
+ * row is written so the difference sticks even if the org-wide default
+ * changes later.
+ */
+export interface OrganisationClientTypeModuleDefaultsTable {
+  organisation_id: string;
+  client_type: string;
+  module_key: string;
+  enabled: boolean;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export type OrganisationClientTypeModuleDefault = Selectable<OrganisationClientTypeModuleDefaultsTable>;
+export type NewOrganisationClientTypeModuleDefault = Insertable<OrganisationClientTypeModuleDefaultsTable>;
+export type OrganisationClientTypeModuleDefaultUpdate = Updateable<OrganisationClientTypeModuleDefaultsTable>;

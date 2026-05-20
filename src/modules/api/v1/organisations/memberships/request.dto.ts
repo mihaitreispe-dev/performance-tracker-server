@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
-import { OrganisationRole } from 'src/database/interfaces';
+import { ClientType, OrganisationRole } from 'src/database/interfaces';
 
 export class InviteMemberDto {
   @ApiProperty({ description: 'Email of the user to invite. Must already have an account.' })
@@ -20,6 +20,15 @@ export class InviteMemberDto {
   @IsString()
   @MaxLength(500)
   invitationMessage?: string;
+
+  @ApiPropertyOptional({
+    enum: ClientType,
+    description:
+      "Only meaningful when role=athlete. 'general' (default) for one-to-many content consumers, 'athlete' for one-to-one coaching clients. The matching per-org default module profile is applied at invite time.",
+  })
+  @IsOptional()
+  @IsEnum(ClientType)
+  clientType?: ClientType;
 }
 
 export class UpdateMembershipRoleDto {

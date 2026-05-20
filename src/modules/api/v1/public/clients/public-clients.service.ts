@@ -6,6 +6,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { Kysely } from 'kysely';
 
 import {
+  ClientType,
   Database,
   MembershipMetadata,
   OrganisationMembership,
@@ -13,6 +14,7 @@ import {
   User,
   UserRole,
 } from 'src/database/interfaces';
+import { ClientProvisioningService } from 'src/modules/api/v1/organisations/client-profiles/client-provisioning.service';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
@@ -50,16 +52,26 @@ export class PublicClientsService {
     @InjectKysely() private readonly db: Kysely<Database>,
     private readonly userRepo: UserRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly provisioningService: ClientProvisioningService,
   ) {}
 
   async upsert(organisationId: string, body: CreatePublicClientBody): Promise<PublicClientResponse> {
     const email = body.email.trim().toLowerCase();
     const displayName = body.displayName?.trim() || email.split('@')[0];
     const incomingMetadata = (body.metadata ?? {}) as MembershipMetadata;
+    // Default new clients to 'general' (lighter touch) — the integrating app
+    // explicitly opts into the 'athlete' track when they want one-to-one
+    // coaching. clientType is ignored on subsequent upserts; the per-type
+    // default profile is only applied on the first membership create.
+    const clientType: ClientType = body.clientType ?? ClientType.GENERAL;
 
     // Run the user + membership upserts in a single transaction so a partial
     // failure (user created but membership write blows up) can't leave an orphan.
-    const { user, membership } = await this.db.transaction().execute(async (trx) => {
+    // `wasCreated` flags whether the membership row was just inserted so we can
+    // apply the per-client-type module defaults exactly once (after commit so
+    // any partial failure during defaults application doesn't roll the
+    // membership back).
+    const { user, membership, wasCreated } = await this.db.transaction().execute(async (trx) => {
       const existingUser = await trx
         .selectFrom('users')
         .where('email', '=', email)
@@ -94,6 +106,7 @@ export class PublicClientsService {
         .executeTakeFirst();
 
       let membership: OrganisationMembership;
+      let wasCreated = false;
       if (existingMembership) {
         const mergedMetadata: MembershipMetadata = {
           ...((existingMembership.metadata as MembershipMetadata) ?? {}),
@@ -118,6 +131,8 @@ export class PublicClientsService {
             organisation_id: organisationId,
             user_id: user.id,
             role: OrganisationRole.ATHLETE,
+            // CHECK constraint enforces client_type IS NOT NULL when role=athlete.
+            client_type: clientType,
             invited_by_user_id: null,
             invitation_message: null,
             metadata: incomingMetadata,
@@ -125,10 +140,21 @@ export class PublicClientsService {
           })
           .returningAll()
           .executeTakeFirstOrThrow();
+        wasCreated = true;
       }
 
-      return { user, membership };
+      return { user, membership, wasCreated };
     });
+
+    if (wasCreated) {
+      // Fire-and-forget: ClientProvisioningService swallows its own errors and
+      // logs, so a defaults-application failure can't 500 the caller's request.
+      await this.provisioningService.applyClientTypeDefaults({
+        organisationId,
+        athleteUserId: user.id,
+        clientType,
+      });
+    }
 
     return { data: mapClientDTO(user, membership) };
   }
@@ -215,6 +241,7 @@ function mapClientDTO(user: User, membership: OrganisationMembership): PublicCli
     membership: {
       id: membership.id,
       role: membership.role,
+      clientType: membership.client_type,
       acceptedAt: membership.accepted_at ? isoOf(membership.accepted_at) : null,
     },
   };

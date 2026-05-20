@@ -12,11 +12,25 @@ export enum OrganisationRole {
   ATHLETE = 'athlete',
 }
 
+/**
+ * Sub-classification for ATHLETE-roled memberships. Owner/admin/coach
+ * memberships always have client_type = null (enforced by DB CHECK).
+ *
+ *   - general:  self-serve content consumer, one-to-many.
+ *   - athlete:  full one-to-one coaching surface.
+ */
+export enum ClientType {
+  GENERAL = 'general',
+  ATHLETE = 'athlete',
+}
+
 export interface OrganisationMembershipsTable {
   id: Generated<string>;
   organisation_id: string;
   user_id: string;
   role: OrganisationRole;
+  /** Only set for role=ATHLETE rows; null for owners/admins/coaches. */
+  client_type: ClientType | null;
   invited_by_user_id: string | null;
   /** Optional personal note from the inviter, shown alongside the pending invitation. */
   invitation_message: string | null;

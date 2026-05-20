@@ -3,11 +3,14 @@ import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import {
   AthleteModuleOverride,
+  ClientType,
   Database,
   ModuleRow,
   NewAthleteModuleOverride,
   NewModule,
+  NewOrganisationClientTypeModuleDefault,
   NewOrganisationModuleSetting,
+  OrganisationClientTypeModuleDefault,
   OrganisationModuleSetting,
 } from 'src/database/interfaces';
 
@@ -86,6 +89,66 @@ export class ModuleRepository {
       .deleteFrom('athlete_module_overrides')
       .where('organisation_id', '=', organisationId)
       .where('athlete_user_id', '=', athleteUserId)
+      .where('module_key', '=', moduleKey)
+      .execute();
+  }
+
+  /**
+   * Bulk-insert a batch of athlete overrides on first provisioning. We bypass
+   * the upsert path because new memberships can't have existing overrides; this
+   * also lets us run a single round-trip.
+   */
+  async insertAthleteOverrides(rows: NewAthleteModuleOverride[]): Promise<void> {
+    if (rows.length === 0) return;
+    await this.db.insertInto('athlete_module_overrides').values(rows).execute();
+  }
+
+  // ---- per-org, per-client-type module defaults ----
+
+  async listClientTypeDefaults(organisationId: string): Promise<OrganisationClientTypeModuleDefault[]> {
+    return this.db
+      .selectFrom('organisation_client_type_module_defaults')
+      .where('organisation_id', '=', organisationId)
+      .selectAll()
+      .execute();
+  }
+
+  async listClientTypeDefaultsFor(
+    organisationId: string,
+    clientType: ClientType,
+  ): Promise<OrganisationClientTypeModuleDefault[]> {
+    return this.db
+      .selectFrom('organisation_client_type_module_defaults')
+      .where('organisation_id', '=', organisationId)
+      .where('client_type', '=', clientType)
+      .selectAll()
+      .execute();
+  }
+
+  async upsertClientTypeDefault(
+    data: NewOrganisationClientTypeModuleDefault,
+  ): Promise<OrganisationClientTypeModuleDefault> {
+    return this.db
+      .insertInto('organisation_client_type_module_defaults')
+      .values(data)
+      .onConflict((oc) =>
+        oc
+          .columns(['organisation_id', 'client_type', 'module_key'])
+          .doUpdateSet({ enabled: data.enabled, updated_at: sql`now()` }),
+      )
+      .returningAll()
+      .executeTakeFirstOrThrow();
+  }
+
+  async deleteClientTypeDefault(
+    organisationId: string,
+    clientType: ClientType,
+    moduleKey: string,
+  ): Promise<void> {
+    await this.db
+      .deleteFrom('organisation_client_type_module_defaults')
+      .where('organisation_id', '=', organisationId)
+      .where('client_type', '=', clientType)
       .where('module_key', '=', moduleKey)
       .execute();
   }

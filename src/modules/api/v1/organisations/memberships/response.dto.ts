@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrganisationRole } from 'src/database/interfaces';
+import { ClientType, OrganisationRole } from 'src/database/interfaces';
 
 export class MembershipDTO {
   @ApiProperty()
@@ -19,6 +19,14 @@ export class MembershipDTO {
 
   @ApiProperty({ enum: OrganisationRole })
   role: OrganisationRole;
+
+  @ApiPropertyOptional({
+    enum: ClientType,
+    nullable: true,
+    description:
+      "Athlete sub-track: 'general' | 'athlete'. Null for non-athlete roles.",
+  })
+  clientType: ClientType | null;
 
   @ApiPropertyOptional({ nullable: true })
   invitedByUserId: string | null;

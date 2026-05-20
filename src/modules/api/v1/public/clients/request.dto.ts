@@ -2,6 +2,7 @@ import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsInt,
   IsObject,
   IsOptional,
@@ -12,6 +13,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+
+import { ClientType } from 'src/database/interfaces';
 
 export class CreatePublicClientBody {
   @ApiProperty()
@@ -37,6 +40,15 @@ export class CreatePublicClientBody {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    enum: ClientType,
+    description:
+      "Sub-track for this client: 'general' (default — one-to-many content consumer) or 'athlete' (one-to-one full coaching). On first creation the org's per-type default module profile is applied. Ignored on subsequent upserts.",
+  })
+  @IsOptional()
+  @IsEnum(ClientType)
+  clientType?: ClientType;
 }
 
 export class ListPublicClientsQuery {
