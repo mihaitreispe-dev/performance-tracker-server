@@ -8,6 +8,7 @@ import {
   User,
   UserRole,
 } from 'src/database/interfaces';
+import { ClientProvisioningService } from 'src/modules/api/v1/organisations/client-profiles/client-provisioning.service';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
@@ -83,6 +84,10 @@ describe('PublicClientsService', () => {
             findByUserAndOrg: jest.fn(),
             listByOrgWithRole: jest.fn(),
           },
+        },
+        {
+          provide: ClientProvisioningService,
+          useValue: { applyClientTypeDefaults: jest.fn() },
         },
       ],
     }).compile();

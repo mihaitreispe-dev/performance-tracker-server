@@ -19531,6 +19531,147 @@
         ]
       }
     },
+    "/v1/organisations/{id}/client-profiles": {
+      "get": {
+        "operationId": "ClientProfilesApiController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientTypeProfilesListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List both default client-type profiles (general + athlete).",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/client-profiles/{clientType}": {
+      "get": {
+        "operationId": "ClientProfilesApiController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientType",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "general",
+                "athlete"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientTypeProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a single default profile.",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "put": {
+        "operationId": "ClientProfilesApiController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientType",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "enum": [
+                "general",
+                "athlete"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClientTypeProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClientTypeProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the per-type module toggle set. Modules omitted from the body are removed from the per-type overrides (fall back to org-wide setting).",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
@@ -41240,6 +41381,15 @@
               "athlete"
             ]
           },
+          "clientType": {
+            "type": "string",
+            "enum": [
+              "general",
+              "athlete"
+            ],
+            "nullable": true,
+            "description": "Athlete sub-track: 'general' | 'athlete'. Null for non-athlete roles."
+          },
           "invitedByUserId": {
             "type": "object",
             "nullable": true
@@ -41307,6 +41457,14 @@
             "type": "string",
             "description": "Optional personal note (max 500 chars) shown to the invitee alongside the pending invitation.",
             "maxLength": 500
+          },
+          "clientType": {
+            "type": "string",
+            "enum": [
+              "general",
+              "athlete"
+            ],
+            "description": "Only meaningful when role=athlete. 'general' (default) for one-to-many content consumers, 'athlete' for one-to-one coaching clients. The matching per-org default module profile is applied at invite time."
           }
         },
         "required": [
@@ -42299,6 +42457,111 @@
           "data"
         ]
       },
+      "ClientTypeModuleStateDTO": {
+        "type": "object",
+        "properties": {
+          "moduleKey": {
+            "type": "string"
+          },
+          "moduleName": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "orgDefault": {
+            "type": "boolean"
+          },
+          "hasOverride": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moduleKey",
+          "moduleName",
+          "enabled",
+          "orgDefault",
+          "hasOverride"
+        ]
+      },
+      "ClientTypeProfileDTO": {
+        "type": "object",
+        "properties": {
+          "clientType": {
+            "type": "string",
+            "enum": [
+              "general",
+              "athlete"
+            ]
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientTypeModuleStateDTO"
+            }
+          }
+        },
+        "required": [
+          "clientType",
+          "modules"
+        ]
+      },
+      "ClientTypeProfilesListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientTypeProfileDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ClientTypeProfileResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ClientTypeProfileDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ClientTypeModuleToggleDto": {
+        "type": "object",
+        "properties": {
+          "moduleKey": {
+            "type": "string",
+            "description": "Module key from /v1/modules."
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moduleKey",
+          "enabled"
+        ]
+      },
+      "UpdateClientTypeProfileDto": {
+        "type": "object",
+        "properties": {
+          "toggles": {
+            "description": "Full set of module toggles for this client type. Modules omitted from the list are deleted from the per-type defaults (so they fall back to the org-wide setting).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientTypeModuleToggleDto"
+            }
+          }
+        },
+        "required": [
+          "toggles"
+        ]
+      },
       "ModuleDTO": {
         "type": "object",
         "properties": {
@@ -43013,6 +43276,14 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Arbitrary external profile data stored per-(user, org). Merged shallowly with any existing metadata on repeat calls."
+          },
+          "clientType": {
+            "type": "string",
+            "enum": [
+              "general",
+              "athlete"
+            ],
+            "description": "Sub-track for this client: 'general' (default — one-to-many content consumer) or 'athlete' (one-to-one full coaching). On first creation the org's per-type default module profile is applied. Ignored on subsequent upserts."
           }
         },
         "required": [
@@ -43027,6 +43298,11 @@
           },
           "role": {
             "type": "string"
+          },
+          "clientType": {
+            "type": "object",
+            "nullable": true,
+            "description": "Athlete sub-track: 'general' | 'athlete'. Null for non-athlete roles (owner/admin/coach)."
           },
           "acceptedAt": {
             "type": "object",
