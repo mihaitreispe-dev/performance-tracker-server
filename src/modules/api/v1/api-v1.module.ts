@@ -47,6 +47,7 @@ import { WorkoutFileImportsApiModule } from './workout-file-imports/workout-file
 import { WorkoutPlansApiModule } from './workout-plans/workout-plans-api.module';
 import { WorkoutSchedulesApiModule } from './workout-schedules/workout-schedules-api.module';
 import { WorkoutsApiModule } from './workouts/workouts-api.module';
+import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { WorkoutsApiModule } from './workouts/workouts-api.module';
     ContentItemsApiModule.register(),
     CoursesApiModule.register(),
     PublicApiModule.register(),
+    StripeWebhookModule.register(),
   ],
   providers: [
     {

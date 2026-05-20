@@ -94,6 +94,22 @@ export class StripeBillingRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Webhook-only lookup. Stripe customer ids are per-Connect-account, so the
+   * (org, stripe_customer_id) tuple uniquely identifies a row even though
+   * `stripe_customer_id` alone could collide across orgs in principle. In
+   * practice we use this from event handlers where the row must already exist.
+   */
+  async findCustomerByStripeIdGlobal(
+    stripeCustomerId: string,
+  ): Promise<StripeCustomer | undefined> {
+    return this.db
+      .selectFrom('stripe_customers')
+      .where('stripe_customer_id', '=', stripeCustomerId)
+      .selectAll()
+      .executeTakeFirst();
+  }
+
   async createCustomer(row: NewStripeCustomer): Promise<StripeCustomer> {
     return this.db
       .insertInto('stripe_customers')
