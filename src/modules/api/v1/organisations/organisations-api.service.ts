@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Organisation, OrganisationRole } from 'src/database/interfaces';
+import { Organisation, OrganisationRole, OrganisationType } from 'src/database/interfaces';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -64,6 +64,7 @@ export class OrganisationsApiService {
   ): Promise<OrganisationResponse> {
     const userId = req.user.id;
     const slug = dto.slug?.trim() || this.generateSlug(dto.name);
+    const orgType = dto.orgType ?? OrganisationType.ORGANISATION;
 
     const existing = await this.orgRepo.findBySlug(slug);
     if (existing) {
@@ -74,6 +75,7 @@ export class OrganisationsApiService {
       name: dto.name,
       slug,
       created_by_user_id: userId,
+      org_type: orgType,
     });
 
     await this.membershipRepo.create({
@@ -86,7 +88,14 @@ export class OrganisationsApiService {
     await this.themeRepo.upsert({
       organisation_id: organisation.id,
       theme_tokens: DEFAULT_THEME_TOKENS,
-      copy_overrides: {},
+      // Seed the verbiage based on the signup track. Individual coaches typically
+      // think in 'athletes'; organisations think in 'clients'. Both are editable
+      // later in Settings > Branding > Copy overrides — this just sets defaults
+      // that match the track.
+      copy_overrides:
+        orgType === OrganisationType.INDIVIDUAL
+          ? { athlete: 'athlete', athletes: 'athletes' }
+          : { athlete: 'client', athletes: 'clients' },
     });
 
     return { data: await this.mapToDTO(organisation) };
@@ -279,6 +288,7 @@ export class OrganisationsApiService {
         o.logo_s3_bucket && o.logo_s3_key
           ? await this.s3Service.getSignedUrlGET({ bucket: o.logo_s3_bucket, key: o.logo_s3_key, expires: 3600 })
           : null,
+      orgType: o.org_type,
       createdAt: o.created_at instanceof Date ? o.created_at.toISOString() : String(o.created_at),
     };
   }

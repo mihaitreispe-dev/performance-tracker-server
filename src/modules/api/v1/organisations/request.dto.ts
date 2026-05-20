@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+
+import { OrganisationType } from 'src/database/interfaces';
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/;
 
@@ -19,6 +21,15 @@ export class CreateOrganisationDto {
   @MaxLength(100)
   @Matches(SLUG_REGEX, { message: 'slug must be lowercase alphanumeric with hyphens' })
   slug?: string;
+
+  @ApiPropertyOptional({
+    enum: OrganisationType,
+    description:
+      "Signup track. Defaults to 'organisation' (multi-coach team with explicit org name + full Team surface). 'individual' = solo coach onboarding their own athletes, org name auto-generated, Team surface hidden.",
+  })
+  @IsOptional()
+  @IsEnum(OrganisationType)
+  orgType?: OrganisationType;
 }
 
 export class UpdateOrganisationDto {

@@ -40208,6 +40208,14 @@
           "slug": {
             "type": "string",
             "description": "URL-safe slug (lowercase, hyphens). Auto-generated from name if omitted."
+          },
+          "orgType": {
+            "type": "string",
+            "enum": [
+              "organisation",
+              "individual"
+            ],
+            "description": "Signup track. Defaults to 'organisation' (multi-coach team with explicit org name + full Team surface). 'individual' = solo coach onboarding their own athletes, org name auto-generated, Team surface hidden."
           }
         },
         "required": [
@@ -40230,6 +40238,14 @@
             "type": "object",
             "nullable": true
           },
+          "orgType": {
+            "type": "string",
+            "enum": [
+              "organisation",
+              "individual"
+            ],
+            "description": "Signup track. UI gating (e.g. hiding the Team tab on individual orgs) keys off this."
+          },
           "createdAt": {
             "type": "string"
           }
@@ -40238,6 +40254,7 @@
           "id",
           "name",
           "slug",
+          "orgType",
           "createdAt"
         ]
       },
@@ -40268,6 +40285,14 @@
             "type": "object",
             "nullable": true
           },
+          "orgType": {
+            "type": "string",
+            "enum": [
+              "organisation",
+              "individual"
+            ],
+            "description": "Signup track. UI gating (e.g. hiding the Team tab on individual orgs) keys off this."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -40285,6 +40310,7 @@
           "id",
           "name",
           "slug",
+          "orgType",
           "createdAt",
           "myRole"
         ]

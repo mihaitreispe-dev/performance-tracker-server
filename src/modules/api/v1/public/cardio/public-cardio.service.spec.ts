@@ -139,7 +139,7 @@ describe('PublicCardioService', () => {
     });
 
     it('refuses to overwrite an existing route', async () => {
-      routeRepo.findByExecutionId.mockResolvedValue({ id: 'r-old' } as WorkoutRoute);
+      routeRepo.findByExecutionId.mockResolvedValue({ id: 'r-old' } as unknown as WorkoutRoute);
       await expect(
         service.uploadRoute(ORG, EXEC, {
           route: sampleRouteGeoJson,
@@ -158,7 +158,7 @@ describe('PublicCardioService', () => {
         elevation_gain_meters: '120',
         elevation_loss_meters: '120',
         created_at: new Date(),
-      } as WorkoutRoute);
+      } as unknown as WorkoutRoute);
       routeRepo.createMarkers.mockResolvedValue([
         {
           id: 'mk-1',
@@ -174,7 +174,7 @@ describe('PublicCardioService', () => {
           avg_heart_rate: 150,
           avg_pace_seconds_per_km: 360,
           created_at: new Date(),
-        } as RouteMarker,
+        } as unknown as RouteMarker,
       ]);
 
       const out = await service.uploadRoute(ORG, EXEC, {

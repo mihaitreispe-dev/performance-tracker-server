@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrganisationRole } from 'src/database/interfaces';
+import { OrganisationRole, OrganisationType } from 'src/database/interfaces';
 
 export class OrganisationDTO {
   @ApiProperty()
@@ -13,6 +13,13 @@ export class OrganisationDTO {
 
   @ApiPropertyOptional({ nullable: true })
   logoUrl: string | null;
+
+  @ApiProperty({
+    enum: OrganisationType,
+    description:
+      "Signup track. UI gating (e.g. hiding the Team tab on individual orgs) keys off this.",
+  })
+  orgType: OrganisationType;
 
   @ApiProperty()
   createdAt: string;
