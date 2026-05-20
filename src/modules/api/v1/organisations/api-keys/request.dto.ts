@@ -47,6 +47,18 @@ export class CreateApiKeyDto {
   @IsOptional()
   @IsDateString()
   expiresAt?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Allow-list of redirect URIs the hosted auth page may bounce users to. Required for the Phase 4 code-grant flow; ignored otherwise.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(2000, { each: true })
+  redirectUris?: string[];
 }
 
 export class ApiKeyIdParams {

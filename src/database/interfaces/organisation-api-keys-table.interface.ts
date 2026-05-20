@@ -22,6 +22,11 @@ export interface OrganisationApiKeysTable {
    */
   scopes: ColumnType<string[], string[] | undefined, string[]>;
   /**
+   * Allow-list of redirect_uris the hosted auth page may bounce users to after
+   * login. Empty = the key isn't enabled for the hosted auth flow.
+   */
+  redirect_uris: ColumnType<string[], string[] | undefined, string[]>;
+  /**
    * Debounced last-use timestamp. The auth guard only writes this if the previous
    * value is older than ~60s, so a hot key doesn't hammer the row on every hit.
    */

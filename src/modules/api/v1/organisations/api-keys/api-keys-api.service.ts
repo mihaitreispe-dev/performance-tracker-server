@@ -52,6 +52,7 @@ export class ApiKeysApiService {
       key_prefix: prefix,
       key_hash: keyHash,
       scopes: dto.scopes,
+      redirect_uris: dto.redirectUris ?? [],
       expires_at: dto.expiresAt ? new Date(dto.expiresAt) : null,
       created_by_user_id: req.user.id,
     });
@@ -122,6 +123,7 @@ export class ApiKeysApiService {
       name: row.name,
       keyPrefix: row.key_prefix,
       scopes: row.scopes,
+      redirectUris: row.redirect_uris ?? [],
       lastUsedAt: toIso(row.last_used_at),
       revokedAt: toIso(row.revoked_at),
       expiresAt: toIso(row.expires_at),

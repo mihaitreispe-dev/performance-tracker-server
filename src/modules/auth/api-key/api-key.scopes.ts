@@ -17,6 +17,8 @@ export const API_KEY_SCOPES = [
   'questionnaires:write',
   'responses:write',
   'workouts:generate',
+  // Phase 4 — hosted auth code grant
+  'auth:exchange',
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

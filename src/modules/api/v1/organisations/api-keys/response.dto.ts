@@ -16,6 +16,9 @@ export class ApiKeyDTO {
   @ApiProperty({ isArray: true, type: String })
   scopes: string[];
 
+  @ApiProperty({ isArray: true, type: String })
+  redirectUris: string[];
+
   @ApiPropertyOptional({ nullable: true })
   lastUsedAt: string | null;
 

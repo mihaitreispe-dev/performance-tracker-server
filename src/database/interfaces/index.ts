@@ -33,6 +33,7 @@ export * from './personal-record-history-table.interface';
 export * from './execution-weather-table.interface';
 export * from './sleep-logs-table.interface';
 export * from './sleep-baselines-table.interface';
+export * from './oauth-authorization-codes-table.interface';
 export * from './oauth-states-table.interface';
 export * from './fitness-metrics-table.interface';
 export * from './training-stress-scores-table.interface';

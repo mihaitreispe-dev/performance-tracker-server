@@ -49,6 +49,7 @@ import {
 import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.interface';
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
+import { OAuthAuthorizationCodesTable } from './oauth-authorization-codes-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
 import { OnboardingQuestionnairesTable } from './onboarding-questionnaires-table.interface';
 import { OnboardingResponsesTable } from './onboarding-responses-table.interface';
@@ -200,6 +201,9 @@ export interface Database {
   // Phase 3 — onboarding questionnaires + responses
   onboarding_questionnaires: OnboardingQuestionnairesTable;
   onboarding_responses: OnboardingResponsesTable;
+
+  // Phase 4 — OAuth code grant for hosted client auth
+  oauth_authorization_codes: OAuthAuthorizationCodesTable;
 
   // Modules registry
   modules: ModulesTable;

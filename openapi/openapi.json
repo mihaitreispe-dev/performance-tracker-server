@@ -20454,6 +20454,75 @@
         ]
       }
     },
+    "/v1/public/auth/authorize": {
+      "post": {
+        "operationId": "PublicOAuthController_authorize",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorizeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mint a single-use authorization code from a Firebase login. Called by the hosted auth page on our domain — not the integrator backend.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/auth/token": {
+      "post": {
+        "operationId": "PublicOAuthController_token",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenExchangeBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAuthSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Exchange a single-use authorization code for a session (access + refresh tokens) for the user.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -39560,6 +39629,12 @@
               "type": "string"
             }
           },
+          "redirectUris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lastUsedAt": {
             "type": "object",
             "nullable": true
@@ -39585,6 +39660,7 @@
           "name",
           "keyPrefix",
           "scopes",
+          "redirectUris",
           "createdByUserId",
           "createdAt"
         ]
@@ -39634,13 +39710,21 @@
                 "questionnaires:read",
                 "questionnaires:write",
                 "responses:write",
-                "workouts:generate"
+                "workouts:generate",
+                "auth:exchange"
               ]
             }
           },
           "expiresAt": {
             "type": "string",
             "description": "ISO timestamp. Key is rejected after this point."
+          },
+          "redirectUris": {
+            "description": "Allow-list of redirect URIs the hosted auth page may bounce users to. Required for the Phase 4 code-grant flow; ignored otherwise.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -39666,6 +39750,12 @@
             "description": "Visible prefix (e.g. \"sz_live_a1b2c3d4\"). Safe to display."
           },
           "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "redirectUris": {
             "type": "array",
             "items": {
               "type": "string"
@@ -39700,6 +39790,7 @@
           "name",
           "keyPrefix",
           "scopes",
+          "redirectUris",
           "createdByUserId",
           "createdAt",
           "fullKey"
@@ -40842,6 +40933,172 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/GeneratedWorkoutSummaryDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AuthorizeBody": {
+        "type": "object",
+        "properties": {
+          "firebaseIdToken": {
+            "type": "string",
+            "description": "Firebase ID token from the hosted page (Firebase Auth on our domain). Proves the user just logged in."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "API key prefix identifying the integrating org. Same value the key starts with (sz_live_…)."
+          },
+          "redirectUri": {
+            "type": "string",
+            "description": "Where to redirect the browser after minting the code. Must be in the key's allow-list."
+          },
+          "state": {
+            "type": "string",
+            "description": "Opaque value echoed back to the relying party. CSRF defence."
+          }
+        },
+        "required": [
+          "firebaseIdToken",
+          "clientId",
+          "redirectUri"
+        ]
+      },
+      "AuthorizeCodeDTO": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Single-use authorization code. Expires in ~5 minutes."
+          },
+          "redirectUri": {
+            "type": "string",
+            "description": "Original redirect_uri the page should navigate to."
+          },
+          "state": {
+            "type": "object",
+            "nullable": true,
+            "description": "Echoed back from the request."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "ISO timestamp at which the code stops being redeemable."
+          }
+        },
+        "required": [
+          "code",
+          "redirectUri",
+          "expiresAt"
+        ]
+      },
+      "AuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuthorizeCodeDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "TokenExchangeBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Single-use authorization code from /v1/public/auth/authorize."
+          },
+          "redirectUri": {
+            "type": "string",
+            "description": "Must be byte-identical to the redirect_uri used to mint the code."
+          }
+        },
+        "required": [
+          "code",
+          "redirectUri"
+        ]
+      },
+      "PublicAuthUserDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "picture": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user",
+                "coach"
+              ]
+            }
+          },
+          "coachId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "roles"
+        ]
+      },
+      "PublicAuthSessionDTO": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresIn": {
+            "type": "number"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "refreshTokenExpiresIn": {
+            "type": "number",
+            "nullable": true
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "bearer"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicAuthUserDTO"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "user"
+        ]
+      },
+      "PublicAuthSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicAuthSessionDTO"
           }
         },
         "required": [
