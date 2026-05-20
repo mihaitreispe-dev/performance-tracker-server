@@ -3,9 +3,11 @@ import { AuthModule } from 'src/modules/auth/auth.module';
 import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
+import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { CourseRepository } from 'src/repositories/course.repository';
 import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
+import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { OAuthAuthorizationCodeRepository } from 'src/repositories/oauth-authorization-code.repository';
@@ -24,9 +26,12 @@ import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-go
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
+import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { PublicAthletesController } from './athletes/public-athletes.controller';
+import { PublicCardioController } from './cardio/public-cardio.controller';
+import { PublicCardioService } from './cardio/public-cardio.service';
 import { PublicAthletesService } from './athletes/public-athletes.service';
 import { PublicOAuthController } from './auth/public-oauth.controller';
 import { PublicOAuthService } from './auth/public-oauth.service';
@@ -56,6 +61,7 @@ export class PublicApiModule {
           PublicOAuthService,
           PublicAthletesService,
           PublicWellnessService,
+          PublicCardioService,
           WorkoutGeneratorService,
           WorkoutRepository,
           WorkoutScheduleRepository,
@@ -80,6 +86,9 @@ export class PublicApiModule {
           QuickWellnessCheckinRepository,
           DailyNutritionSummaryRepository,
           UserNutritionGoalsRepository,
+          WorkoutRouteRepository,
+          CardioMetricsRepository,
+          ExecutionWeatherRepository,
         ],
         controllers: [
           PublicApiController,
@@ -88,6 +97,7 @@ export class PublicApiModule {
           PublicOAuthController,
           PublicAthletesController,
           PublicWellnessController,
+          PublicCardioController,
         ],
       };
     }

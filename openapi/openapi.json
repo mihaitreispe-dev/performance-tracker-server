@@ -21460,6 +21460,200 @@
         ]
       }
     },
+    "/v1/public/workout-executions/{id}/route": {
+      "post": {
+        "operationId": "PublicCardioController_uploadRoute",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadRouteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWorkoutRouteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upload the GPS route for this execution. One route per execution; uploads to an execution that already has a route are rejected with 400.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicCardioController_getRoute",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWorkoutRouteResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch the GPS route + markers for an execution.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/cardio-metrics": {
+      "post": {
+        "operationId": "PublicCardioController_uploadCardioMetrics",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardioMetricsBatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCardioMetricsBatchResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Batch-upload cardio metric samples (HR, pace, cadence, power, ...). Max 50,000 samples per call — chunk longer activities.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicCardioController_listCardioMetrics",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50000,
+              "default": 50000,
+              "type": "number"
+            }
+          },
+          {
+            "name": "metricType",
+            "required": false,
+            "in": "query",
+            "description": "Filter to one stream.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "heart_rate",
+                "power",
+                "cadence",
+                "pace",
+                "breathing_rate",
+                "stride_length",
+                "vertical_oscillation",
+                "ground_contact_balance",
+                "elevation",
+                "speed",
+                "vertical_ratio",
+                "ground_contact_time"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCardioMetricListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Read cardio metric samples for an execution. Filter by metricType.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/weather": {
+      "get": {
+        "operationId": "PublicCardioController_getWeather",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicExecutionWeatherResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Weather snapshot at the execution location + start time.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -26561,28 +26755,21 @@
       "UploadRouteBody": {
         "type": "object",
         "properties": {
-          "routeGeojson": {
-            "description": "Route as GeoJSON LineString",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/GeoJSONLineStringBody"
-              }
-            ]
+          "route": {
+            "$ref": "#/components/schemas/RouteGeoJSONBody"
           },
           "totalDistanceMeters": {
             "type": "number",
-            "description": "Total distance in meters"
+            "description": "Total route distance in metres."
           },
           "elevationGainMeters": {
-            "type": "number",
-            "description": "Elevation gain in meters"
+            "type": "number"
           },
           "elevationLossMeters": {
-            "type": "number",
-            "description": "Elevation loss in meters"
+            "type": "number"
           },
           "markers": {
-            "description": "Route markers (km/mile splits)",
+            "description": "Optional split markers.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RouteMarkerBody"
@@ -26590,7 +26777,7 @@
           }
         },
         "required": [
-          "routeGeojson",
+          "route",
           "totalDistanceMeters"
         ]
       },
@@ -40603,7 +40790,9 @@
                 "executions:read",
                 "executions:write",
                 "wellness:read",
-                "wellness:write"
+                "wellness:write",
+                "cardio:read",
+                "cardio:write"
               ]
             }
           },
@@ -43228,6 +43417,348 @@
             "type": "number"
           }
         }
+      },
+      "RouteGeoJSONBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "LineString"
+            ]
+          },
+          "coordinates": {
+            "type": "array",
+            "description": "Array of [lon, lat] or [lon, lat, elevation] tuples. ≥2 points.",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ]
+      },
+      "PublicRouteMarkerDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "markerType": {
+            "type": "string"
+          },
+          "markerNumber": {
+            "type": "number"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "elevationMeters": {
+            "type": "object",
+            "nullable": true
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "splitTimeSeconds": {
+            "type": "number"
+          },
+          "cumulativeTimeSeconds": {
+            "type": "number"
+          },
+          "avgHeartRate": {
+            "type": "object",
+            "nullable": true
+          },
+          "avgPaceSecondsPerKm": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "markerType",
+          "markerNumber",
+          "latitude",
+          "longitude",
+          "recordedAt",
+          "splitTimeSeconds",
+          "cumulativeTimeSeconds"
+        ]
+      },
+      "PublicWorkoutRouteDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "route": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "GeoJSON LineString — { type: \"LineString\", coordinates: [[lon, lat, elev?]...] }"
+          },
+          "totalDistanceMeters": {
+            "type": "number"
+          },
+          "elevationGainMeters": {
+            "type": "object",
+            "nullable": true
+          },
+          "elevationLossMeters": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicRouteMarkerDTO"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "workoutExecutionId",
+          "route",
+          "totalDistanceMeters",
+          "createdAt",
+          "markers"
+        ]
+      },
+      "PublicWorkoutRouteResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicWorkoutRouteDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CardioMetricSample": {
+        "type": "object",
+        "properties": {
+          "metricType": {
+            "type": "string",
+            "enum": [
+              "heart_rate",
+              "power",
+              "cadence",
+              "pace",
+              "breathing_rate",
+              "stride_length",
+              "vertical_oscillation",
+              "ground_contact_balance",
+              "elevation",
+              "speed",
+              "vertical_ratio",
+              "ground_contact_time"
+            ]
+          },
+          "recordedAt": {
+            "type": "string",
+            "description": "ISO timestamp when the sample was recorded."
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "description": "e.g. \"bpm\", \"wm\", \"rpm\", \"m/s\", \"m\""
+          }
+        },
+        "required": [
+          "metricType",
+          "recordedAt",
+          "value",
+          "unit"
+        ]
+      },
+      "CardioMetricsBatchBody": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CardioMetricSample"
+            }
+          }
+        },
+        "required": [
+          "samples"
+        ]
+      },
+      "PublicCardioBatchSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of samples persisted."
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "PublicCardioMetricsBatchResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicCardioBatchSummaryDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicCardioMetricDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "metricType": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workoutExecutionId",
+          "metricType",
+          "recordedAt",
+          "value",
+          "unit"
+        ]
+      },
+      "PublicCardioMetricListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicCardioMetricDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicExecutionWeatherDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "recordedAt": {
+            "type": "string"
+          },
+          "temperatureCelsius": {
+            "type": "object",
+            "nullable": true
+          },
+          "feelsLikeCelsius": {
+            "type": "object",
+            "nullable": true
+          },
+          "humidityPercent": {
+            "type": "object",
+            "nullable": true
+          },
+          "windSpeedKmh": {
+            "type": "object",
+            "nullable": true
+          },
+          "windDirectionDegrees": {
+            "type": "object",
+            "nullable": true
+          },
+          "windGustsKmh": {
+            "type": "object",
+            "nullable": true
+          },
+          "precipitationMm": {
+            "type": "object",
+            "nullable": true
+          },
+          "weatherCode": {
+            "type": "object",
+            "nullable": true
+          },
+          "weatherDescription": {
+            "type": "object",
+            "nullable": true
+          },
+          "cloudCoverPercent": {
+            "type": "object",
+            "nullable": true
+          },
+          "pressureHpa": {
+            "type": "object",
+            "nullable": true
+          },
+          "visibilityMeters": {
+            "type": "object",
+            "nullable": true
+          },
+          "uvIndex": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "workoutExecutionId",
+          "latitude",
+          "longitude",
+          "recordedAt"
+        ]
+      },
+      "PublicExecutionWeatherResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicExecutionWeatherDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "CreateScheduledPromptBody": {
         "type": "object",

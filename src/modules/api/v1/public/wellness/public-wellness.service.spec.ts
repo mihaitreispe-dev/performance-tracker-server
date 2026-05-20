@@ -112,12 +112,12 @@ describe('PublicWellnessService', () => {
       execRepo.findById.mockResolvedValue(undefined as never);
       await expect(
         service.createPainLog(ORG, 'exec-missing', {
-          bodyPart: BodyPart.KNEE_LEFT,
+          bodyPart: BodyPart.LEFT_KNEE,
           bodyView: BodyView.FRONT,
           painLevel: 4,
           painDurationStart: 0,
           painDurationEnd: 100,
-          painTrend: PainTrend.STEADY,
+          painTrend: PainTrend.CONSTANT,
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -127,12 +127,12 @@ describe('PublicWellnessService', () => {
       memRepo.findByUserAndOrg.mockResolvedValue(undefined as never);
       await expect(
         service.createPainLog(ORG, 'exec-1', {
-          bodyPart: BodyPart.KNEE_LEFT,
+          bodyPart: BodyPart.LEFT_KNEE,
           bodyView: BodyView.FRONT,
           painLevel: 4,
           painDurationStart: 0,
           painDurationEnd: 100,
-          painTrend: PainTrend.STEADY,
+          painTrend: PainTrend.CONSTANT,
         }),
       ).rejects.toThrow(NotFoundException);
     });
