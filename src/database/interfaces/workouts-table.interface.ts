@@ -31,6 +31,11 @@ export interface WorkoutsTable {
   type: WorkoutType;
   user_id: string;
   cardio_category_id: string | null;
+  /**
+   * Audit link back to the onboarding response that produced this workout via the
+   * Phase 3 generator. Null for hand-authored workouts.
+   */
+  generated_from_response_id: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

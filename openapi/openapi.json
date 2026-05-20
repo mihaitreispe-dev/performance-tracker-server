@@ -20210,6 +20210,250 @@
         ]
       }
     },
+    "/v1/public/questionnaires": {
+      "get": {
+        "operationId": "PublicQuestionnairesController_list",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "publishedOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingQuestionnaireListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's onboarding questionnaires.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "post": {
+        "operationId": "PublicQuestionnairesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOnboardingQuestionnaireBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingQuestionnaireResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a new onboarding questionnaire.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/questionnaires/{id}": {
+      "get": {
+        "operationId": "PublicQuestionnairesController_getById",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingQuestionnaireResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Fetch a single questionnaire definition.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "patch": {
+        "operationId": "PublicQuestionnairesController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOnboardingQuestionnaireBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingQuestionnaireResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update an existing questionnaire (rename, edit schema, publish/unpublish).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/questionnaires/{id}/responses": {
+      "post": {
+        "operationId": "PublicQuestionnairesController_submitResponse",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitResponseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponseSingle"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Submit a client's answers against a questionnaire. Derived tags are computed and stored alongside.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/responses/{userId}": {
+      "get": {
+        "operationId": "PublicQuestionnairesController_listResponsesForUser",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingResponseList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a client's onboarding responses (newest first).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/generated-workouts": {
+      "post": {
+        "operationId": "PublicQuestionnairesController_generate",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedWorkoutResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Generate a starter workout from the client's latest onboarding response. Returns the new workout id plus a transparency surface (level, goal, derived tags, chosen exercises).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -40351,6 +40595,257 @@
         "required": [
           "data",
           "meta"
+        ]
+      },
+      "OnboardingQuestionnaireDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "version": {
+            "type": "number"
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "OnboardingSchema definition."
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "schema",
+          "isPublished",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "OnboardingQuestionnaireListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingQuestionnaireDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "OnboardingQuestionnaireResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OnboardingQuestionnaireDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateOnboardingQuestionnaireBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "OnboardingSchema definition. See docs for `single_choice` / `multi_choice` / `scale` / `text`. Validated server-side before write."
+          },
+          "isPublished": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "name",
+          "schema"
+        ]
+      },
+      "UpdateOnboardingQuestionnaireBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "schema": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isPublished": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SubmitResponseBody": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User id (client). Must already be a member of this organisation (athlete role)."
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Answers keyed by question id. Validated against the questionnaire schema."
+          }
+        },
+        "required": [
+          "userId",
+          "answers"
+        ]
+      },
+      "OnboardingResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "questionnaireId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "derivedTags": {
+            "description": "Profile tags derived from the answers.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "completedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "questionnaireId",
+          "userId",
+          "answers",
+          "derivedTags",
+          "completedAt"
+        ]
+      },
+      "OnboardingResponseSingle": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OnboardingResponseDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "OnboardingResponseList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingResponseDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "GeneratedWorkoutSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "workoutId": {
+            "type": "string",
+            "description": "Workout id; pull the full record via /v1/public/workouts/:id."
+          },
+          "level": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "chosenExerciseIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "templateRationale": {
+            "type": "string"
+          },
+          "derivedTags": {
+            "description": "Tags fed into the generator.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "workoutId",
+          "level",
+          "goal",
+          "chosenExerciseIds",
+          "durationMinutes",
+          "templateRationale",
+          "derivedTags"
+        ]
+      },
+      "GeneratedWorkoutResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/GeneratedWorkoutSummaryDTO"
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "CreateScheduledPromptBody": {

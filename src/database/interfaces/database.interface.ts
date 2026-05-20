@@ -50,6 +50,8 @@ import { MultiStreamLoadDailyTable } from './multi-stream-load-daily-table.inter
 import { MuscleGroupsTable } from './muscle-groups-table.interface';
 import { NotificationsTable } from './notifications-table.interface';
 import { OAuthStatesTable } from './oauth-states-table.interface';
+import { OnboardingQuestionnairesTable } from './onboarding-questionnaires-table.interface';
+import { OnboardingResponsesTable } from './onboarding-responses-table.interface';
 import { OrganisationApiKeysTable } from './organisation-api-keys-table.interface';
 import {
   OrganisationApiUsageDailyTable,
@@ -194,6 +196,10 @@ export interface Database {
   organisation_api_keys: OrganisationApiKeysTable;
   organisation_api_usage: OrganisationApiUsageTable;
   organisation_api_usage_daily: OrganisationApiUsageDailyTable;
+
+  // Phase 3 — onboarding questionnaires + responses
+  onboarding_questionnaires: OnboardingQuestionnairesTable;
+  onboarding_responses: OnboardingResponsesTable;
 
   // Modules registry
   modules: ModulesTable;
