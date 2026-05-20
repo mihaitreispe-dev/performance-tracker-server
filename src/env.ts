@@ -99,6 +99,24 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   VIMEO_ACCESS_TOKEN?: string;
 
+  // Stripe Connect (optional — only required for the billing surface)
+
+  @IsString()
+  @IsOptional()
+  STRIPE_SECRET_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  STRIPE_WEBHOOK_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  STRIPE_RETURN_URL_BASE?: string;
+
+  @IsString()
+  @IsOptional()
+  CLIENT_URL?: string;
+
   // Swagger
 
   @IsString()

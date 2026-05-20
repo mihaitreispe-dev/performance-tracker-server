@@ -61,6 +61,15 @@ import {
 import { OrganisationMembershipsTable } from './organisation-memberships-table.interface';
 import { OrganisationThemesTable } from './organisation-themes-table.interface';
 import { OrganisationsTable } from './organisations-table.interface';
+import {
+  OrganisationStripeAccountsTable,
+  StripeCouponsTable,
+  StripeCustomersTable,
+  StripePricesTable,
+  StripeProductsTable,
+  StripeSubscriptionsTable,
+  StripeWebhookEventsTable,
+} from './stripe-billing-tables.interface';
 import { PainLogsTable } from './pain-logs-table.interface';
 import { PeriodizationPlansTable } from './periodization-plans-table.interface';
 import { PersonalRecordHistoryTable } from './personal-record-history-table.interface';
@@ -204,6 +213,15 @@ export interface Database {
 
   // Phase 4 — OAuth code grant for hosted client auth
   oauth_authorization_codes: OAuthAuthorizationCodesTable;
+
+  // Phase 9 — Stripe Connect Express + subscriptions
+  organisation_stripe_accounts: OrganisationStripeAccountsTable;
+  stripe_customers: StripeCustomersTable;
+  stripe_products: StripeProductsTable;
+  stripe_prices: StripePricesTable;
+  stripe_subscriptions: StripeSubscriptionsTable;
+  stripe_coupons: StripeCouponsTable;
+  stripe_webhook_events: StripeWebhookEventsTable;
 
   // Modules registry
   modules: ModulesTable;

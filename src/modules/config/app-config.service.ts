@@ -90,6 +90,30 @@ export class AppConfigService {
     return this.configService.get('VIMEO_ACCESS_TOKEN');
   }
 
+  // Stripe — Phase 9 (Connect Express + subscriptions)
+
+  /** Platform-level secret API key (sk_test_… or sk_live_…). Required to issue any Stripe call. */
+  get stripeSecretKey(): string | undefined {
+    return this.configService.get('STRIPE_SECRET_KEY');
+  }
+
+  /** Endpoint signing secret (whsec_…) for the Connect webhook. */
+  get stripeWebhookSecret(): string | undefined {
+    return this.configService.get('STRIPE_WEBHOOK_SECRET');
+  }
+
+  /**
+   * Base URL the platform's own pages live at. Used for the Connect onboarding
+   * `return_url` / `refresh_url`. Falls back to apiV1URL if unset.
+   */
+  get stripeReturnUrlBase(): string {
+    return (
+      this.configService.get<string>('STRIPE_RETURN_URL_BASE') ??
+      this.configService.get<string>('CLIENT_URL') ??
+      this.apiV1URL
+    );
+  }
+
   // Swagger
 
   get swaggerUsername(): string | undefined {
