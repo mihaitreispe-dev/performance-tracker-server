@@ -20834,6 +20834,632 @@
         ]
       }
     },
+    "/v1/public/clients/{id}/profile-metrics": {
+      "get": {
+        "operationId": "PublicWellnessController_getProfileMetrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileMetricsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Read the client's profile (weight, height, birth date, gender, etc.)",
+        "tags": [
+          "Public"
+        ]
+      },
+      "patch": {
+        "operationId": "PublicWellnessController_updateProfileMetrics",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileMetricsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicProfileMetricsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update the client's profile (any subset of fields; missing fields untouched).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/sleep-logs": {
+      "post": {
+        "operationId": "PublicWellnessController_createSleepLog",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SleepLogBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSleepLogResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Record a sleep log for the client.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicWellnessController_listSleepLogs",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive lower bound.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive upper bound.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSleepLogListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the client's sleep logs, newest first. Supports date-range filtering.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/workout-executions/{id}/pain-logs": {
+      "post": {
+        "operationId": "PublicWellnessController_createPainLog",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PainLogBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPainLogResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Record a pain log against a workout execution. The owning user is inferred from the execution; the API key must be in their org.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/pain-logs": {
+      "get": {
+        "operationId": "PublicWellnessController_listPainLogs",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive lower bound.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive upper bound.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPainLogListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the client's pain logs across all their executions.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/recovery-journal": {
+      "put": {
+        "operationId": "PublicWellnessController_upsertRecovery",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryJournalBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRecoveryEntryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upsert a recovery journal entry by (user, entryDate). Pass partial data — only the supplied fields are written.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicWellnessController_listRecovery",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive lower bound.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive upper bound.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRecoveryEntryListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the client's recovery journal entries, newest first.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/wellness-checkins": {
+      "put": {
+        "operationId": "PublicWellnessController_upsertCheckin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WellnessCheckinBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWellnessCheckinResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upsert a quick wellness check-in by (user, checkinDate).",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicWellnessController_listCheckins",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive lower bound.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive upper bound.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicWellnessCheckinListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the client's quick wellness check-ins, newest first.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/nutrition-summaries": {
+      "put": {
+        "operationId": "PublicWellnessController_upsertNutritionSummary",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertNutritionSummaryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNutritionSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upsert the client's daily nutrition summary by (user, date). Aggregate macros — the integrator decides how to roll up meal-level data.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "get": {
+        "operationId": "PublicWellnessController_listNutritionSummaries",
+        "parameters": [
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive lower bound.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "ISO date. Inclusive upper bound.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNutritionSummaryListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the client's daily nutrition summaries. Defaults to the last 30 days.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/nutrition-goals": {
+      "get": {
+        "operationId": "PublicWellnessController_getNutritionGoals",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNutritionGoalsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Read the client's nutrition targets.",
+        "tags": [
+          "Public"
+        ]
+      },
+      "put": {
+        "operationId": "PublicWellnessController_upsertNutritionGoals",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertNutritionGoalsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicNutritionGoalsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upsert the client's nutrition targets (absolute or weight-based).",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/coaching/scheduled-prompts": {
       "post": {
         "operationId": "ScheduledPromptsController_create",
@@ -37783,70 +38409,20 @@
       "UpdateProfileMetricsBody": {
         "type": "object",
         "properties": {
-          "birth_date": {
+          "birthDate": {
             "type": "string",
-            "description": "Birth date (YYYY-MM-DD)"
+            "description": "ISO date."
           },
           "gender": {
-            "type": "string",
-            "enum": [
-              "male",
-              "female",
-              "other"
-            ],
-            "description": "Gender"
+            "type": "string"
           },
-          "weight_kg": {
+          "weightKg": {
             "type": "number",
-            "description": "Weight in kg"
+            "description": "Kilograms."
           },
-          "height_cm": {
+          "heightCm": {
             "type": "number",
-            "description": "Height in cm"
-          },
-          "years_training": {
-            "type": "number",
-            "description": "Years of training experience"
-          },
-          "weekly_volume_hours": {
-            "type": "number",
-            "description": "Average weekly training volume in hours"
-          },
-          "sweat_rate_ml_per_hour": {
-            "type": "number",
-            "description": "Measured sweat rate in ml per hour (200-3000)"
-          },
-          "gi_sensitivity": {
-            "type": "string",
-            "enum": [
-              "low",
-              "moderate",
-              "high"
-            ],
-            "description": "GI sensitivity level"
-          },
-          "preferred_carb_sources": {
-            "description": "Preferred carb sources",
-            "example": [
-              "gels",
-              "drinks",
-              "chews",
-              "real_food"
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "caffeine_tolerance": {
-            "type": "string",
-            "enum": [
-              "none",
-              "low",
-              "moderate",
-              "high"
-            ],
-            "description": "Caffeine tolerance level"
+            "description": "Centimetres."
           }
         }
       },
@@ -40025,7 +40601,9 @@
                 "auth:exchange",
                 "schedules:read",
                 "executions:read",
-                "executions:write"
+                "executions:write",
+                "wellness:read",
+                "wellness:write"
               ]
             }
           },
@@ -41812,6 +42390,844 @@
         "required": [
           "data"
         ]
+      },
+      "PublicProfileMetricsDTO": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "weightKg": {
+            "type": "object",
+            "nullable": true
+          },
+          "heightCm": {
+            "type": "object",
+            "nullable": true
+          },
+          "birthDate": {
+            "type": "object",
+            "nullable": true
+          },
+          "gender": {
+            "type": "object",
+            "nullable": true
+          },
+          "yearsTraining": {
+            "type": "object",
+            "nullable": true
+          },
+          "weeklyVolumeHours": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "PublicProfileMetricsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicProfileMetricsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SleepLogBody": {
+        "type": "object",
+        "properties": {
+          "logDate": {
+            "type": "string",
+            "description": "ISO date."
+          },
+          "startTime": {
+            "type": "string",
+            "description": "ISO datetime."
+          },
+          "endTime": {
+            "type": "string",
+            "description": "ISO datetime."
+          },
+          "totalDurationSeconds": {
+            "type": "number"
+          },
+          "avgRestingHr": {
+            "type": "number"
+          },
+          "avgHrv": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "logDate",
+          "totalDurationSeconds"
+        ]
+      },
+      "PublicSleepLogDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "logDate": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "object",
+            "nullable": true
+          },
+          "endTime": {
+            "type": "object",
+            "nullable": true
+          },
+          "totalDurationSeconds": {
+            "type": "number"
+          },
+          "avgRestingHr": {
+            "type": "object",
+            "nullable": true
+          },
+          "avgHrv": {
+            "type": "object",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "logDate",
+          "totalDurationSeconds",
+          "source"
+        ]
+      },
+      "PublicSleepLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicSleepLogDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicSleepLogListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicSleepLogDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "PainLogBody": {
+        "type": "object",
+        "properties": {
+          "bodyPart": {
+            "type": "string",
+            "enum": [
+              "head",
+              "neck",
+              "left_shoulder",
+              "right_shoulder",
+              "left_upper_arm",
+              "right_upper_arm",
+              "left_elbow",
+              "right_elbow",
+              "left_forearm",
+              "right_forearm",
+              "left_wrist",
+              "right_wrist",
+              "left_hand",
+              "right_hand",
+              "chest",
+              "upper_back",
+              "lower_back",
+              "abdomen",
+              "left_hip",
+              "right_hip",
+              "left_glute",
+              "right_glute",
+              "left_thigh",
+              "right_thigh",
+              "left_hamstring",
+              "right_hamstring",
+              "left_knee",
+              "right_knee",
+              "left_shin",
+              "right_shin",
+              "left_calf",
+              "right_calf",
+              "left_ankle",
+              "right_ankle",
+              "left_foot",
+              "right_foot",
+              "left_heel",
+              "right_heel",
+              "left_arch",
+              "right_arch",
+              "left_toes",
+              "right_toes"
+            ]
+          },
+          "bodyView": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "left_foot",
+              "right_foot"
+            ]
+          },
+          "painLevel": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "painDurationStart": {
+            "type": "number",
+            "description": "Percentage of workout (0–100) when pain started."
+          },
+          "painDurationEnd": {
+            "type": "number",
+            "description": "Percentage of workout (0–100) when pain ended (or 100 if ongoing)."
+          },
+          "painTrend": {
+            "type": "string",
+            "enum": [
+              "decreasing",
+              "constant",
+              "increasing"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "isInjury": {
+            "type": "boolean",
+            "default": false
+          },
+          "injuryType": {
+            "type": "string",
+            "enum": [
+              "acute",
+              "chronic",
+              "overuse"
+            ]
+          },
+          "expectedRecoveryDays": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bodyPart",
+          "bodyView",
+          "painLevel",
+          "painDurationStart",
+          "painDurationEnd",
+          "painTrend"
+        ]
+      },
+      "PublicPainLogDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "workoutExecutionId": {
+            "type": "string"
+          },
+          "bodyPart": {
+            "type": "string"
+          },
+          "bodyView": {
+            "type": "string"
+          },
+          "painLevel": {
+            "type": "number"
+          },
+          "painDurationStart": {
+            "type": "number"
+          },
+          "painDurationEnd": {
+            "type": "number"
+          },
+          "painTrend": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "object",
+            "nullable": true
+          },
+          "isInjury": {
+            "type": "boolean"
+          },
+          "injuryType": {
+            "type": "object",
+            "nullable": true
+          },
+          "expectedRecoveryDays": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "workoutExecutionId",
+          "bodyPart",
+          "bodyView",
+          "painLevel",
+          "painDurationStart",
+          "painDurationEnd",
+          "painTrend",
+          "isInjury",
+          "createdAt"
+        ]
+      },
+      "PublicPainLogResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicPainLogDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicPainLogListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPainLogDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "RecoveryJournalBody": {
+        "type": "object",
+        "properties": {
+          "entryDate": {
+            "type": "string",
+            "description": "ISO date."
+          },
+          "sleepQualityRating": {
+            "type": "number",
+            "description": "1–5"
+          },
+          "sleepLatencyMinutes": {
+            "type": "number"
+          },
+          "sleepDisturbances": {
+            "type": "number"
+          },
+          "perceivedRecovery": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "muscleSoreness": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "energyLevel": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "mood": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "stressLevel": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "motivationLevel": {
+            "type": "number",
+            "description": "1–10"
+          },
+          "caffeineMg": {
+            "type": "number"
+          },
+          "caffeineCutoffTime": {
+            "type": "string",
+            "description": "HH:MM format."
+          },
+          "alcoholUnits": {
+            "type": "number"
+          },
+          "hydrationLiters": {
+            "type": "number"
+          },
+          "mealQuality": {
+            "type": "number",
+            "description": "1–5"
+          }
+        },
+        "required": [
+          "entryDate"
+        ]
+      },
+      "PublicRecoveryEntryDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "entryDate": {
+            "type": "string"
+          },
+          "sleepQualityRating": {
+            "type": "object",
+            "nullable": true
+          },
+          "sleepLatencyMinutes": {
+            "type": "object",
+            "nullable": true
+          },
+          "sleepDisturbances": {
+            "type": "object",
+            "nullable": true
+          },
+          "perceivedRecovery": {
+            "type": "object",
+            "nullable": true
+          },
+          "muscleSoreness": {
+            "type": "object",
+            "nullable": true
+          },
+          "energyLevel": {
+            "type": "object",
+            "nullable": true
+          },
+          "mood": {
+            "type": "object",
+            "nullable": true
+          },
+          "stressLevel": {
+            "type": "object",
+            "nullable": true
+          },
+          "motivationLevel": {
+            "type": "object",
+            "nullable": true
+          },
+          "caffeineMg": {
+            "type": "object",
+            "nullable": true
+          },
+          "caffeineCutoffTime": {
+            "type": "object",
+            "nullable": true
+          },
+          "alcoholUnits": {
+            "type": "object",
+            "nullable": true
+          },
+          "hydrationLiters": {
+            "type": "object",
+            "nullable": true
+          },
+          "mealQuality": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "entryDate"
+        ]
+      },
+      "PublicRecoveryEntryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicRecoveryEntryDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicRecoveryEntryListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicRecoveryEntryDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "WellnessCheckinBody": {
+        "type": "object",
+        "properties": {
+          "checkinDate": {
+            "type": "string",
+            "description": "ISO date."
+          },
+          "sleepQuality": {
+            "type": "number",
+            "description": "1–5"
+          },
+          "energyLevel": {
+            "type": "number",
+            "description": "1–5"
+          },
+          "muscleSoreness": {
+            "type": "number",
+            "description": "1–5 (5 = no soreness)"
+          },
+          "stressLevel": {
+            "type": "number",
+            "description": "1–5 (5 = no stress)"
+          },
+          "trainingReadiness": {
+            "type": "number",
+            "description": "1–5"
+          },
+          "completionSeconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "checkinDate"
+        ]
+      },
+      "PublicWellnessCheckinDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "checkinDate": {
+            "type": "string"
+          },
+          "sleepQuality": {
+            "type": "object",
+            "nullable": true
+          },
+          "energyLevel": {
+            "type": "object",
+            "nullable": true
+          },
+          "muscleSoreness": {
+            "type": "object",
+            "nullable": true
+          },
+          "stressLevel": {
+            "type": "object",
+            "nullable": true
+          },
+          "trainingReadiness": {
+            "type": "object",
+            "nullable": true
+          },
+          "completionSeconds": {
+            "type": "object",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "checkinDate",
+          "source"
+        ]
+      },
+      "PublicWellnessCheckinResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicWellnessCheckinDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicWellnessCheckinListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicWellnessCheckinDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "UpsertNutritionSummaryBody": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "ISO date."
+          },
+          "totalCalories": {
+            "type": "number"
+          },
+          "totalProtein": {
+            "type": "number"
+          },
+          "totalCarbs": {
+            "type": "number"
+          },
+          "totalFat": {
+            "type": "number"
+          },
+          "totalFiber": {
+            "type": "number"
+          },
+          "totalSugar": {
+            "type": "number"
+          },
+          "totalSodium": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date"
+        ]
+      },
+      "PublicNutritionSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "totalCalories": {
+            "type": "number"
+          },
+          "totalProtein": {
+            "type": "number"
+          },
+          "totalCarbs": {
+            "type": "number"
+          },
+          "totalFat": {
+            "type": "number"
+          },
+          "totalFiber": {
+            "type": "number"
+          },
+          "totalSugar": {
+            "type": "number"
+          },
+          "totalSodium": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "date",
+          "totalCalories",
+          "totalProtein",
+          "totalCarbs",
+          "totalFat",
+          "totalFiber",
+          "totalSugar",
+          "totalSodium"
+        ]
+      },
+      "PublicNutritionSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicNutritionSummaryDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicNutritionSummaryListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicNutritionSummaryDTO"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PublicListMeta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "PublicNutritionGoalsDTO": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "dailyCalories": {
+            "type": "object",
+            "nullable": true
+          },
+          "proteinG": {
+            "type": "object",
+            "nullable": true
+          },
+          "carbsG": {
+            "type": "object",
+            "nullable": true
+          },
+          "fatG": {
+            "type": "object",
+            "nullable": true
+          },
+          "fiberG": {
+            "type": "object",
+            "nullable": true
+          },
+          "proteinPercent": {
+            "type": "object",
+            "nullable": true
+          },
+          "carbsPercent": {
+            "type": "object",
+            "nullable": true
+          },
+          "fatPercent": {
+            "type": "object",
+            "nullable": true
+          },
+          "autoCalculateFromWeight": {
+            "type": "boolean"
+          },
+          "caloriesPerKg": {
+            "type": "object",
+            "nullable": true
+          },
+          "proteinGPerKg": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "autoCalculateFromWeight"
+        ]
+      },
+      "PublicNutritionGoalsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicNutritionGoalsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpsertNutritionGoalsBody": {
+        "type": "object",
+        "properties": {
+          "dailyCalories": {
+            "type": "number"
+          },
+          "proteinG": {
+            "type": "number"
+          },
+          "carbsG": {
+            "type": "number"
+          },
+          "fatG": {
+            "type": "number"
+          },
+          "fiberG": {
+            "type": "number"
+          },
+          "proteinPercent": {
+            "type": "number"
+          },
+          "carbsPercent": {
+            "type": "number"
+          },
+          "fatPercent": {
+            "type": "number"
+          },
+          "autoCalculateFromWeight": {
+            "type": "boolean"
+          },
+          "caloriesPerKg": {
+            "type": "number"
+          },
+          "proteinGPerKg": {
+            "type": "number"
+          }
+        }
       },
       "CreateScheduledPromptBody": {
         "type": "object",

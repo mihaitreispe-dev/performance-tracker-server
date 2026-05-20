@@ -2,8 +2,10 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { CourseRepository } from 'src/repositories/course.repository';
+import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { OAuthAuthorizationCodeRepository } from 'src/repositories/oauth-authorization-code.repository';
@@ -11,9 +13,14 @@ import { OnboardingQuestionnaireRepository } from 'src/repositories/onboarding-q
 import { OnboardingResponseRepository } from 'src/repositories/onboarding-response.repository';
 import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { PainLogRepository } from 'src/repositories/pain-log.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
+import { QuickWellnessCheckinRepository } from 'src/repositories/quick-wellness-checkin.repository';
+import { RecoveryJournalRepository } from 'src/repositories/recovery-journal.repository';
 import { RefreshTokenRepository } from 'src/repositories/refresh-token.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
+import { SleepLogRepository } from 'src/repositories/sleep-log.repository';
+import { UserNutritionGoalsRepository } from 'src/repositories/user-nutrition-goals.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
@@ -30,6 +37,8 @@ import { PublicApiService } from './public-api.service';
 import { PublicQuestionnairesController } from './questionnaires/public-questionnaires.controller';
 import { PublicQuestionnairesService } from './questionnaires/public-questionnaires.service';
 import { WorkoutGeneratorService } from './questionnaires/workout-generator';
+import { PublicWellnessController } from './wellness/public-wellness.controller';
+import { PublicWellnessService } from './wellness/public-wellness.service';
 
 @Module({})
 export class PublicApiModule {
@@ -46,6 +55,7 @@ export class PublicApiModule {
           PublicQuestionnairesService,
           PublicOAuthService,
           PublicAthletesService,
+          PublicWellnessService,
           WorkoutGeneratorService,
           WorkoutRepository,
           WorkoutScheduleRepository,
@@ -63,6 +73,13 @@ export class PublicApiModule {
           OAuthAuthorizationCodeRepository,
           RefreshTokenRepository,
           UserRepository,
+          AthleteProfileMetricsRepository,
+          SleepLogRepository,
+          PainLogRepository,
+          RecoveryJournalRepository,
+          QuickWellnessCheckinRepository,
+          DailyNutritionSummaryRepository,
+          UserNutritionGoalsRepository,
         ],
         controllers: [
           PublicApiController,
@@ -70,6 +87,7 @@ export class PublicApiModule {
           PublicQuestionnairesController,
           PublicOAuthController,
           PublicAthletesController,
+          PublicWellnessController,
         ],
       };
     }

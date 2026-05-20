@@ -23,6 +23,9 @@ export const API_KEY_SCOPES = [
   'schedules:read',
   'executions:read',
   'executions:write',
+  // Phase 6 — wellness + recovery logging
+  'wellness:read',
+  'wellness:write',
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
