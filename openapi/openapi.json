@@ -18909,6 +18909,628 @@
         ]
       }
     },
+    "/v1/organisations/{id}/billing/account": {
+      "get": {
+        "operationId": "BillingApiController_getAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the organisation's Stripe Connect account state. Returns { data: null } if onboarding hasn't started.",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "patch": {
+        "operationId": "BillingApiController_updateAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConnectAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the organisation's billing account settings (currently just the platform fee).",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/onboarding": {
+      "post": {
+        "operationId": "BillingApiController_startOnboarding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConnectOnboardingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLinkResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start (or resume) Stripe Express onboarding. Returns a single-use hosted URL the admin should be redirected to.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/account/refresh": {
+      "post": {
+        "operationId": "BillingApiController_refreshAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Force a pull of capability flags from Stripe (charges_enabled, payouts_enabled, details_submitted). Use after onboarding completes.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/account/login-link": {
+      "post": {
+        "operationId": "BillingApiController_createLoginLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginLinkResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mint a single-use URL into the admin's Stripe Express dashboard (for viewing payouts, KYC, etc.).",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/products": {
+      "get": {
+        "operationId": "BillingApiController_listProducts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingProductListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List products in the organisation catalogue.",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "post": {
+        "operationId": "BillingApiController_createProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a product on the org's Stripe connected account and mirror it locally.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/products/{productId}": {
+      "delete": {
+        "operationId": "BillingApiController_archiveProduct",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingProductResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive a product (sets Stripe's active=false). Existing subscriptions keep running; new checkouts are blocked.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/prices": {
+      "get": {
+        "operationId": "BillingApiController_listPrices",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPriceListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List prices in the catalogue. Optionally filter by `productId` (the Stripe product id, not the local uuid).",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "post": {
+        "operationId": "BillingApiController_createPrice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePriceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPriceResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a recurring price for an existing product. Supports month/year billing with optional trial.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/prices/{priceId}": {
+      "delete": {
+        "operationId": "BillingApiController_archivePrice",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingPriceResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Archive a price (Stripe disallows mutation, only archive). Pass the local price uuid.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/coupons": {
+      "get": {
+        "operationId": "BillingApiController_listCoupons",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingCouponListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List coupons + promotion codes for the organisation.",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "post": {
+        "operationId": "BillingApiController_createCoupon",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCouponDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingCouponResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a coupon (percent or amount off). Pass `code` to also mint a customer-typeable promotion code.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/coupons/{couponId}": {
+      "delete": {
+        "operationId": "BillingApiController_deleteCoupon",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingCouponResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a coupon on Stripe and deactivate the local mirror. Existing subscriptions keep the discount they've already received.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/subscriptions": {
+      "get": {
+        "operationId": "BillingApiController_listSubscriptions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSubscriptionListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List subscriptions for the organisation (read straight from the local mirror, kept in sync via webhooks).",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/billing/refunds": {
+      "post": {
+        "operationId": "BillingApiController_createRefund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRefundDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Refund a charge on a customer's PaymentIntent. Omit `amount` for a full refund.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
@@ -21649,6 +22271,144 @@
           }
         ],
         "summary": "Weather snapshot at the execution location + start time.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/products": {
+      "get": {
+        "operationId": "PublicBillingController_listProducts",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Include archived/inactive products + prices in the response. Defaults to false (active-only).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBillingProductListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List the organisation's billable products with their prices. Active-only by default; pass includeInactive=true to include archived entries.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/checkout-session": {
+      "post": {
+        "operationId": "PublicBillingController_createCheckoutSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCheckoutSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a Stripe Checkout Session for a client. The response includes a hosted URL — redirect the client's browser there to complete payment.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/billing-portal-session": {
+      "post": {
+        "operationId": "PublicBillingController_createBillingPortalSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillingPortalSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBillingPortalSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Open the Stripe Customer Portal for a client. Clients can update their payment method, view invoices, or cancel from there.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/subscription": {
+      "get": {
+        "operationId": "PublicBillingController_getSubscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicClientSubscriptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get the client's current active subscription, or { data: null } if they don't have one.",
         "tags": [
           "Public"
         ]
@@ -40818,7 +41578,9 @@
                 "wellness:read",
                 "wellness:write",
                 "cardio:read",
-                "cardio:write"
+                "cardio:write",
+                "billing:read",
+                "billing:write"
               ]
             }
           },
@@ -40960,6 +41722,577 @@
             "items": {
               "$ref": "#/components/schemas/ApiKeyUsageDailyDTO"
             }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ConnectAccountDTO": {
+        "type": "object",
+        "properties": {
+          "organisationId": {
+            "type": "string"
+          },
+          "stripeAccountId": {
+            "type": "string"
+          },
+          "chargesEnabled": {
+            "type": "boolean"
+          },
+          "payoutsEnabled": {
+            "type": "boolean"
+          },
+          "detailsSubmitted": {
+            "type": "boolean"
+          },
+          "defaultCurrency": {
+            "type": "object",
+            "nullable": true
+          },
+          "country": {
+            "type": "object",
+            "nullable": true
+          },
+          "platformFeeBps": {
+            "type": "number",
+            "description": "Platform fee in basis points (10000 = 100%)."
+          }
+        },
+        "required": [
+          "organisationId",
+          "stripeAccountId",
+          "chargesEnabled",
+          "payoutsEnabled",
+          "detailsSubmitted",
+          "platformFeeBps"
+        ]
+      },
+      "ConnectAccountResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConnectAccountDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "StartConnectOnboardingDto": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "ISO-3166-1 alpha-2 country code (e.g. \"US\", \"GB\"). Stripe routes capabilities accordingly."
+          },
+          "email": {
+            "type": "string",
+            "description": "Pre-fill the operator email on the Stripe onboarding page."
+          },
+          "returnUrl": {
+            "type": "string",
+            "description": "Where Stripe should bring the user back after onboarding. Typically your /organisations/:id/settings?tab=billing URL."
+          }
+        },
+        "required": [
+          "returnUrl"
+        ]
+      },
+      "OnboardingLinkDTO": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Stripe-hosted onboarding URL. Single-use, short-lived (~minutes). Redirect the org admin's browser here."
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ]
+      },
+      "OnboardingLinkResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OnboardingLinkDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateConnectAccountDto": {
+        "type": "object",
+        "properties": {
+          "platformFeeBps": {
+            "type": "number",
+            "description": "Platform fee on every subscription charge, in basis points (10000 = 100%). Capped to a sane range to prevent fat-fingered 100% fees.",
+            "minimum": 0,
+            "maximum": 5000
+          }
+        }
+      },
+      "LoginLinkDTO": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Single-use URL into the org admin's Stripe Express dashboard."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "LoginLinkResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LoginLinkDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BillingProductDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stripeProductId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stripeProductId",
+          "name",
+          "active",
+          "createdAt"
+        ]
+      },
+      "BillingProductListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingProductDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "BillingProductResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingProductDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BillingPriceDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stripeProductId": {
+            "type": "string"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": "object",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string"
+          },
+          "unitAmount": {
+            "type": "number"
+          },
+          "interval": {
+            "type": "string"
+          },
+          "intervalCount": {
+            "type": "number"
+          },
+          "trialPeriodDays": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stripeProductId",
+          "stripePriceId",
+          "currency",
+          "unitAmount",
+          "interval",
+          "intervalCount",
+          "active",
+          "createdAt"
+        ]
+      },
+      "BillingPriceListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingPriceDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreatePriceDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "Local product id (uuid, not the Stripe id)."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO-4217 currency code, lower-case (e.g. \"usd\")."
+          },
+          "unitAmount": {
+            "type": "number",
+            "description": "Amount in the smallest currency unit (cents)."
+          },
+          "interval": {
+            "type": "string",
+            "enum": [
+              "month",
+              "year"
+            ]
+          },
+          "intervalCount": {
+            "type": "number"
+          },
+          "trialPeriodDays": {
+            "type": "number",
+            "description": "Free trial length in days, 0–365."
+          },
+          "nickname": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "productId",
+          "currency",
+          "unitAmount",
+          "interval"
+        ]
+      },
+      "BillingPriceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingPriceDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BillingCouponDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stripeCouponId": {
+            "type": "string"
+          },
+          "stripePromotionCodeId": {
+            "type": "object",
+            "nullable": true
+          },
+          "code": {
+            "type": "object",
+            "nullable": true
+          },
+          "percentOff": {
+            "type": "object",
+            "nullable": true
+          },
+          "amountOff": {
+            "type": "object",
+            "nullable": true
+          },
+          "currency": {
+            "type": "object",
+            "nullable": true
+          },
+          "duration": {
+            "type": "string"
+          },
+          "durationInMonths": {
+            "type": "object",
+            "nullable": true
+          },
+          "maxRedemptions": {
+            "type": "object",
+            "nullable": true
+          },
+          "redeemBy": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stripeCouponId",
+          "duration",
+          "active",
+          "createdAt"
+        ]
+      },
+      "BillingCouponListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingCouponDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateCouponDto": {
+        "type": "object",
+        "properties": {
+          "percentOff": {
+            "type": "number",
+            "description": "Percent off, 1–100. Mutually exclusive with amountOff."
+          },
+          "amountOff": {
+            "type": "number",
+            "description": "Amount off in the smallest currency unit. Requires currency."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO-4217 currency, required if amountOff is set."
+          },
+          "duration": {
+            "type": "string",
+            "enum": [
+              "once",
+              "repeating",
+              "forever"
+            ]
+          },
+          "durationInMonths": {
+            "type": "number",
+            "description": "Required when duration=repeating."
+          },
+          "maxRedemptions": {
+            "type": "number"
+          },
+          "redeemBy": {
+            "type": "number",
+            "description": "Unix seconds. Coupon stops being redeemable after this point."
+          },
+          "name": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Customer-facing code to mint a Stripe promotion_code for. If omitted, only an internal coupon is created."
+          }
+        },
+        "required": [
+          "duration"
+        ]
+      },
+      "BillingCouponResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingCouponDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "BillingSubscriptionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "object",
+            "nullable": true
+          },
+          "stripeCustomerId": {
+            "type": "string"
+          },
+          "stripeSubscriptionId": {
+            "type": "string"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currentPeriodStart": {
+            "type": "object",
+            "nullable": true
+          },
+          "currentPeriodEnd": {
+            "type": "object",
+            "nullable": true
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean"
+          },
+          "trialEnd": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "stripeCustomerId",
+          "stripeSubscriptionId",
+          "stripePriceId",
+          "status",
+          "cancelAtPeriodEnd"
+        ]
+      },
+      "BillingSubscriptionListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillingSubscriptionDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateRefundDto": {
+        "type": "object",
+        "properties": {
+          "paymentIntentId": {
+            "type": "string",
+            "description": "Stripe PaymentIntent id (pi_xxx). Refunds the most-recent charge on it."
+          },
+          "amount": {
+            "type": "number",
+            "description": "Partial refund — amount in smallest currency unit. Omit for a full refund."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "duplicate",
+              "fraudulent",
+              "requested_by_customer"
+            ]
+          }
+        },
+        "required": [
+          "paymentIntentId"
+        ]
+      },
+      "RefundDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "currency",
+          "status"
+        ]
+      },
+      "RefundResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RefundDTO"
           }
         },
         "required": [
@@ -43780,6 +45113,236 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PublicExecutionWeatherDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicBillingPriceDTO": {
+        "type": "object",
+        "properties": {
+          "stripePriceId": {
+            "type": "string",
+            "description": "Stripe price id — pass this to /checkout-session."
+          },
+          "nickname": {
+            "type": "object",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO-4217 currency code, lowercase."
+          },
+          "unitAmount": {
+            "type": "number",
+            "description": "Amount in the smallest currency unit (cents for USD)."
+          },
+          "interval": {
+            "type": "string",
+            "description": "'month' | 'year'."
+          },
+          "intervalCount": {
+            "type": "number"
+          },
+          "trialPeriodDays": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stripePriceId",
+          "currency",
+          "unitAmount",
+          "interval",
+          "intervalCount",
+          "active"
+        ]
+      },
+      "PublicBillingProductDTO": {
+        "type": "object",
+        "properties": {
+          "stripeProductId": {
+            "type": "string",
+            "description": "Stripe product id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicBillingPriceDTO"
+            }
+          }
+        },
+        "required": [
+          "stripeProductId",
+          "name",
+          "active",
+          "prices"
+        ]
+      },
+      "PublicBillingProductListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicBillingProductDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateCheckoutSessionBody": {
+        "type": "object",
+        "properties": {
+          "priceId": {
+            "type": "string",
+            "description": "Stripe price id (price_...) for the plan the client is buying."
+          },
+          "successUrl": {
+            "type": "string",
+            "description": "Where to send the customer after a successful checkout."
+          },
+          "cancelUrl": {
+            "type": "string",
+            "description": "Where to send the customer if they cancel before paying."
+          },
+          "promotionCodeId": {
+            "type": "string",
+            "description": "Optional Stripe promotion code id (promo_...) to pre-apply at checkout."
+          }
+        },
+        "required": [
+          "priceId",
+          "successUrl",
+          "cancelUrl"
+        ]
+      },
+      "PublicCheckoutSessionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stripe Checkout Session id (cs_...)."
+          },
+          "url": {
+            "type": "string",
+            "description": "Hosted Checkout URL — redirect the customer's browser here."
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "PublicCheckoutSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicCheckoutSessionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateBillingPortalSessionBody": {
+        "type": "object",
+        "properties": {
+          "returnUrl": {
+            "type": "string",
+            "description": "Where Stripe should bring the customer back from the portal."
+          }
+        },
+        "required": [
+          "returnUrl"
+        ]
+      },
+      "PublicBillingPortalSessionDTO": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Hosted billing portal URL — redirect the customer here."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "PublicBillingPortalSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicBillingPortalSessionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicClientSubscriptionDTO": {
+        "type": "object",
+        "properties": {
+          "stripeSubscriptionId": {
+            "type": "string"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Stripe subscription status: 'trialing'|'active'|'past_due'|'canceled'|..."
+          },
+          "currentPeriodStart": {
+            "type": "object",
+            "nullable": true
+          },
+          "currentPeriodEnd": {
+            "type": "object",
+            "nullable": true
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean"
+          },
+          "trialEnd": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "stripeSubscriptionId",
+          "stripePriceId",
+          "status",
+          "cancelAtPeriodEnd"
+        ]
+      },
+      "PublicClientSubscriptionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicClientSubscriptionDTO"
+              }
+            ]
           }
         },
         "required": [

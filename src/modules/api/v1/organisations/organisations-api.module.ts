@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
+import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { StripeModule } from 'src/modules/stripe/stripe.module';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
@@ -29,7 +30,7 @@ export class OrganisationsApiModule {
     if (!this.instance) {
       this.instance = {
         module: OrganisationsApiModule,
-        imports: [AuthModule.register(), S3Module.register(), StripeModule.register()],
+        imports: [AuthModule.register(), AppConfigModule.register(), S3Module.register(), StripeModule.register()],
         providers: [
           OrganisationsApiService,
           MembershipsApiService,
