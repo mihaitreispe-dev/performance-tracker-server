@@ -114,7 +114,17 @@ export class ExerciseDTO {
   @IsUUID()
   userId: string;
 
-  @ApiPropertyOptional({ type: String })
+  /**
+   * Auto-extracted thumbnail URL (signed CloudFront / S3 URL). Null until
+   * the MediaConvert pipeline finishes — clients should render a
+   * placeholder while `status` is `upload_pending`/`upload_done`/
+   * `assets_pending`. There is no separate uploaded-image fallback any
+   * more: every exercise's thumbnail comes from its video.
+   *
+   * Field is named `picture` for backwards compatibility with existing
+   * consumers — semantically it's the auto-extracted thumbnail.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Auto-extracted thumbnail URL. Null until video processing completes.' })
   @IsUrl()
   @IsOptional()
   picture?: string | null;
@@ -210,7 +220,8 @@ export class ExerciseChainMemberDTO {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ type: String })
+  /** Auto-extracted thumbnail URL; named `picture` for back-compat. */
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsString()
   @IsOptional()
   picture?: string | null;

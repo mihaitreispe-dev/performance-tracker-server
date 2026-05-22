@@ -31,8 +31,20 @@ export interface ExercisesTable {
   cues: ColumnType<string[], string[] | undefined, string[]>;
   visibility: ExerciseVisibility;
   user_id: string;
-  picture_s3_bucket: string | null;
-  picture_s3_key: string | null;
+  /**
+   * Auto-extracted thumbnail from the exercise's video, produced by the
+   * MediaConvert pipeline once the upload finishes. Null while the video is
+   * still in flight, populated once status reaches `assets_done`. Never set
+   * by an end-user — there's no separate image upload path.
+   */
+  thumbnail_s3_bucket: string | null;
+  thumbnail_s3_key: string | null;
+  /**
+   * Mandatory for any non-draft exercise — enforced at the DB level via the
+   * `exercises_video_required_chk` CHECK constraint (migration
+   * 1774401800000). The columns stay nullable so a freshly-created draft can
+   * exist between `POST /exercises` and the first upload-url request.
+   */
   video_s3_bucket: string | null;
   video_s3_key: string | null;
   video_mime_type: string | null;

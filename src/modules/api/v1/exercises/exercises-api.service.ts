@@ -130,12 +130,18 @@ export class ExercisesApiService {
     await this.requireAdmin(req.user.id);
     const organisationId = assertActiveOrg(req);
 
-    const videoFilename = body.videoMimeType
-      ? `${uuidv4()}.${this.getExtensionFromMimeType(body.videoMimeType)}`
-      : null;
-    const videoS3Key = videoFilename
-      ? s3Keys.upload.exercise({ visitorId: req.user.id, filename: videoFilename }).video
-      : null;
+    // Every exercise is a video asset. The thumbnail is extracted from that
+    // video by MediaConvert during the upload-completion handoff — there is
+    // no image-only path. The client should already block submit without a
+    // video, but we re-validate here because the API is the trust boundary.
+    if (!body.videoMimeType) {
+      throw new BadRequestException(
+        'videoMimeType is required — every exercise must ship with a video. The thumbnail is auto-extracted.',
+      );
+    }
+
+    const videoFilename = `${uuidv4()}.${this.getExtensionFromMimeType(body.videoMimeType)}`;
+    const videoS3Key = s3Keys.upload.exercise({ visitorId: req.user.id, filename: videoFilename }).video;
 
     const exercise = await this.exerciseRepo.create({
       organisation_id: organisationId,
@@ -146,10 +152,10 @@ export class ExercisesApiService {
       level: body.level ?? null,
       visibility: body.visibility ?? ExerciseVisibility.PRIVATE,
       user_id: req.user.id,
-      video_s3_bucket: videoS3Key ? this.s3Service.uploadBucket : null,
+      video_s3_bucket: this.s3Service.uploadBucket,
       video_s3_key: videoS3Key,
-      video_mime_type: body.videoMimeType ?? null,
-      status: videoS3Key ? ExerciseStatus.UPLOAD_PENDING : ExerciseStatus.DRAFT,
+      video_mime_type: body.videoMimeType,
+      status: ExerciseStatus.UPLOAD_PENDING,
     });
 
     // Link equipment
@@ -299,8 +305,12 @@ export class ExercisesApiService {
       update.video_mime_type = body.videoMimeType;
       update.status = ExerciseStatus.UPLOAD_PENDING;
       update.media_convert_job_id = null;
-      update.picture_s3_bucket = null;
-      update.picture_s3_key = null;
+      // Thumbnail is auto-extracted from the new video by MediaConvert. We
+      // null the existing pointer so the response correctly reports "still
+      // processing" until the new pipeline finishes — otherwise the UI
+      // would show the previous video's thumbnail against the new clip.
+      update.thumbnail_s3_bucket = null;
+      update.thumbnail_s3_key = null;
     }
 
     if (body.introContentItemId !== undefined) {
@@ -517,9 +527,10 @@ export class ExercisesApiService {
   }
 
   private async mapChainMemberToDTO(member: ExerciseChainMemberWithExercise): Promise<ExerciseChainMemberDTO> {
-    // Get picture URL for the exercise
     const exercise = await this.exerciseRepo.findById(member.exercise_id);
-    const picture = exercise ? await this.getPictureUrl(exercise) : null;
+    // Output is named `picture` for back-compat; the value is the auto-
+    // extracted thumbnail (no uploaded-image fallback any more).
+    const picture = exercise ? await this.getThumbnailUrl(exercise) : null;
 
     return {
       id: member.exercise_id,
@@ -537,7 +548,7 @@ export class ExercisesApiService {
   private async mapExerciseToDTO(exercise: Exercise): Promise<ExerciseDTO> {
     const [assets, picture, equipmentList, primaryMuscles, secondaryMuscles, exerciseImages] = await Promise.all([
       this.buildMediaAssets(exercise),
-      this.getPictureUrl(exercise),
+      this.getThumbnailUrl(exercise),
       this.equipmentRepo.findByExerciseId(exercise.id),
       this.muscleGroupRepo.findPrimaryByExerciseId(exercise.id),
       this.muscleGroupRepo.findSecondaryByExerciseId(exercise.id),
@@ -559,7 +570,11 @@ export class ExercisesApiService {
       visibility: exercise.visibility,
       status: exercise.status,
       userId: exercise.user_id,
-      picture: picture ?? images[0]?.url ?? null,
+      // `picture` is the auto-extracted thumbnail (back-compat name). Once
+      // assets land it's populated; while uploading/processing it stays null
+      // and the UI renders a placeholder. The `images` array is a separate
+      // gallery field (independent of the thumbnail invariant).
+      picture,
       images,
       assets,
       equipment,
@@ -634,28 +649,23 @@ export class ExercisesApiService {
     ];
   }
 
-  private async getPictureUrl(exercise: Exercise): Promise<string | null> {
-    // If assets are done, use the extracted thumbnail as picture
-    if (exercise.status === ExerciseStatus.ASSETS_DONE) {
-      const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
-      if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
-        return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
-      }
-      return `${this.configService.cdnUrl}/${s3Paths.thumbnail}`;
-    }
+  /**
+   * Resolves a signed URL to the exercise's thumbnail — the still frame
+   * MediaConvert extracts from the video. Returns null until the video
+   * pipeline produces it (i.e. for any status < `assets_done`); the UI
+   * surfaces that as "still processing".
+   *
+   * There is intentionally no fallback to an uploaded image — the
+   * image-only exercise path was retired in migration 1774401800000.
+   */
+  private async getThumbnailUrl(exercise: Exercise): Promise<string | null> {
+    if (exercise.status !== ExerciseStatus.ASSETS_DONE) return null;
 
-    // Otherwise use explicitly set picture if available
-    if (exercise.picture_s3_bucket && exercise.picture_s3_key) {
-      if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
-        return await this.s3Service.getCloudFrontSignedUrlGET({ key: exercise.picture_s3_key });
-      }
-      return await this.s3Service.getSignedUrlGET({
-        bucket: exercise.picture_s3_bucket,
-        key: exercise.picture_s3_key,
-      });
+    const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
+    if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
+      return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
     }
-
-    return null;
+    return `${this.configService.cdnUrl}/${s3Paths.thumbnail}`;
   }
 
   private getExtensionFromMimeType(mimeType: string): string {

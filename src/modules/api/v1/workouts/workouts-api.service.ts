@@ -966,16 +966,10 @@ export class WorkoutsApiService {
       return `${this.configService.cdnUrl}/${paths.thumbnail}`;
     }
 
-    // 2. Check for directly uploaded picture
-    if (exercise.picture_s3_bucket && exercise.picture_s3_key) {
-      if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
-        return await this.s3Service.getCloudFrontSignedUrlGET({ key: exercise.picture_s3_key });
-      }
-      return await this.s3Service.getSignedUrlGET({
-        bucket: exercise.picture_s3_bucket,
-        key: exercise.picture_s3_key,
-      });
-    }
+    // 2. Direct uploaded-picture fallback was retired with migration
+    // 1774401800000 — exercises are video-first now and the thumbnail is
+    // auto-extracted by MediaConvert. Pre-assets_done states intentionally
+    // surface null and let the UI render a placeholder.
 
     // 3. Check for exercise images (use first one as thumbnail)
     const images = await this.exerciseImageRepo.findByExerciseId(exercise.id);

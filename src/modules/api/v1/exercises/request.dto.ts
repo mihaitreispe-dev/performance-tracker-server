@@ -58,10 +58,15 @@ export class CreateExerciseBody {
   @IsOptional()
   visibility?: ExerciseVisibility;
 
-  @ApiPropertyOptional({ type: String, description: 'Video MIME type (e.g. video/mp4)' })
+  /**
+   * Required. Every exercise ships with a video — the server uses this to
+   * mint the upload key and the MediaConvert pipeline derives the thumbnail
+   * from the file the client PUTs to S3. Image-only exercises are no
+   * longer supported.
+   */
+  @ApiProperty({ type: String, description: 'Video MIME type (e.g. video/mp4). Required.' })
   @IsString()
-  @IsOptional()
-  videoMimeType?: string;
+  videoMimeType: string;
 
   @ApiPropertyOptional({ type: [String], description: 'Equipment IDs to link' })
   @IsArray()
