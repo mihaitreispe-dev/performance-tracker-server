@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Kysely } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
 
 import {
   ContentItem,
@@ -6,6 +8,7 @@ import {
   ContentItemStatus,
   Course,
   CourseStatus,
+  Database,
   Exercise,
   ExerciseStatus,
   Workout,
@@ -15,6 +18,8 @@ import { CourseRepository } from 'src/repositories/course.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+
+import { PublicWorkoutStepDTO } from './response.dto';
 
 import {
   PublicCourseDTO,
@@ -51,6 +56,7 @@ export class PublicApiService {
     private readonly contentItemRepo: ContentItemRepository,
     private readonly exerciseRepo: ExerciseRepository,
     private readonly s3Service: S3Service,
+    @InjectKysely() private readonly db: Kysely<Database>,
   ) {}
 
   // ----------------------------- Workouts -----------------------------
@@ -76,7 +82,120 @@ export class PublicApiService {
     if (!row || row.organisation_id !== organisationId) {
       throw new NotFoundException('Workout not found');
     }
-    return { data: mapWorkoutDTO(row) };
+    const structure = await this.loadWorkoutStructure(id);
+    return { data: { ...mapWorkoutDTO(row), structure } };
+  }
+
+  /**
+   * Flatten workout_items → exercise_instances (+ group items) → exercises in
+   * one query so the public detail endpoint hands back everything an athlete
+   * UI needs to play along (exercise name, prescribed sets/reps/load, cues).
+   *
+   * Standalone exercise_instance items and items inside an
+   * exercise_instance_group are emitted as sibling steps, distinguished by
+   * `groupId`. Consumers that don't care about supersets can ignore the
+   * field. Ordering: workout_item.position ASC, then group_item.position ASC
+   * within a group.
+   */
+  private async loadWorkoutStructure(workoutId: string): Promise<PublicWorkoutStepDTO[]> {
+    // Standalone exercise instances (workout_item → exercise_instance directly).
+    const standalone = await this.db
+      .selectFrom('workout_items as wi')
+      .innerJoin('exercise_instances as ei', 'ei.id', 'wi.exercise_instance_id')
+      .innerJoin('exercises as e', 'e.id', 'ei.exercise_id')
+      .where('wi.workout_id', '=', workoutId)
+      .where('wi.exercise_instance_id', 'is not', null)
+      .select([
+        'wi.position as wi_position',
+        'ei.id as ei_id',
+        'ei.mode',
+        'ei.sets',
+        'ei.reps',
+        'ei.execution_time',
+        'ei.load',
+        'ei.intensity',
+        'ei.tempo',
+        'ei.notes',
+        'e.id as ex_id',
+        'e.name as ex_name',
+        'e.description as ex_description',
+        'e.cues as ex_cues',
+      ])
+      .execute();
+
+    // Grouped instances. We dive through exercise_instance_group_items to fetch
+    // every exercise_instance underneath each workout_item that references a
+    // group. The outer ORDER BY is on (wi.position, gi.position) so the
+    // flattened list reads in the order a coach would walk through a superset.
+    const grouped = await this.db
+      .selectFrom('workout_items as wi')
+      .innerJoin('exercise_instance_group_items as gi', 'gi.group_id', 'wi.exercise_instance_group_id')
+      .innerJoin('exercise_instances as ei', 'ei.id', 'gi.exercise_instance_id')
+      .innerJoin('exercises as e', 'e.id', 'ei.exercise_id')
+      .where('wi.workout_id', '=', workoutId)
+      .where('wi.exercise_instance_group_id', 'is not', null)
+      .select([
+        'wi.position as wi_position',
+        'gi.position as gi_position',
+        'wi.exercise_instance_group_id as group_id',
+        'ei.id as ei_id',
+        'ei.mode',
+        'ei.sets',
+        'ei.reps',
+        'ei.execution_time',
+        'ei.load',
+        'ei.intensity',
+        'ei.tempo',
+        'ei.notes',
+        'e.id as ex_id',
+        'e.name as ex_name',
+        'e.description as ex_description',
+        'e.cues as ex_cues',
+      ])
+      .execute();
+
+    const steps: PublicWorkoutStepDTO[] = [
+      ...standalone.map((s) => ({
+        exerciseInstanceId: s.ei_id,
+        exerciseId: s.ex_id,
+        exerciseName: s.ex_name,
+        exerciseDescription: s.ex_description,
+        cues: (s.ex_cues as string[] | null) ?? [],
+        position: s.wi_position,
+        groupId: null,
+        mode: s.mode,
+        sets: s.sets,
+        reps: s.reps,
+        executionTime: s.execution_time,
+        load: s.load,
+        intensity: s.intensity,
+        tempo: s.tempo,
+        notes: s.notes,
+      })),
+      ...grouped.map((g) => ({
+        exerciseInstanceId: g.ei_id,
+        exerciseId: g.ex_id,
+        exerciseName: g.ex_name,
+        exerciseDescription: g.ex_description,
+        cues: (g.ex_cues as string[] | null) ?? [],
+        // Synthesise a fractional position so grouped items sort *between*
+        // their parent workout_item and the next one without us pulling sort
+        // logic into JS-side comparator gymnastics.
+        position: g.wi_position + (g.gi_position ?? 0) / 1000,
+        groupId: g.group_id,
+        mode: g.mode,
+        sets: g.sets,
+        reps: g.reps,
+        executionTime: g.execution_time,
+        load: g.load,
+        intensity: g.intensity,
+        tempo: g.tempo,
+        notes: g.notes,
+      })),
+    ].sort((a, b) => a.position - b.position);
+
+    // Re-base positions to 1..N so they're presentable to consumers.
+    return steps.map((s, idx) => ({ ...s, position: idx + 1 }));
   }
 
   // ----------------------------- Courses -----------------------------
