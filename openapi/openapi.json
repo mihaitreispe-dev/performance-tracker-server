@@ -25542,7 +25542,9 @@
             "type": "string"
           },
           "picture": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Auto-extracted thumbnail URL. Null until video processing completes."
           },
           "images": {
             "type": "array",
@@ -25700,7 +25702,7 @@
           },
           "videoMimeType": {
             "type": "string",
-            "description": "Video MIME type (e.g. video/mp4)"
+            "description": "Video MIME type (e.g. video/mp4). Required."
           },
           "equipmentIds": {
             "description": "Equipment IDs to link",
@@ -25725,7 +25727,8 @@
           }
         },
         "required": [
-          "name"
+          "name",
+          "videoMimeType"
         ]
       },
       "ImportExerciseFromVimeoBody": {
@@ -25869,7 +25872,8 @@
             "type": "string"
           },
           "picture": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "level": {
             "type": "string",
