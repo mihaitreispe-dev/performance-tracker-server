@@ -92,18 +92,20 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
       .execute();
 
     // Theme matches the brand screenshot in both variants:
-    //   Light — deep navy primary on cream + sage accents (the hero
-    //     "Ce facem" look). Used for the daytime / default mode.
-    //   Dark — same palette flipped: cream becomes the text colour
-    //     against a deep-navy background, with sage staying as the
-    //     accent so brand recognition carries over.
+    //   Light — sage primary on cream with navy reserved for body copy and
+    //     secondary accents. Leading with the lighter brand colour keeps
+    //     the daytime mode airy; buttons/tabs/indicators pick up the sage
+    //     without flooding the shell with blue.
+    //   Dark — same palette: cream text on deep navy background, sage
+    //     primary so CTAs pop against the dark surface. Brand recognition
+    //     carries across modes because primary is the same hue family.
     await trx
       .insertInto('organisation_themes' as never)
       .values({
         organisation_id: orgId,
         theme_tokens: {
-          primary: '#1a2541',
-          secondary: '#a8c9a8',
+          primary: '#a8c9a8',
+          secondary: '#1a2541',
           background: '#fdfcf7',
           surface: '#ffffff',
           text: '#1a2541',
