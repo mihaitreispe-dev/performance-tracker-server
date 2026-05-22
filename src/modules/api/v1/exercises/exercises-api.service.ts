@@ -658,14 +658,29 @@ export class ExercisesApiService {
    */
   private async resolveContentUrls(s3Paths: ReturnType<typeof s3Keys.content.exercise>): Promise<[string, string, string, string]> {
     if (this.configService.disableCdn) {
-      const bucket = this.configService.s3ContentBucket;
-      const [video, poster, thumbnail, audio] = await Promise.all([
-        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.video }),
-        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.poster }),
-        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.thumbnail }),
-        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.audio }),
-      ]);
-      return [video, poster, thumbnail, audio];
+      // Local dev (MinIO): we previously signed each URL, but that broke
+      // HLS playback — the .m3u8 playlist references its segments by
+      // relative path, hls.js fetches them off the playlist's base URL
+      // with no query string, and MinIO 403s the unsigned segment GET.
+      //
+      // The fix is to make the content bucket public-read (handled by
+      // the `minio-init` service in docker-compose) and emit plain
+      // `${endpoint}/${bucket}/${key}` URLs from here. Playlist +
+      // segments + thumbnail all use the same anonymous path then. This
+      // mirrors the production model — CloudFront serves the content
+      // bucket publicly; signed access is reserved for the upload
+      // bucket where pre-processing assets live.
+      // s3Endpoint is `string | undefined` — falling back to cdnUrl keeps
+      // anyone running with DISABLE_CDN=Y but no local endpoint (e.g.
+      // an unusual prod-staging hybrid) from emitting `undefined/...`.
+      const endpoint = this.configService.s3Endpoint ?? this.configService.cdnUrl;
+      const base = `${endpoint}/${this.configService.s3ContentBucket}`;
+      return [
+        `${base}/${s3Paths.video}`,
+        `${base}/${s3Paths.poster}`,
+        `${base}/${s3Paths.thumbnail}`,
+        `${base}/${s3Paths.audio}`,
+      ];
     }
 
     if (this.configService.isCloudFrontSigningEnabled) {
@@ -701,14 +716,14 @@ export class ExercisesApiService {
 
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
 
-    // Same three-mode pick as buildMediaAssets — local dev needs an S3
-    // presigned URL because the plain `${cdn}/${key}` path doesn't include
-    // the bucket and the content bucket isn't anonymously readable.
+    // Same three-mode pick as buildMediaAssets — local dev relies on the
+    // content bucket being public-read (see minio-init service) so we
+    // emit a plain endpoint URL. That way thumbnails and HLS segments
+    // share the same URL scheme; signing is reserved for the upload
+    // bucket which stays private.
     if (this.configService.disableCdn) {
-      return await this.s3Service.getSignedUrlGET({
-        bucket: this.configService.s3ContentBucket,
-        key: s3Paths.thumbnail,
-      });
+      const endpoint = this.configService.s3Endpoint ?? this.configService.cdnUrl;
+      return `${endpoint}/${this.configService.s3ContentBucket}/${s3Paths.thumbnail}`;
     }
     if (this.configService.isCloudFrontSigningEnabled) {
       return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
