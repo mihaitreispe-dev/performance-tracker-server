@@ -41512,7 +41512,11 @@
           },
           "themeTokens": {
             "type": "object",
-            "description": "Theme tokens map. Empty object if no theme set."
+            "description": "Light-mode theme tokens. Empty object if no theme set."
+          },
+          "themeTokensDark": {
+            "type": "object",
+            "description": "Dark-mode theme tokens. Same keys as themeTokens. Empty object means \"fall back to the base MUI dark palette\"."
           },
           "copyOverrides": {
             "type": "object",
@@ -41530,6 +41534,7 @@
         "required": [
           "organisationId",
           "themeTokens",
+          "themeTokensDark",
           "copyOverrides"
         ]
       },
@@ -41549,11 +41554,20 @@
         "properties": {
           "themeTokens": {
             "type": "object",
-            "description": "Theme tokens map (color names → hex/rgb strings). Replaces stored value if provided.",
+            "description": "Light-mode theme tokens (color names → hex/rgb). Replaces stored value if provided.",
             "example": {
               "primary": "#ff6b35",
               "secondary": "#004e89",
               "background": "#ffffff"
+            }
+          },
+          "themeTokensDark": {
+            "type": "object",
+            "description": "Dark-mode theme tokens (color names → hex/rgb). Same keys as themeTokens, applied when the user is in dark mode. Empty map / omitted means \"fall back to the base dark theme\" for this org.",
+            "example": {
+              "primary": "#9aa3ff",
+              "secondary": "#22c1c3",
+              "background": "#0e1117"
             }
           },
           "copyOverrides": {

@@ -3,7 +3,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
 
 /**
- * Demo "RA" organisation — provisions a turn-key tenant the sample app
+ * Demo "Rehabit" organisation (slug `ra-demo`, the slug is kept for
+ * back-compat with the API keys + sample app already referencing it) —
+ * provisions a turn-key tenant the sample app
  * (performance-tracker-sample-app) can point at without any manual setup.
  *
  * What this seed creates:
@@ -59,7 +61,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
         id: systemUserId,
         firebase_uid: `system:demo-seed-${Date.now()}`,
         email: `demo-seed+${Date.now()}@example.invalid`,
-        display_name: 'RA Demo Seed',
+        display_name: 'Rehabit Demo Seed',
         provider: 'system',
         roles: ['user'],
         fcm_tokens: [],
@@ -70,7 +72,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
       .insertInto('organisations' as never)
       .values({
         id: orgId,
-        name: 'RA',
+        name: 'Rehabit',
         slug: 'ra-demo',
         created_by_user_id: systemUserId,
         org_type: 'individual',
@@ -119,6 +121,10 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           athlete: 'membru',
           athletes: 'membri',
         },
+        // Manrope is the closest free Google Font to the brand reference
+        // — geometric, low-contrast, friendly. Inter is the system-style
+        // fallback before we drop into native sans.
+        font_family: '"Manrope", "Inter", system-ui, -apple-system, sans-serif',
       } as never)
       .execute();
 
@@ -254,7 +260,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
     [
       '',
       '─'.repeat(64),
-      'RA demo organisation seeded.',
+      'Rehabit demo organisation seeded.',
       '─'.repeat(64),
       `Organisation id:  ${orgId}`,
       `Slug:             ra-demo`,
