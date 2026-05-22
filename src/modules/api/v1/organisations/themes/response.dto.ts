@@ -4,8 +4,14 @@ export class ThemeDTO {
   @ApiProperty()
   organisationId: string;
 
-  @ApiProperty({ description: 'Theme tokens map. Empty object if no theme set.' })
+  @ApiProperty({ description: 'Light-mode theme tokens. Empty object if no theme set.' })
   themeTokens: Record<string, string>;
+
+  @ApiProperty({
+    description:
+      'Dark-mode theme tokens. Same keys as themeTokens. Empty object means "fall back to the base MUI dark palette".',
+  })
+  themeTokensDark: Record<string, string>;
 
   @ApiProperty({ description: 'Copy override map. Empty object if none set.' })
   copyOverrides: Record<string, string>;

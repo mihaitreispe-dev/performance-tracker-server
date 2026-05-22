@@ -51,11 +51,15 @@ export class ThemesApiService {
     // / copy / font are user-editable from the BrandingPage form. Favicon comes from
     // requestFaviconUpload + confirmFaviconUpload below.
     const existing = await this.themeRepo.findByOrganisationId(organisationId);
+    // Partial update semantics: if the caller didn't send a variant, keep
+    // whatever's already on disk. This lets the Branding page save one
+    // variant at a time without nuking the other.
     const theme = await this.themeRepo.upsert({
       organisation_id: organisationId,
-      theme_tokens: dto.themeTokens ?? EMPTY_TOKENS,
-      copy_overrides: dto.copyOverrides ?? EMPTY_OVERRIDES,
-      font_family: dto.fontFamily ?? null,
+      theme_tokens: dto.themeTokens ?? existing?.theme_tokens ?? EMPTY_TOKENS,
+      theme_tokens_dark: dto.themeTokensDark ?? existing?.theme_tokens_dark ?? EMPTY_TOKENS,
+      copy_overrides: dto.copyOverrides ?? existing?.copy_overrides ?? EMPTY_OVERRIDES,
+      font_family: dto.fontFamily ?? existing?.font_family ?? null,
       favicon_s3_bucket: existing?.favicon_s3_bucket ?? null,
       favicon_s3_key: existing?.favicon_s3_key ?? null,
     });
@@ -111,6 +115,7 @@ export class ThemesApiService {
     const theme = await this.themeRepo.upsert({
       organisation_id: organisationId,
       theme_tokens: existing?.theme_tokens ?? EMPTY_TOKENS,
+      theme_tokens_dark: existing?.theme_tokens_dark ?? EMPTY_TOKENS,
       copy_overrides: existing?.copy_overrides ?? EMPTY_OVERRIDES,
       font_family: existing?.font_family ?? null,
       favicon_s3_bucket: body.bucket,
@@ -138,6 +143,7 @@ export class ThemesApiService {
     const theme = await this.themeRepo.upsert({
       organisation_id: organisationId,
       theme_tokens: existing.theme_tokens,
+      theme_tokens_dark: existing.theme_tokens_dark,
       copy_overrides: existing.copy_overrides,
       font_family: existing.font_family,
       favicon_s3_bucket: null,
@@ -164,6 +170,7 @@ export class ThemesApiService {
     return {
       organisationId,
       themeTokens: theme?.theme_tokens ?? EMPTY_TOKENS,
+      themeTokensDark: theme?.theme_tokens_dark ?? EMPTY_TOKENS,
       copyOverrides: theme?.copy_overrides ?? EMPTY_OVERRIDES,
       fontFamily: theme?.font_family ?? null,
       faviconUrl:

@@ -3,12 +3,22 @@ import { IsObject, IsOptional, IsString, Matches, MaxLength } from 'class-valida
 
 export class UpdateThemeDto {
   @ApiPropertyOptional({
-    description: 'Theme tokens map (color names → hex/rgb strings). Replaces stored value if provided.',
+    description:
+      'Light-mode theme tokens (color names → hex/rgb). Replaces stored value if provided.',
     example: { primary: '#ff6b35', secondary: '#004e89', background: '#ffffff' },
   })
   @IsObject()
   @IsOptional()
   themeTokens?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    description:
+      'Dark-mode theme tokens (color names → hex/rgb). Same keys as themeTokens, applied when the user is in dark mode. Empty map / omitted means "fall back to the base dark theme" for this org.',
+    example: { primary: '#9aa3ff', secondary: '#22c1c3', background: '#0e1117' },
+  })
+  @IsObject()
+  @IsOptional()
+  themeTokensDark?: Record<string, string>;
 
   @ApiPropertyOptional({
     description: 'Copy override map (key → replacement string). Replaces stored value if provided.',

@@ -89,8 +89,12 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
       } as never)
       .execute();
 
-    // Theme matches the brand screenshot: deep navy primary, sage green
-    // accent, warm cream background, white card surface.
+    // Theme matches the brand screenshot in both variants:
+    //   Light — deep navy primary on cream + sage accents (the hero
+    //     "Ce facem" look). Used for the daytime / default mode.
+    //   Dark — same palette flipped: cream becomes the text colour
+    //     against a deep-navy background, with sage staying as the
+    //     accent so brand recognition carries over.
     await trx
       .insertInto('organisation_themes' as never)
       .values({
@@ -101,6 +105,15 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           background: '#fdfcf7',
           surface: '#ffffff',
           text: '#1a2541',
+        },
+        theme_tokens_dark: {
+          // Primary = sage so CTAs pop on the dark background; navy text
+          // wouldn't have enough contrast as a button colour here.
+          primary: '#a8c9a8',
+          secondary: '#d7e8d2',
+          background: '#0b1422',
+          surface: '#1a2541',
+          text: '#fdfcf7',
         },
         copy_overrides: {
           athlete: 'membru',
