@@ -1,6 +1,7 @@
-import { Kysely, sql } from 'kysely';
 import { randomBytes, randomUUID } from 'node:crypto';
+
 import * as bcrypt from 'bcrypt';
+import { Kysely, sql } from 'kysely';
 
 /**
  * Demo "Rehabit" organisation (slug `ra-demo`, the slug is kept for
@@ -41,11 +42,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
 
   // Generate the API key cleartext outside the txn — it's purely a value
   // we hash on the way in, so the txn only sees the hash.
-  const secret = randomBytes(32)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  const secret = randomBytes(32).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const fullKey = `sz_test_${secret}`;
   const keyPrefix = fullKey.slice(0, 16);
   const keyHash = await bcrypt.hash(fullKey, 12);
@@ -111,11 +108,17 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           text: '#1a2541',
         },
         theme_tokens_dark: {
-          // Primary = sage so CTAs pop on the dark background; navy text
-          // wouldn't have enough contrast as a button colour here.
+          // Dark mode mirrors the light-mode roles by inverting lightness:
+          //   light:  cream bg  → white card     → sage CTA → navy text
+          //   dark:   charcoal  → brand-navy card → sage CTA → cream text
+          // The brand navy (#1a2541) is promoted to the card surface so
+          // it reads as an intentional design choice rather than a generic
+          // platform-blue dark mode. Background is a desaturated charcoal-
+          // navy so cards sit cleanly above it without the whole shell
+          // turning into one saturated blue field.
           primary: '#a8c9a8',
           secondary: '#d7e8d2',
-          background: '#0b1422',
+          background: '#0e1320',
           surface: '#1a2541',
           text: '#fdfcf7',
         },
@@ -150,10 +153,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           'executions:read',
           'executions:write',
         ],
-        redirect_uris: [
-          'http://localhost:5180/callback',
-          'com.example.performancesample://callback',
-        ],
+        redirect_uris: ['http://localhost:5180/callback', 'com.example.performancesample://callback'],
         created_by_user_id: systemUserId,
       } as never)
       .execute();
@@ -265,7 +265,7 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
       'Rehabit demo organisation seeded.',
       '─'.repeat(64),
       `Organisation id:  ${orgId}`,
-      `Slug:             ra-demo`,
+      'Slug:             ra-demo',
       `Sample workout:   ${workoutId} ("Antrenament de probă")`,
       '',
       'API key (copy into the sample app .env as VITE_CLIENT_ID):',
