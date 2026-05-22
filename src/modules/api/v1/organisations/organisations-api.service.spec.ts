@@ -14,6 +14,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
 
 import { OrganisationsApiService } from './organisations-api.service';
@@ -58,6 +59,12 @@ describe('OrganisationsApiService.createOrganisation', () => {
         {
           provide: OrganisationThemeRepository,
           useValue: { upsert: jest.fn() },
+        },
+        {
+          // listMyOrganisations needs this for the system-admin shortcut.
+          // createOrganisation never reads it, so a stub is enough.
+          provide: UserRepository,
+          useValue: { findRolesByUserId: jest.fn().mockResolvedValue([]) },
         },
         {
           provide: S3Service,

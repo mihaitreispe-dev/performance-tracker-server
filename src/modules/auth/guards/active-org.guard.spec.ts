@@ -1,21 +1,27 @@
 import { BadRequestException, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { OrganisationMembership, OrganisationRole } from '../../../database/interfaces';
+import { OrganisationMembership, OrganisationRole, UserRole } from '../../../database/interfaces';
 import { OrganisationMembershipRepository } from '../../../repositories/organisation-membership.repository';
+import { UserRepository } from '../../../repositories/user.repository';
 import { ACTIVE_ORG_HEADER, ActiveOrgGuard, SkipActiveOrg } from './active-org.guard';
 
 describe('ActiveOrgGuard', () => {
   let guard: ActiveOrgGuard;
   let membershipRepo: jest.Mocked<OrganisationMembershipRepository>;
+  let userRepo: jest.Mocked<UserRepository>;
   let reflector: jest.Mocked<Reflector>;
 
   beforeEach(() => {
     membershipRepo = {
       findByUserAndOrg: jest.fn(),
     } as unknown as jest.Mocked<OrganisationMembershipRepository>;
+    userRepo = {
+      // Default to no roles; admin-path tests override per-case.
+      findRolesByUserId: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<UserRepository>;
     reflector = { getAllAndOverride: jest.fn() } as unknown as jest.Mocked<Reflector>;
-    guard = new ActiveOrgGuard(membershipRepo, reflector);
+    guard = new ActiveOrgGuard(membershipRepo, userRepo, reflector);
   });
 
   function makeContext(opts: { user?: { id: string }; headers?: Record<string, unknown> }): {
@@ -101,6 +107,34 @@ describe('ActiveOrgGuard', () => {
     });
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.activeOrg).toEqual({ organisationId: 'org-1', role: OrganisationRole.ATHLETE });
+  });
+
+  it('lets a system admin (UserRole.ADMIN) into an org they are not a member of with synthesised admin role', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    membershipRepo.findByUserAndOrg.mockResolvedValue(undefined);
+    userRepo.findRolesByUserId.mockResolvedValue([UserRole.ADMIN]);
+
+    const { context, request } = makeContext({
+      user: { id: 'platform-admin' },
+      headers: { [ACTIVE_ORG_HEADER]: 'org-they-do-not-belong-to' },
+    });
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(request.activeOrg).toEqual({
+      organisationId: 'org-they-do-not-belong-to',
+      role: OrganisationRole.ADMIN,
+    });
+  });
+
+  it('still 403s a non-admin non-member', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    membershipRepo.findByUserAndOrg.mockResolvedValue(undefined);
+    userRepo.findRolesByUserId.mockResolvedValue([UserRole.USER]);
+
+    const { context } = makeContext({
+      user: { id: 'regular' },
+      headers: { [ACTIVE_ORG_HEADER]: 'org-1' },
+    });
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('SkipActiveOrg() decorator is a callable that returns a metadata setter', () => {

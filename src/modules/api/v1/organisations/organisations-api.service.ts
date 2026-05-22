@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Organisation, OrganisationRole, OrganisationType } from 'src/database/interfaces';
+import { Organisation, OrganisationRole, OrganisationType, UserRole } from 'src/database/interfaces';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { v4 as uuidv4 } from 'uuid';
 
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
@@ -55,6 +56,7 @@ export class OrganisationsApiService {
     private readonly orgRepo: OrganisationRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
     private readonly themeRepo: OrganisationThemeRepository,
+    private readonly userRepo: UserRepository,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -104,22 +106,45 @@ export class OrganisationsApiService {
   async listMyOrganisations(req: Request & { user: AuthUser }): Promise<MyOrganisationsListResponse> {
     const userId = req.user.id;
     const memberships = await this.membershipRepo.listAcceptedByUser(userId);
-    if (memberships.length === 0) {
-      return { data: [] };
-    }
-    const orgs = await Promise.all(memberships.map((m) => this.orgRepo.findById(m.organisation_id)));
 
-    const data: MyOrganisationDTO[] = (
+    // Resolve the orgs the user is actually a member of (their real role per
+    // org survives into the response).
+    const ownOrgs = memberships.length === 0 ? [] : await Promise.all(memberships.map((m) => this.orgRepo.findById(m.organisation_id)));
+    const ownDtos: MyOrganisationDTO[] = (
       await Promise.all(
         memberships.map(async (m, idx) => {
-          const org = orgs[idx];
+          const org = ownOrgs[idx];
           if (!org || HIDDEN_ORG_SLUGS.has(org.slug)) return null;
           return { ...(await this.mapToDTO(org)), myRole: m.role } satisfies MyOrganisationDTO;
         }),
       )
     ).filter((x): x is MyOrganisationDTO => x !== null);
 
-    return { data };
+    // System admins (UserRole.ADMIN — a platform-level role, distinct from
+    // an org-level owner/admin) can drop into any org for support. We union
+    // the rest of the catalogue in here and synthesise `myRole='admin'` for
+    // the visited org so the UI gates behave as if they were an org-admin.
+    // Roles live in the DB (not on request.user) — same reason RolesGuard
+    // re-queries them.
+    const roles = await this.userRepo.findRolesByUserId(userId);
+    if (!roles.includes(UserRole.ADMIN)) {
+      return { data: ownDtos };
+    }
+
+    const memberOrgIds = new Set(ownDtos.map((o) => o.id));
+    const allOrgs = await this.orgRepo.findAll();
+    const extraDtos: MyOrganisationDTO[] = (
+      await Promise.all(
+        allOrgs
+          .filter((o) => !memberOrgIds.has(o.id) && !HIDDEN_ORG_SLUGS.has(o.slug))
+          .map(async (org) => ({
+            ...(await this.mapToDTO(org)),
+            myRole: OrganisationRole.ADMIN,
+          })),
+      )
+    );
+
+    return { data: [...ownDtos, ...extraDtos] };
   }
 
   async listPendingInvitations(req: Request & { user: AuthUser }): Promise<PendingInvitationsListResponse> {

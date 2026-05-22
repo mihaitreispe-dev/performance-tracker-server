@@ -258,7 +258,10 @@ async function ingestOne({ db, s3, exercise, organisationId, ownerUserId }: Inge
           name: exercise.name,
           description: exercise.target ? `Target: ${exercise.target}` : null,
           cues: exercise.instructions ?? [],
-          visibility: 'private',
+          // WorkoutX content is meant to be the shared dev seed across orgs,
+          // so we surface it as public — the catalogue is browsable by every
+          // member of every org without each one having to mint their own.
+          visibility: 'public',
           category: exercise.bodyPart ?? null,
           level: null,
           video_s3_bucket: UPLOAD_BUCKET,
