@@ -108,18 +108,21 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           text: '#1a2541',
         },
         theme_tokens_dark: {
-          // Dark mode mirrors the light-mode roles by inverting lightness:
-          //   light:  cream bg  → white card     → sage CTA → navy text
-          //   dark:   charcoal  → brand-navy card → sage CTA → cream text
-          // The brand navy (#1a2541) is promoted to the card surface so
-          // it reads as an intentional design choice rather than a generic
-          // platform-blue dark mode. Background is a desaturated charcoal-
-          // navy so cards sit cleanly above it without the whole shell
-          // turning into one saturated blue field.
+          // Dark mode leans into the green half of the Rehabit palette
+          // instead of carrying navy across from light mode. The structure
+          // mirrors light:
+          //   light:  cream bg     → white card    → sage CTA → navy text
+          //   dark:   forest-char  → forest card   → sage CTA → cream text
+          // Background is a near-black green-charcoal so cards lift cleanly
+          // above it; surface is a deep forest that picks up enough of the
+          // brand sage to feel intentional rather than like a generic
+          // "dark mode for any brand". Sage stays as the CTA — the
+          // continuity from light mode is what makes Rehabit recognisable
+          // across the two.
           primary: '#a8c9a8',
           secondary: '#d7e8d2',
-          background: '#0e1320',
-          surface: '#1a2541',
+          background: '#0e1612',
+          surface: '#1c2a23',
           text: '#fdfcf7',
         },
         copy_overrides: {
