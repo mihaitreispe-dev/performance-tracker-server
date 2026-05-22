@@ -610,26 +610,27 @@ export class ExercisesApiService {
       return [];
     }
 
-    const cdnUrl = this.configService.cdnUrl;
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
 
     if (exercise.status === ExerciseStatus.ASSETS_DONE) {
-      const posterCloudFrontUrl = this.configService.isCloudFrontSigningEnabled
-        ? await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.poster })
-        : undefined;
-      const thumbnailCloudFrontUrl = this.configService.isCloudFrontSigningEnabled
-        ? await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail })
-        : undefined;
+      // Three modes, in priority order:
+      //   1. disableCdn (local dev / no CDN): everything goes through S3
+      //      presigned URLs against the content bucket. The CDN_URL path
+      //      below doesn't work locally because (a) MinIO needs the bucket
+      //      in the URL and (b) anonymous reads are blocked by default.
+      //   2. CloudFront signing on: serve via CloudFront with signed URLs.
+      //   3. Plain CDN: public CDN, no signing — concatenate cdnUrl + key.
+      const [videoUrl, posterUrl, thumbnailUrl, audioUrl] = await this.resolveContentUrls(s3Paths);
 
       return [
         {
-          url: `${cdnUrl}/${s3Paths.video}`,
-          poster: posterCloudFrontUrl || `${cdnUrl}/${s3Paths.poster}`,
-          thumbnail: thumbnailCloudFrontUrl || `${cdnUrl}/${s3Paths.thumbnail}`,
+          url: videoUrl,
+          poster: posterUrl,
+          thumbnail: thumbnailUrl,
           mimeType: 'application/x-mpegURL',
         },
         {
-          url: `${cdnUrl}/${s3Paths.audio}`,
+          url: audioUrl,
           mimeType: 'audio/mp4',
         },
       ];
@@ -650,6 +651,43 @@ export class ExercisesApiService {
   }
 
   /**
+   * Resolves the four content URLs (video / poster / thumbnail / audio)
+   * for a processed exercise, picking between S3 presigned, CloudFront
+   * signed, and plain CDN URLs based on config. Returned as a fixed-order
+   * tuple so the caller doesn't have to know which strategy was used.
+   */
+  private async resolveContentUrls(s3Paths: ReturnType<typeof s3Keys.content.exercise>): Promise<[string, string, string, string]> {
+    if (this.configService.disableCdn) {
+      const bucket = this.configService.s3ContentBucket;
+      const [video, poster, thumbnail, audio] = await Promise.all([
+        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.video }),
+        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.poster }),
+        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.thumbnail }),
+        this.s3Service.getSignedUrlGET({ bucket, key: s3Paths.audio }),
+      ]);
+      return [video, poster, thumbnail, audio];
+    }
+
+    if (this.configService.isCloudFrontSigningEnabled) {
+      const [video, poster, thumbnail, audio] = await Promise.all([
+        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.video }),
+        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.poster }),
+        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail }),
+        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.audio }),
+      ]);
+      return [video, poster, thumbnail, audio];
+    }
+
+    const cdnUrl = this.configService.cdnUrl;
+    return [
+      `${cdnUrl}/${s3Paths.video}`,
+      `${cdnUrl}/${s3Paths.poster}`,
+      `${cdnUrl}/${s3Paths.thumbnail}`,
+      `${cdnUrl}/${s3Paths.audio}`,
+    ];
+  }
+
+  /**
    * Resolves a signed URL to the exercise's thumbnail — the still frame
    * MediaConvert extracts from the video. Returns null until the video
    * pipeline produces it (i.e. for any status < `assets_done`); the UI
@@ -662,7 +700,17 @@ export class ExercisesApiService {
     if (exercise.status !== ExerciseStatus.ASSETS_DONE) return null;
 
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
-    if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
+
+    // Same three-mode pick as buildMediaAssets — local dev needs an S3
+    // presigned URL because the plain `${cdn}/${key}` path doesn't include
+    // the bucket and the content bucket isn't anonymously readable.
+    if (this.configService.disableCdn) {
+      return await this.s3Service.getSignedUrlGET({
+        bucket: this.configService.s3ContentBucket,
+        key: s3Paths.thumbnail,
+      });
+    }
+    if (this.configService.isCloudFrontSigningEnabled) {
       return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
     }
     return `${this.configService.cdnUrl}/${s3Paths.thumbnail}`;
