@@ -6,6 +6,7 @@ import {
 import { Request } from 'express';
 
 import { OrganisationApiKey, OrganisationRole } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import {
   generateApiKey,
   hashApiKey,
@@ -14,6 +15,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
 import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 
 import { CreateApiKeyDto } from './request.dto';
 import {
@@ -34,6 +36,7 @@ export class ApiKeysApiService {
     private readonly apiKeyRepo: OrganisationApiKeyRepository,
     private readonly usageRepo: OrganisationApiUsageRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly userRepo: UserRepository,
   ) {}
 
   async create(
@@ -111,9 +114,9 @@ export class ApiKeysApiService {
 
   private async ensureAdmin(userId: string, orgId: string): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, orgId, ADMIN_ROLES);
-    if (!ok) {
-      throw new ForbiddenException('Insufficient permissions in this organisation');
-    }
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Insufficient permissions in this organisation');
   }
 
   private mapToDTO(row: OrganisationApiKey): ApiKeyDTO {

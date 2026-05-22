@@ -8,12 +8,14 @@ import {
 import { Request } from 'express';
 
 import { OrganisationRole } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { StripeService } from 'src/modules/stripe/stripe.service';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 
 import {
   CreateCouponDto,
@@ -70,6 +72,7 @@ export class BillingApiService {
     private readonly billingRepo: StripeBillingRepository,
     private readonly stripeService: StripeService,
     private readonly configService: AppConfigService,
+    private readonly userRepo: UserRepository,
   ) {}
 
   // ---------- Connect onboarding ----------
@@ -392,7 +395,9 @@ export class BillingApiService {
 
   private async ensureAdmin(userId: string, orgId: string): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, orgId, ADMIN_ROLES);
-    if (!ok) throw new ForbiddenException('Owner or admin role required for billing operations');
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Owner or admin role required for billing operations');
   }
 
   /** Resolves the connected account or throws — used by every Stripe-calling path. */

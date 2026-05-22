@@ -6,6 +6,7 @@ import { ClientType, ModuleKey, OrganisationRole } from 'src/database/interfaces
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ModuleRepository } from 'src/repositories/module.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 
 import { ClientProfilesApiService } from './client-profiles-api.service';
 
@@ -39,6 +40,13 @@ describe('ClientProfilesApiService', () => {
         {
           provide: OrganisationMembershipRepository,
           useValue: { hasRole: jest.fn() },
+        },
+        {
+          // ensureAdmin falls through to this only when hasRole returns
+          // false; every test below either grants membership or expects
+          // the 403 path, so an empty role list is correct.
+          provide: UserRepository,
+          useValue: { findRolesByUserId: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();

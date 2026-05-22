@@ -2,9 +2,11 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { Request } from 'express';
 
 import { ClientType, OrganisationRole } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ModuleRepository } from 'src/repositories/module.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 
 import { UpdateClientTypeProfileDto } from './request.dto';
 import {
@@ -33,6 +35,7 @@ export class ClientProfilesApiService {
   constructor(
     private readonly moduleRepo: ModuleRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly userRepo: UserRepository,
   ) {}
 
   async listProfiles(
@@ -126,8 +129,8 @@ export class ClientProfilesApiService {
 
   private async ensureAdmin(userId: string, orgId: string): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, orgId, ADMIN_ROLES);
-    if (!ok) {
-      throw new ForbiddenException('Owner or admin role required to manage client profiles');
-    }
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Owner or admin role required to manage client profiles');
   }
 }

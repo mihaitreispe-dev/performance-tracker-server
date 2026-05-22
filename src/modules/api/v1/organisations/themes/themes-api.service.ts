@@ -1,11 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import { CopyOverrides, OrganisationRole, OrganisationTheme, ThemeTokens } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 import { v4 as uuidv4 } from 'uuid';
 
 import { ConfirmFaviconUploadDto, RequestFaviconUploadDto, UpdateThemeDto } from './request.dto';
@@ -28,6 +30,7 @@ export class ThemesApiService {
   constructor(
     private readonly themeRepo: OrganisationThemeRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly userRepo: UserRepository,
     private readonly s3Service: S3Service,
   ) {}
 
@@ -145,16 +148,16 @@ export class ThemesApiService {
 
   private async ensureMember(userId: string, organisationId: string): Promise<void> {
     const membership = await this.membershipRepo.findByUserAndOrg(userId, organisationId);
-    if (!membership) {
-      throw new ForbiddenException('You are not a member of this organisation');
-    }
+    if (membership) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('You are not a member of this organisation');
   }
 
   private async ensureRole(userId: string, organisationId: string, roles: OrganisationRole[]): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, organisationId, roles);
-    if (!ok) {
-      throw new ForbiddenException('Insufficient permissions in this organisation');
-    }
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Insufficient permissions in this organisation');
   }
 
   private async mapToDTO(organisationId: string, theme?: OrganisationTheme): Promise<ThemeDTO> {

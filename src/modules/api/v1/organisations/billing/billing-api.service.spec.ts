@@ -16,6 +16,7 @@ import { OrganisationRepository } from 'src/repositories/organisation.repository
 // `OrganisationRepository` is referenced as the DI token only; we don't dereference
 // its instance members in the tests.
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
+import { UserRepository } from 'src/repositories/user.repository';
 
 import { BillingApiService } from './billing-api.service';
 
@@ -83,6 +84,13 @@ describe('BillingApiService', () => {
           },
         },
         { provide: AppConfigService, useValue: {} },
+        {
+          // ensureAdmin consults this only as a fallback when membership
+          // check fails — every test in this spec exercises the member
+          // path, so an empty role list is correct.
+          provide: UserRepository,
+          useValue: { findRolesByUserId: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 

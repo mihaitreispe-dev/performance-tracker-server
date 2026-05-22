@@ -6,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Organisation, OrganisationRole, OrganisationType, UserRole } from 'src/database/interfaces';
+import { Organisation, OrganisationRole, OrganisationType } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -124,10 +125,7 @@ export class OrganisationsApiService {
     // an org-level owner/admin) can drop into any org for support. We union
     // the rest of the catalogue in here and synthesise `myRole='admin'` for
     // the visited org so the UI gates behave as if they were an org-admin.
-    // Roles live in the DB (not on request.user) — same reason RolesGuard
-    // re-queries them.
-    const roles = await this.userRepo.findRolesByUserId(userId);
-    if (!roles.includes(UserRole.ADMIN)) {
+    if (!(await isPlatformAdmin(this.userRepo, userId))) {
       return { data: ownDtos };
     }
 
@@ -282,16 +280,20 @@ export class OrganisationsApiService {
 
   private async ensureMember(userId: string, organisationId: string): Promise<void> {
     const membership = await this.membershipRepo.findByUserAndOrg(userId, organisationId);
-    if (!membership) {
-      throw new ForbiddenException('You are not a member of this organisation');
-    }
+    if (membership) return;
+    // Platform admins (UserRole.ADMIN) can drop into any org for support —
+    // same allowance ActiveOrgGuard makes. Without this the org-settings
+    // page surfaces "not found" the moment an admin switches to an org
+    // they're not actually a member of via the new Select.
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('You are not a member of this organisation');
   }
 
   private async ensureRole(userId: string, organisationId: string, roles: OrganisationRole[]): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, organisationId, roles);
-    if (!ok) {
-      throw new ForbiddenException('Insufficient permissions in this organisation');
-    }
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Insufficient permissions in this organisation');
   }
 
   private generateSlug(name: string): string {

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ClientType, OrganisationMembership, OrganisationRole, User } from 'src/database/interfaces';
+import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -151,16 +152,16 @@ export class MembershipsApiService {
 
   private async ensureMember(userId: string, orgId: string): Promise<void> {
     const membership = await this.membershipRepo.findByUserAndOrg(userId, orgId);
-    if (!membership) {
-      throw new ForbiddenException('You are not a member of this organisation');
-    }
+    if (membership) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('You are not a member of this organisation');
   }
 
   private async ensureRole(userId: string, orgId: string, roles: OrganisationRole[]): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, orgId, roles);
-    if (!ok) {
-      throw new ForbiddenException('Insufficient permissions in this organisation');
-    }
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Insufficient permissions in this organisation');
   }
 
   private mapToDTO(m: OrganisationMembership, user?: User): MembershipDTO {
