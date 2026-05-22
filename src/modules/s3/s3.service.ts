@@ -42,6 +42,13 @@ export class S3Service {
       region: this.region,
       endpoint: endpoint,
       useAccelerateEndpoint: !endpoint,
+      // When pointed at a custom endpoint (MinIO in local dev, any
+      // self-hosted S3-compatible store in prod), force path-style URLs.
+      // The SDK defaults to virtual-host style (\`bucket.host\`) which
+      // breaks against MinIO since the bucket isn't a real subdomain on
+      // the host's IP. Real AWS leaves endpoint undefined, where the
+      // option is moot and the SDK picks the optimal style itself.
+      forcePathStyle: !!endpoint,
     };
 
     this.s3Client = new S3(s3Opts);
