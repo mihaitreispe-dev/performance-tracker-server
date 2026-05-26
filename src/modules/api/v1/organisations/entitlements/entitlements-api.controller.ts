@@ -7,7 +7,7 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { EntitlementsApiService } from './entitlements-api.service';
 import { EntitlementResourceParams, ReplaceEntitlementsDto } from './request.dto';
-import { EntitlementsListResponse } from './response.dto';
+import { EntitlementsListResponse, LockStatusResponse } from './response.dto';
 
 /**
  * Admin endpoints to gate workouts / snacks / courses behind a set of
@@ -57,5 +57,26 @@ export class EntitlementsApiController {
       params.resourceId,
       dto.stripeProductIds,
     );
+  }
+
+  /**
+   * Member-readable lock status for the calling user. Always returns
+   * 200 with `{ locked, requiredTiers }` — never throws 402 like the
+   * public detail endpoints do — because this is a UI hint endpoint:
+   * the client uses it to decide whether to render the paywall in
+   * place of the resource. Returning 200-with-flag keeps consumers
+   * from having to special-case error handling for a non-error.
+   */
+  @Get('lock-status')
+  @ApiOperation({
+    summary:
+      "Lock status for the calling user against a specific resource. Any active org member can call. Returns `{ locked, requiredTiers }`.",
+  })
+  @ApiOkResponse({ type: LockStatusResponse })
+  async lockStatus(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: EntitlementResourceParams,
+  ): Promise<LockStatusResponse> {
+    return this.service.lockStatus(req, params.id, params.resourceType, params.resourceId);
   }
 }

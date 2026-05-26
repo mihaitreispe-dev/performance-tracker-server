@@ -6,12 +6,13 @@ import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import {
   EntitlementsService,
+  LockStatusDTO,
   RequiredTierDTO,
 } from 'src/modules/entitlements/entitlements.service';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
-import { EntitlementsListResponse } from './response.dto';
+import { EntitlementsListResponse, LockStatusResponse } from './response.dto';
 
 const ADMIN_ROLES: OrganisationRole[] = [OrganisationRole.OWNER, OrganisationRole.ADMIN];
 
@@ -65,10 +66,50 @@ export class EntitlementsApiService {
     return { data: tiers };
   }
 
+  /**
+   * Lock-status read for any authenticated member of the org — used by
+   * athlete-facing surfaces in the admin app to decide between "render
+   * the resource" and "render the paywall". Only requires membership,
+   * not the admin role; the `userId` whose access we check is always
+   * the session user, never overridden by the caller.
+   */
+  async lockStatus(
+    req: Request & { user: AuthUser },
+    organisationId: string,
+    resourceType: EntitlementResourceType,
+    resourceId: string,
+  ): Promise<LockStatusResponse> {
+    await this.ensureMember(req.user.id, organisationId);
+    const status: LockStatusDTO = await this.entitlements.getLockStatus(
+      req.user.id,
+      resourceType,
+      resourceId,
+    );
+    return { data: status };
+  }
+
   private async ensureAdmin(userId: string, orgId: string): Promise<void> {
     const ok = await this.membershipRepo.hasRole(userId, orgId, ADMIN_ROLES);
     if (ok) return;
     if (await isPlatformAdmin(this.userRepo, userId)) return;
     throw new ForbiddenException('Insufficient permissions in this organisation');
+  }
+
+  /**
+   * Member-level check — any active org membership counts. Used by
+   * paywall reads where we don't want to leak entitlement metadata to
+   * users who aren't in the org at all but DO want to let regular
+   * athletes peek at their own lock state.
+   */
+  private async ensureMember(userId: string, orgId: string): Promise<void> {
+    const ok = await this.membershipRepo.hasRole(userId, orgId, [
+      OrganisationRole.OWNER,
+      OrganisationRole.ADMIN,
+      OrganisationRole.COACH,
+      OrganisationRole.ATHLETE,
+    ]);
+    if (ok) return;
+    if (await isPlatformAdmin(this.userRepo, userId)) return;
+    throw new ForbiddenException('Not a member of this organisation');
   }
 }

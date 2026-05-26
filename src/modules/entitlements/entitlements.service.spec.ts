@@ -230,7 +230,7 @@ describe('EntitlementsService', () => {
               },
             ],
           ],
-        ]),
+        ]) as never,
       );
       billingRepo.listActivePricesForProducts.mockResolvedValue([]);
       billingRepo.listActiveProductIdsForUser.mockResolvedValue(['p1']);
