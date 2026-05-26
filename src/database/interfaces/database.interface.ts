@@ -85,6 +85,7 @@ import { RacePlansTable } from './race-plans-table.interface';
 import { RacePredictionsTable } from './race-predictions-table.interface';
 import { RecoveryJournalEntriesTable } from './recovery-journal-entries-table.interface';
 import { RefreshTokensTable } from './refresh-tokens-table.interface';
+import { ResourceEntitlementsTable } from './resource-entitlements-table.interface';
 import { RouteMarkersTable } from './route-markers-table.interface';
 import { RpeTssTrackingTable } from './rpe-tss-tracking-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
@@ -223,6 +224,9 @@ export interface Database {
   stripe_subscriptions: StripeSubscriptionsTable;
   stripe_coupons: StripeCouponsTable;
   stripe_webhook_events: StripeWebhookEventsTable;
+
+  // Phase 11 — Resource gating: which products unlock which workouts/snacks/courses
+  resource_entitlements: ResourceEntitlementsTable;
 
   // Modules registry
   modules: ModulesTable;

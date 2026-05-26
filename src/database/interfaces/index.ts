@@ -82,6 +82,7 @@ export * from './organisation-themes-table.interface';
 export * from './onboarding-questionnaires-table.interface';
 export * from './onboarding-responses-table.interface';
 export * from './stripe-billing-tables.interface';
+export * from './resource-entitlements-table.interface';
 export * from './modules-table.interface';
 export * from './content-items-table.interface';
 export * from './courses-table.interface';

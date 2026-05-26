@@ -143,6 +143,22 @@ export class StripeBillingRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Find a product by its local primary key alone — no org scoping.
+   * Callers are responsible for verifying tenant ownership when they
+   * use this (the entitlements service does, see
+   * `setEntitlementsForResource`). Used over `findProduct` when the
+   * caller has the local id but doesn't already have the org id in
+   * hand and wants to avoid an extra query just to check it.
+   */
+  async findProductById(id: string): Promise<StripeProduct | undefined> {
+    return this.db
+      .selectFrom('stripe_products')
+      .where('id', '=', id)
+      .selectAll()
+      .executeTakeFirst();
+  }
+
   async createProduct(row: NewStripeProduct): Promise<StripeProduct> {
     return this.db
       .insertInto('stripe_products')
@@ -212,6 +228,22 @@ export class StripeBillingRepository {
       .executeTakeFirst();
   }
 
+  /**
+   * Batch lookup of every active price across many Stripe product ids.
+   * Used by the entitlements service to pick a "cheapest price" hint for
+   * the paywall UI without a per-product roundtrip. Returns rows; the
+   * caller is responsible for the min-per-product reduction.
+   */
+  async listActivePricesForProducts(stripeProductIds: string[]): Promise<StripePrice[]> {
+    if (stripeProductIds.length === 0) return [];
+    return this.db
+      .selectFrom('stripe_prices')
+      .where('stripe_product_id', 'in', stripeProductIds)
+      .where('active', '=', true)
+      .selectAll()
+      .execute();
+  }
+
   // ---------- stripe_subscriptions ----------
 
   async listSubscriptionsForOrg(organisationId: string, opts: { offset?: number; limit?: number } = {}): Promise<StripeSubscription[]> {
@@ -238,6 +270,29 @@ export class StripeBillingRepository {
       .orderBy('created_at', 'desc')
       .limit(1)
       .executeTakeFirst();
+  }
+
+  /**
+   * Resolve every local stripe_products.id that the user currently has
+   * an active or trialing subscription to. Powers batch lock-status
+   * checks (list endpoints). Pre-flattened to a primitive[] so callers
+   * can stuff it into a Set without an extra map.
+   *
+   * Active = (trialing, active). Excludes past_due / unpaid / canceled —
+   * see `userHasAccess` in the entitlements repo for the matching
+   * single-resource version of this rule.
+   */
+  async listActiveProductIdsForUser(userId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectFrom('stripe_subscriptions as s')
+      .innerJoin('stripe_prices as pr', 'pr.stripe_price_id', 's.stripe_price_id')
+      .innerJoin('stripe_products as p', 'p.stripe_product_id', 'pr.stripe_product_id')
+      .where('s.user_id', '=', userId)
+      .where('s.status', 'in', ['trialing', 'active'])
+      .select('p.id')
+      .distinct()
+      .execute();
+    return rows.map((r) => r.id);
   }
 
   async findSubscriptionByStripeId(
