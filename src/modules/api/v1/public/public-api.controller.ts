@@ -6,7 +6,7 @@ import type { ApiKeyContext } from 'src/modules/auth/api-key/api-key.guard';
 import { PublicApiRoute } from 'src/modules/auth/api-key/public-api-route.decorator';
 
 import { PublicApiService } from './public-api.service';
-import { PublicSearchQuery, ResourceIdParam } from './request.dto';
+import { PublicClientContextQuery, PublicSearchQuery, ResourceIdParam } from './request.dto';
 import {
   PublicCourseListResponse,
   PublicCourseResponse,
@@ -30,66 +30,74 @@ export class PublicApiController {
 
   @Get('workouts')
   @PublicApiRoute('workouts:read')
-  @ApiOperation({ summary: 'List the organisation\'s workouts.' })
+  @ApiOperation({ summary: "List the organisation's workouts. Pass `clientId` to have the response's `lock` reflect that specific client's access." })
   async listWorkouts(
     @Req() req: PublicRequest,
     @Query() query: PublicSearchQuery,
   ): Promise<PublicWorkoutListResponse> {
-    return this.service.listWorkouts(req.apiKey.organisationId, normalize(query));
+    return this.service.listWorkouts(req.apiKey.organisationId, normalize(query), query.clientId ?? null);
   }
 
   @Get('workouts/:id')
   @PublicApiRoute('workouts:read')
-  @ApiOperation({ summary: 'Fetch a single workout.' })
+  @ApiOperation({
+    summary:
+      'Fetch a single workout. Pass `clientId` to enforce access — locked resources respond HTTP 402 with a tier payload instead of the workout body.',
+  })
   async getWorkout(
     @Req() req: PublicRequest,
     @Param() params: ResourceIdParam,
+    @Query() query: PublicClientContextQuery,
   ): Promise<PublicWorkoutResponse> {
-    return this.service.getWorkout(req.apiKey.organisationId, params.id);
+    return this.service.getWorkout(req.apiKey.organisationId, params.id, query.clientId ?? null);
   }
 
   // --- Courses ---
 
   @Get('courses')
   @PublicApiRoute('courses:read')
-  @ApiOperation({ summary: 'List the organisation\'s published courses.' })
+  @ApiOperation({ summary: "List the organisation's published courses. Pass `clientId` for client-specific lock state." })
   async listCourses(
     @Req() req: PublicRequest,
     @Query() query: PublicSearchQuery,
   ): Promise<PublicCourseListResponse> {
-    return this.service.listCourses(req.apiKey.organisationId, normalize(query));
+    return this.service.listCourses(req.apiKey.organisationId, normalize(query), query.clientId ?? null);
   }
 
   @Get('courses/:id')
   @PublicApiRoute('courses:read')
-  @ApiOperation({ summary: 'Fetch a single published course.' })
+  @ApiOperation({ summary: 'Fetch a single published course. Pass `clientId` to enforce access (HTTP 402 if locked).' })
   async getCourse(
     @Req() req: PublicRequest,
     @Param() params: ResourceIdParam,
+    @Query() query: PublicClientContextQuery,
   ): Promise<PublicCourseResponse> {
-    return this.service.getCourse(req.apiKey.organisationId, params.id);
+    return this.service.getCourse(req.apiKey.organisationId, params.id, query.clientId ?? null);
   }
 
   // --- Movement snacks ---
 
   @Get('movement-snacks')
   @PublicApiRoute('movement_snacks:read')
-  @ApiOperation({ summary: 'List the organisation\'s movement snacks.' })
+  @ApiOperation({ summary: "List the organisation's movement snacks. Pass `clientId` for client-specific lock state." })
   async listMovementSnacks(
     @Req() req: PublicRequest,
     @Query() query: PublicSearchQuery,
   ): Promise<PublicMovementSnackListResponse> {
-    return this.service.listMovementSnacks(req.apiKey.organisationId, normalize(query));
+    return this.service.listMovementSnacks(req.apiKey.organisationId, normalize(query), query.clientId ?? null);
   }
 
   @Get('movement-snacks/:id')
   @PublicApiRoute('movement_snacks:read')
-  @ApiOperation({ summary: 'Fetch a single movement snack.' })
+  @ApiOperation({
+    summary: 'Fetch a single movement snack. Pass `clientId` to enforce access (HTTP 402 if locked).',
+  })
   async getMovementSnack(
     @Req() req: PublicRequest,
     @Param() params: ResourceIdParam,
+    @Query() query: PublicClientContextQuery,
   ): Promise<PublicMovementSnackResponse> {
-    return this.service.getMovementSnack(req.apiKey.organisationId, params.id);
+    return this.service.getMovementSnack(req.apiKey.organisationId, params.id, query.clientId ?? null);
   }
 
   // --- Exercises ---

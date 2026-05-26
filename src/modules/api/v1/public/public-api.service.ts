@@ -13,13 +13,14 @@ import {
   ExerciseStatus,
   Workout,
 } from 'src/database/interfaces';
+import { EntitlementsService, LockStatusDTO } from 'src/modules/entitlements/entitlements.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { CourseRepository } from 'src/repositories/course.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 
-import { PublicWorkoutStepDTO } from './response.dto';
+import { PublicLockStatusDTO, PublicWorkoutStepDTO } from './response.dto';
 
 import {
   PublicCourseDTO,
@@ -35,6 +36,9 @@ import {
   PublicWorkoutListResponse,
   PublicWorkoutResponse,
 } from './response.dto';
+
+/** Sentinel for free / un-gated resources — avoids re-allocating an empty object per row. */
+const FREE_LOCK: PublicLockStatusDTO = { locked: false, requiredTiers: [] };
 
 interface PaginationOpts {
   offset: number;
@@ -56,12 +60,17 @@ export class PublicApiService {
     private readonly contentItemRepo: ContentItemRepository,
     private readonly exerciseRepo: ExerciseRepository,
     private readonly s3Service: S3Service,
+    private readonly entitlements: EntitlementsService,
     @InjectKysely() private readonly db: Kysely<Database>,
   ) {}
 
   // ----------------------------- Workouts -----------------------------
 
-  async listWorkouts(organisationId: string, opts: PaginationOpts): Promise<PublicWorkoutListResponse> {
+  async listWorkouts(
+    organisationId: string,
+    opts: PaginationOpts,
+    clientUserId: string | null = null,
+  ): Promise<PublicWorkoutListResponse> {
     const [rows, totalCount] = await Promise.all([
       this.workoutRepo.findMany({
         organisationId,
@@ -71,19 +80,48 @@ export class PublicApiService {
       }),
       this.workoutRepo.countMany(organisationId, opts.search ? { search: opts.search } : undefined),
     ]);
+    const lockByResource = await this.entitlements.getLockStatusMap(
+      clientUserId,
+      'workout',
+      rows.map((r) => r.id),
+    );
     return {
-      data: rows.map(mapWorkoutDTO),
+      data: rows.map((row) => mapWorkoutDTO(row, lockByResource.get(row.id) ?? FREE_LOCK)),
       meta: { totalCount, offset: opts.offset, limit: opts.limit },
     };
   }
 
-  async getWorkout(organisationId: string, id: string): Promise<PublicWorkoutResponse> {
+  /**
+   * Detail endpoint. When `clientUserId` is provided we enforce the
+   * paywall — locked resources throw a 402 with the tier payload so the
+   * caller can render the upsell screen. When it's omitted (e.g. an
+   * unauthenticated catalogue browse) we still stamp the lock metadata
+   * but always return the structure; callers in that band aren't a
+   * specific user yet so there's nothing meaningful to enforce against.
+   *
+   * We deliberately do the access assertion BEFORE loading the heavy
+   * `structure` payload — no point burning a join query for a request
+   * we're about to 402.
+   */
+  async getWorkout(
+    organisationId: string,
+    id: string,
+    clientUserId: string | null = null,
+  ): Promise<PublicWorkoutResponse> {
     const row = await this.workoutRepo.findById(id);
     if (!row || row.organisation_id !== organisationId) {
       throw new NotFoundException('Workout not found');
     }
+    const lock = clientUserId
+      ? await this.entitlements.assertAccess({
+          organisationId,
+          userId: clientUserId,
+          resourceType: 'workout',
+          resourceId: id,
+        })
+      : await this.entitlements.getLockStatus(null, 'workout', id);
     const structure = await this.loadWorkoutStructure(id);
-    return { data: { ...mapWorkoutDTO(row), structure } };
+    return { data: { ...mapWorkoutDTO(row, lock), structure } };
   }
 
   /**
@@ -200,25 +238,46 @@ export class PublicApiService {
 
   // ----------------------------- Courses -----------------------------
 
-  async listCourses(organisationId: string, opts: PaginationOpts): Promise<PublicCourseListResponse> {
+  async listCourses(
+    organisationId: string,
+    opts: PaginationOpts,
+    clientUserId: string | null = null,
+  ): Promise<PublicCourseListResponse> {
     // Only expose published courses on the public surface — drafts stay coach-only.
     const rows = await this.courseRepo.list(
       organisationId,
       { status: CourseStatus.PUBLISHED },
       { offset: opts.offset, limit: opts.limit },
     );
+    const lockByResource = await this.entitlements.getLockStatusMap(
+      clientUserId,
+      'course',
+      rows.map((r) => r.id),
+    );
     return {
-      data: rows.map(mapCourseDTO),
+      data: rows.map((row) => mapCourseDTO(row, lockByResource.get(row.id) ?? FREE_LOCK)),
       meta: { totalCount: rows.length, offset: opts.offset, limit: opts.limit },
     };
   }
 
-  async getCourse(organisationId: string, id: string): Promise<PublicCourseResponse> {
+  async getCourse(
+    organisationId: string,
+    id: string,
+    clientUserId: string | null = null,
+  ): Promise<PublicCourseResponse> {
     const row = await this.courseRepo.findById(id, organisationId);
     if (!row || row.status !== CourseStatus.PUBLISHED) {
       throw new NotFoundException('Course not found');
     }
-    return { data: mapCourseDTO(row) };
+    const lock = clientUserId
+      ? await this.entitlements.assertAccess({
+          organisationId,
+          userId: clientUserId,
+          resourceType: 'course',
+          resourceId: id,
+        })
+      : await this.entitlements.getLockStatus(null, 'course', id);
+    return { data: mapCourseDTO(row, lock) };
   }
 
   // ------------------------ Movement snacks --------------------------
@@ -226,6 +285,7 @@ export class PublicApiService {
   async listMovementSnacks(
     organisationId: string,
     opts: PaginationOpts,
+    clientUserId: string | null = null,
   ): Promise<PublicMovementSnackListResponse> {
     const rows = await this.contentItemRepo.list(
       {
@@ -236,7 +296,14 @@ export class PublicApiService {
       },
       { offset: opts.offset, limit: opts.limit },
     );
-    const data = await Promise.all(rows.map((r) => this.mapMovementSnackDTO(r)));
+    const lockByResource = await this.entitlements.getLockStatusMap(
+      clientUserId,
+      'content_item',
+      rows.map((r) => r.id),
+    );
+    const data = await Promise.all(
+      rows.map((r) => this.mapMovementSnackDTO(r, lockByResource.get(r.id) ?? FREE_LOCK)),
+    );
     return {
       data,
       meta: { totalCount: rows.length, offset: opts.offset, limit: opts.limit },
@@ -246,12 +313,21 @@ export class PublicApiService {
   async getMovementSnack(
     organisationId: string,
     id: string,
+    clientUserId: string | null = null,
   ): Promise<PublicMovementSnackResponse> {
     const row = await this.contentItemRepo.findByIdInOrg(id, organisationId);
     if (!row || row.kind !== ContentItemKind.SNACK || row.status !== ContentItemStatus.READY) {
       throw new NotFoundException('Movement snack not found');
     }
-    return { data: await this.mapMovementSnackDTO(row) };
+    const lock = clientUserId
+      ? await this.entitlements.assertAccess({
+          organisationId,
+          userId: clientUserId,
+          resourceType: 'content_item',
+          resourceId: id,
+        })
+      : await this.entitlements.getLockStatus(null, 'content_item', id);
+    return { data: await this.mapMovementSnackDTO(row, lock) };
   }
 
   // ----------------------------- Exercises ---------------------------
@@ -284,9 +360,16 @@ export class PublicApiService {
 
   // -------------------------- Helpers --------------------------------
 
-  private async mapMovementSnackDTO(row: ContentItem): Promise<PublicMovementSnackDTO> {
+  private async mapMovementSnackDTO(
+    row: ContentItem,
+    lock: PublicLockStatusDTO,
+  ): Promise<PublicMovementSnackDTO> {
+    // Hide the playable video URL from locked snacks so a malicious
+    // client can't lift the underlying media just by reading the list
+    // response. They still get title + description so the paywall card
+    // can preview what they'd unlock.
     const videoUrl =
-      row.video_s3_bucket && row.video_s3_key
+      !lock.locked && row.video_s3_bucket && row.video_s3_key
         ? await this.s3Service
             .getSignedUrlGET({ bucket: row.video_s3_bucket, key: row.video_s3_key })
             .catch(() => null)
@@ -299,11 +382,12 @@ export class PublicApiService {
       videoUrl,
       tags: row.tags ?? [],
       createdAt: isoOf(row.created_at),
+      lock,
     };
   }
 }
 
-function mapWorkoutDTO(row: Workout): PublicWorkoutDTO {
+function mapWorkoutDTO(row: Workout, lock: PublicLockStatusDTO): PublicWorkoutDTO {
   return {
     id: row.id,
     name: row.name,
@@ -311,16 +395,18 @@ function mapWorkoutDTO(row: Workout): PublicWorkoutDTO {
     difficulty: row.difficulty,
     type: row.type,
     createdAt: isoOf(row.created_at),
+    lock,
   };
 }
 
-function mapCourseDTO(row: Course): PublicCourseDTO {
+function mapCourseDTO(row: Course, lock: PublicLockStatusDTO): PublicCourseDTO {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     status: row.status,
     createdAt: isoOf(row.created_at),
+    lock,
   };
 }
 

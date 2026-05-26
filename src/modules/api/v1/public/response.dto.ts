@@ -15,6 +15,49 @@ export class PublicListMeta {
 }
 
 /**
+ * Cheapest active recurring price for a tier, surfaced inline on locked
+ * resources so paywall UIs can render "$X/mo" without a second call to
+ * /public/products. Null when the product has no active prices yet
+ * (e.g. mid-setup orgs).
+ */
+export class PublicTierPriceHintDTO {
+  @ApiProperty() stripePriceId: string;
+  @ApiProperty({ description: 'Smallest currency unit (cents for USD).' }) unitAmount: number;
+  @ApiProperty() currency: string;
+  @ApiProperty({ description: "'month' | 'year' for recurring prices." }) interval: string;
+}
+
+/**
+ * Subscription tier that unlocks a gated resource. Lives in the public
+ * shape (not just the admin one) because we want lockable cards to show
+ * "Included with Pro" badges directly.
+ */
+export class PublicRequiredTierDTO {
+  @ApiProperty({ description: 'Local stripe_products.id.' }) id: string;
+  @ApiProperty({ description: 'Bare Stripe product id.' }) stripeProductId: string;
+  @ApiProperty() name: string;
+  @ApiPropertyOptional({ nullable: true, type: String }) description: string | null;
+  @ApiPropertyOptional({ nullable: true, type: PublicTierPriceHintDTO })
+  cheapestPrice: PublicTierPriceHintDTO | null;
+}
+
+/**
+ * Lock state stamped onto every public resource shape. `locked` is the
+ * truthy access signal; `requiredTiers` is always populated when the
+ * resource is gated so the client can render "Locked / Included with X"
+ * badges even when the caller doesn't (or can't) identify a specific
+ * client user.
+ *
+ * - `locked: true` + `requiredTiers: [...]` → paywall this resource.
+ * - `locked: false` + `requiredTiers: [...]` → user has access via one of these tiers.
+ * - `locked: false` + `requiredTiers: []` → resource is free for everyone.
+ */
+export class PublicLockStatusDTO {
+  @ApiProperty() locked: boolean;
+  @ApiProperty({ type: [PublicRequiredTierDTO] }) requiredTiers: PublicRequiredTierDTO[];
+}
+
+/**
  * One step inside a workout's structure. Flattened from workout_items →
  * (exercise_instance | exercise_instance_group_items) so the sample/3rd-party
  * apps can drive a play-along UI with one round-trip. Groups are exposed as
@@ -69,6 +112,13 @@ export class PublicWorkoutDTO {
       'Only populated on the detail endpoint (GET /public/workouts/:id). List endpoints omit it to keep the payload small.',
   })
   structure?: PublicWorkoutStepDTO[];
+
+  @ApiProperty({
+    type: PublicLockStatusDTO,
+    description:
+      'Subscription gate for this workout. `locked: false, requiredTiers: []` means free. List endpoints always populate this so cards can render lock badges; detail endpoint returns HTTP 402 (with the same payload) if a `clientId` is provided and the client lacks access.',
+  })
+  lock: PublicLockStatusDTO;
 }
 
 export class PublicWorkoutListResponse {
@@ -99,6 +149,9 @@ export class PublicCourseDTO {
 
   @ApiProperty()
   createdAt: string;
+
+  @ApiProperty({ type: PublicLockStatusDTO })
+  lock: PublicLockStatusDTO;
 }
 
 export class PublicCourseListResponse {
@@ -135,6 +188,9 @@ export class PublicMovementSnackDTO {
 
   @ApiProperty()
   createdAt: string;
+
+  @ApiProperty({ type: PublicLockStatusDTO })
+  lock: PublicLockStatusDTO;
 }
 
 export class PublicMovementSnackListResponse {

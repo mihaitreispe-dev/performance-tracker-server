@@ -5,7 +5,9 @@ import { S3Module } from 'src/modules/s3/s3.module';
 import { StripeModule } from 'src/modules/stripe/stripe.module';
 import { AthleteProfileMetricsRepository } from 'src/repositories/athlete-profile-metrics.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
+import { EntitlementsService } from 'src/modules/entitlements/entitlements.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
+import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { CourseRepository } from 'src/repositories/course.repository';
 import { DailyNutritionSummaryRepository } from 'src/repositories/daily-nutrition-summary.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
@@ -62,6 +64,12 @@ export class PublicApiModule {
         imports: [S3Module.register(), AuthModule.register(), FirebaseModule.register(), StripeModule.register()],
         providers: [
           PublicApiService,
+          // Shared with the admin entitlements module — registering it
+          // here keeps the public surface independent and matches the
+          // dep pattern of the other shared services (PublicBilling vs
+          // BillingApi both register StripeBillingRepository).
+          EntitlementsService,
+          ResourceEntitlementsRepository,
           PublicClientsService,
           PublicQuestionnairesService,
           PublicOAuthService,
