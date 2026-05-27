@@ -174,6 +174,21 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   ENABLE_SMART_CROP?: string;
 
+  // Local ffmpeg transcode (MediaConvert stand-in for local dev) — optional,
+  // defaults off. When Y, exercise uploads are transcoded locally instead of
+  // via MediaConvert. Requires ffmpeg on PATH + a reachable object store.
+  @IsString()
+  @Matches('^Y|N$', 'i')
+  @IsOptional()
+  ENABLE_LOCAL_TRANSCODE?: string;
+
+  // How the local transcode fills the 16:9 frame: 'pad' (letterbox, default)
+  // or 'crop' (centre-crop). No effect unless ENABLE_LOCAL_TRANSCODE=Y.
+  @IsString()
+  @Matches('^pad|crop$', 'i')
+  @IsOptional()
+  LOCAL_TRANSCODE_WIDE_MODE?: string;
+
   // Garmin Integration
 
   @IsString()

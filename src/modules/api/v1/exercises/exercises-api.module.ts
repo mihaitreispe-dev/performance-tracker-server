@@ -1,6 +1,7 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AppAccessControlModule } from 'src/modules/app-access-control/app-access-control.module';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
+import { LocalTranscodeModule } from 'src/modules/local-transcode/local-transcode.module';
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
@@ -29,6 +30,7 @@ export class ExercisesApiModule {
           MediaConvertModule.register(),
           VimeoModule.register(),
           SmartCropModule.register(),
+          LocalTranscodeModule.register(),
         ],
         providers: [
           ExercisesApiService,

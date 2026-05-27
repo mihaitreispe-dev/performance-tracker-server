@@ -188,6 +188,19 @@ export class AppConfigService {
     return this.configService.get('ENABLE_SMART_CROP') === 'Y';
   }
 
+  /**
+   * Local ffmpeg transcode in place of MediaConvert (local-dev stand-in).
+   * Off by default.
+   */
+  get enableLocalTranscode(): boolean {
+    return this.configService.get('ENABLE_LOCAL_TRANSCODE') === 'Y';
+  }
+
+  /** How the local transcode fills the 16:9 frame: 'crop' or 'pad' (default). */
+  get localTranscodeWideMode(): 'pad' | 'crop' {
+    return this.configService.get('LOCAL_TRANSCODE_WIDE_MODE') === 'crop' ? 'crop' : 'pad';
+  }
+
   // Generic getter for optional config
 
   get<K extends keyof Env>(key: K): Env[K] | undefined {

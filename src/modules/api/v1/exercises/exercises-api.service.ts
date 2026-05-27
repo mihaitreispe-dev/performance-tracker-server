@@ -22,6 +22,7 @@ import { AppAccessControlService } from 'src/modules/app-access-control/app-acce
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
+import { LocalTranscodeService } from 'src/modules/local-transcode/local-transcode.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
@@ -70,6 +71,7 @@ export class ExercisesApiService {
     private readonly contentItemRepo: ContentItemRepository,
     private readonly vimeoService: VimeoService,
     private readonly smartCropService: SmartCropService,
+    private readonly localTranscodeService: LocalTranscodeService,
   ) {}
 
   private readonly importLogger = new Logger('VimeoImporter');
@@ -464,6 +466,19 @@ export class ExercisesApiService {
   private async startAssetProcessing(exercise: Exercise): Promise<boolean> {
     if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
       return false;
+    }
+
+    // Local-dev path (env split): ffmpeg stands in for MediaConvert. Flip to
+    // ASSETS_PENDING and transcode in the background, mirroring how the AWS
+    // path returns immediately while a job runs out of band.
+    if (this.localTranscodeService.enabled) {
+      await this.exerciseRepo.updateById(exercise.id, {
+        status: ExerciseStatus.ASSETS_PENDING,
+        media_convert_job_id: null,
+        rekognition_job_id: null,
+      });
+      this.localTranscodeService.transcodeInBackground(exercise);
+      return true;
     }
 
     // Smart-crop path: Rekognition detection is async (can take minutes), so
