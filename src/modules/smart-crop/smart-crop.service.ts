@@ -10,30 +10,31 @@ import { AppConfigService } from 'src/modules/config/app-config.service';
 import { computeAspectCrop, type NormalizedBox, type PixelRect, unionBoxes } from './crop-geometry';
 
 const PERSON_LABEL = 'Person';
-const POLL_INTERVAL_MS = 5000;
-const MAX_POLL_ATTEMPTS = 60; // ~5 minutes
 const MIN_CONFIDENCE = 70;
+const PAGE_SIZE = 1000;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+export type DetectionStatus = 'in_progress' | 'done' | 'failed';
 
-interface DetectionResult {
-  frameWidth?: number;
-  frameHeight?: number;
-  personBoxes: NormalizedBox[];
+export interface DetectionCropResult {
+  status: DetectionStatus;
+  /** Present only when status === 'done' and a person was found. */
+  crop: PixelRect | null;
 }
 
 /**
- * Smart-crop spike: ask Rekognition where the person is in a clip, then turn
- * that into a MediaConvert crop rectangle that frames them for a
- * cross-orientation rendition (e.g. 16:9 from a portrait source) instead of
- * letterboxing.
+ * Smart-crop: ask Rekognition where the person is in a clip, then turn that
+ * into a MediaConvert crop rectangle that frames them for a cross-orientation
+ * rendition (e.g. 16:9 from a portrait source) instead of letterboxing.
  *
- * Entirely best-effort and flag-gated (ENABLE_SMART_CROP). Every failure
- * path returns null so the encoder simply falls back to aspect-preserving
- * fit. Rekognition video label detection is async; we start a job and poll
- * GetLabelDetection (no SNS channel needed). Person bounding boxes are
- * unioned across the sampled frames and VideoMetadata gives the source
- * pixel dimensions the crop rectangle needs.
+ * Two-phase, non-blocking API so the analysis can be driven durably by a cron
+ * (see CronService.syncSmartCropAnalysis) rather than an in-process poll:
+ *   1. startDetection() — kick off a Rekognition video label-detection job,
+ *      returns its job id (persisted on the exercise row).
+ *   2. getDetectionCrop() — a single GetLabelDetection check; when the job has
+ *      succeeded, union the Person boxes and compute the crop.
+ *
+ * Entirely best-effort and flag-gated (ENABLE_SMART_CROP). Failures surface as
+ * status 'failed' / null crop so the encoder simply letterboxes.
  */
 @Injectable()
 export class SmartCropService {
@@ -57,88 +58,77 @@ export class SmartCropService {
   }
 
   /**
-   * Returns a crop rect (source pixels) that frames the person for
-   * `targetAspect`, or null when disabled, no person is found, or anything
-   * goes wrong. Never throws — the caller treats null as "no crop".
+   * Start an async Rekognition video label-detection job. Returns the job id
+   * to persist, or null when disabled or the start call fails (caller then
+   * falls back to a no-crop encode).
    */
-  async detectPersonCrop(opts: { bucket: string; key: string; targetAspect: number }): Promise<PixelRect | null> {
+  async startDetection(opts: { bucket: string; key: string }): Promise<string | null> {
     if (!this.client) return null;
     try {
-      const start = await this.client.send(
+      const res = await this.client.send(
         new StartLabelDetectionCommand({
           Video: { S3Object: { Bucket: opts.bucket, Name: opts.key } },
           MinConfidence: MIN_CONFIDENCE,
         }),
       );
-      if (!start.JobId) {
-        this.logger.warn('StartLabelDetection returned no JobId; skipping smart crop');
-        return null;
-      }
-
-      const detection = await this.pollLabelDetection(start.JobId);
-      if (!detection || !detection.frameWidth || !detection.frameHeight) {
-        return null;
-      }
-      if (detection.personBoxes.length === 0) {
-        this.logger.log(`No person detected for s3://${opts.bucket}/${opts.key}; falling back to letterbox`);
-        return null;
-      }
-
-      const region = unionBoxes(detection.personBoxes);
-      if (!region) return null;
-
-      const crop = computeAspectCrop({
-        region,
-        frameWidth: detection.frameWidth,
-        frameHeight: detection.frameHeight,
-        targetAspect: opts.targetAspect,
-      });
-      if (crop) {
-        this.logger.log(
-          `Smart crop for s3://${opts.bucket}/${opts.key}: ${crop.width}x${crop.height}+${crop.x}+${crop.y} ` +
-            `(source ${detection.frameWidth}x${detection.frameHeight}, ${detection.personBoxes.length} person box(es))`,
-        );
-      }
-      return crop;
+      return res.JobId ?? null;
     } catch (err) {
-      this.logger.warn(`Smart-crop detection failed; falling back to letterbox: ${(err as Error).message}`);
+      this.logger.warn(`StartLabelDetection failed for s3://${opts.bucket}/${opts.key}: ${(err as Error).message}`);
       return null;
     }
   }
 
-  private async pollLabelDetection(jobId: string): Promise<DetectionResult | null> {
-    for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
-      const page = await this.client!.send(new GetLabelDetectionCommand({ JobId: jobId, MaxResults: 1000 }));
+  /**
+   * Check a detection job. Returns 'in_progress' while Rekognition is still
+   * working, or a terminal 'done'/'failed' with the computed crop (null when
+   * no person was found or anything went wrong). Never throws.
+   */
+  async getDetectionCrop(opts: { jobId: string; targetAspect: number }): Promise<DetectionCropResult> {
+    if (!this.client) return { status: 'failed', crop: null };
+    try {
+      const first = await this.client.send(new GetLabelDetectionCommand({ JobId: opts.jobId, MaxResults: PAGE_SIZE }));
 
-      if (page.JobStatus === 'IN_PROGRESS') {
-        await sleep(POLL_INTERVAL_MS);
-        continue;
+      if (first.JobStatus === 'IN_PROGRESS') {
+        return { status: 'in_progress', crop: null };
       }
-      if (page.JobStatus !== 'SUCCEEDED') {
-        this.logger.warn(`Label detection job ${jobId} ended with status ${page.JobStatus}`);
-        return null;
+      if (first.JobStatus !== 'SUCCEEDED') {
+        this.logger.warn(`Label detection job ${opts.jobId} ended with status ${first.JobStatus}`);
+        return { status: 'failed', crop: null };
       }
 
       const personBoxes: NormalizedBox[] = [];
-      collectPersonBoxes(page.Labels, personBoxes);
-
-      let nextToken = page.NextToken;
+      collectPersonBoxes(first.Labels, personBoxes);
+      let nextToken = first.NextToken;
       while (nextToken) {
-        const next = await this.client!.send(
-          new GetLabelDetectionCommand({ JobId: jobId, MaxResults: 1000, NextToken: nextToken }),
+        const page = await this.client.send(
+          new GetLabelDetectionCommand({ JobId: opts.jobId, MaxResults: PAGE_SIZE, NextToken: nextToken }),
         );
-        collectPersonBoxes(next.Labels, personBoxes);
-        nextToken = next.NextToken;
+        collectPersonBoxes(page.Labels, personBoxes);
+        nextToken = page.NextToken;
       }
 
-      return {
-        frameWidth: page.VideoMetadata?.FrameWidth,
-        frameHeight: page.VideoMetadata?.FrameHeight,
-        personBoxes,
-      };
+      const frameWidth = first.VideoMetadata?.FrameWidth;
+      const frameHeight = first.VideoMetadata?.FrameHeight;
+      if (!frameWidth || !frameHeight || personBoxes.length === 0) {
+        this.logger.log(`No person detected in job ${opts.jobId}; falling back to letterbox`);
+        return { status: 'done', crop: null };
+      }
+
+      const region = unionBoxes(personBoxes);
+      if (!region) return { status: 'done', crop: null };
+
+      const crop = computeAspectCrop({ region, frameWidth, frameHeight, targetAspect: opts.targetAspect });
+      if (crop) {
+        this.logger.log(
+          `Smart crop from job ${opts.jobId}: ${crop.width}x${crop.height}+${crop.x}+${crop.y} ` +
+            `(source ${frameWidth}x${frameHeight}, ${personBoxes.length} person box(es))`,
+        );
+      }
+      return { status: 'done', crop };
+    } catch (err) {
+      this.logger.warn(`GetLabelDetection failed for job ${opts.jobId}: ${(err as Error).message}`);
+      return { status: 'failed', crop: null };
     }
-    this.logger.warn(`Label detection job ${jobId} timed out after ${MAX_POLL_ATTEMPTS} polls`);
-    return null;
   }
 }
 

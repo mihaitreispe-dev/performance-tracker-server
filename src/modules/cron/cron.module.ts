@@ -4,8 +4,10 @@ import { AdvancedMetricsApiModule } from 'src/modules/api/v1/advanced-metrics/ad
 import { ScheduledPromptsModule } from 'src/modules/api/v1/coaching/scheduled-prompts/scheduled-prompts.module';
 import { NotificationsApiModule } from 'src/modules/api/v1/notifications/notifications-api.module';
 import { RacePredictionApiModule } from 'src/modules/api/v1/race-prediction/race-prediction-api.module';
+import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { OpenWearablesModule } from 'src/modules/openwearables/openwearables.module';
+import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
 import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.repository';
 import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
@@ -32,7 +34,9 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
 @Module({
   imports: [
     ScheduleModule,
+    AppConfigModule.register(),
     MediaConvertModule.register(),
+    SmartCropModule.register(),
     OpenWearablesModule.register(),
     ScheduledPromptsModule.register(),
     NotificationsApiModule.register(),

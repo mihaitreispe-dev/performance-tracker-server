@@ -158,6 +158,23 @@ export class ExerciseRepository {
   }
 
   /**
+   * System / background-worker path: rows in the smart-crop analysis phase —
+   * pending assets, a Rekognition job in flight, but no MediaConvert job yet.
+   * The smart-crop cron polls these to completion then creates the encode
+   * job. Do NOT use from request paths.
+   */
+  async findManyAnalyzingSmartCrop(): Promise<Exercise[]> {
+    const results = await this.db
+      .selectFrom('exercises')
+      .where('status', '=', ExerciseStatus.ASSETS_PENDING)
+      .where('rekognition_job_id', 'is not', null)
+      .where('media_convert_job_id', 'is', null)
+      .selectAll()
+      .execute();
+    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+  }
+
+  /**
    * System / backfill path: every exercise that still has its uploaded
    * source clip, across all tenants — optionally narrowed to specific
    * statuses. Used by the reprocess-assets backfill script to re-encode the

@@ -52,6 +52,16 @@ export interface ExercisesTable {
   level: ExerciseLevel | null;
   status: ExerciseStatus;
   media_convert_job_id: string | null;
+  /**
+   * Smart-crop (Rekognition) state. While `status = assets_pending` and this
+   * is set but `media_convert_job_id` is null, the exercise is in the
+   * body-detect analysis phase: a cron polls the Rekognition job, computes
+   * the 16:9 crop, then creates the MediaConvert job (which sets
+   * `media_convert_job_id` and hands off to the encode-status cron).
+   */
+  rekognition_job_id: string | null;
+  /** When smart-crop analysis began — drives the analysis-timeout fallback. */
+  smart_crop_started_at: Timestamp | null;
   intro_content_item_id: string | null;
   /** Inline intro markers on the exercise's main demo video — used by the player's Skip-intro affordance. */
   intro_start_seconds: number | null;
