@@ -24,6 +24,7 @@ import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
 import { VimeoService, type VimeoProgressiveRendition } from 'src/modules/vimeo/vimeo.service';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
@@ -68,6 +69,7 @@ export class ExercisesApiService {
     private readonly mediaConvertService: MediaConvertService,
     private readonly contentItemRepo: ContentItemRepository,
     private readonly vimeoService: VimeoService,
+    private readonly smartCropService: SmartCropService,
   ) {}
 
   private readonly importLogger = new Logger('VimeoImporter');
@@ -463,10 +465,20 @@ export class ExercisesApiService {
     if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
       return false;
     }
-    const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
+
+    // Smart-crop path: detecting the person via Rekognition is async and can
+    // take many seconds, so we don't block the request on it. Flip to
+    // ASSETS_PENDING now (the cron skips rows without a job id) and let a
+    // background task run detection then create the job with the wide crop.
+    if (this.smartCropService.enabled) {
+      await this.exerciseRepo.updateById(exercise.id, { status: ExerciseStatus.ASSETS_PENDING });
+      void this.runSmartCropProcessing(exercise);
+      return true;
+    }
+
     const mediaConvertJob = await this.mediaConvertService.createJob({
-      inputURL: `s3://${exercise.video_s3_bucket}/${exercise.video_s3_key}`,
-      outputS3Folder: `s3://${this.s3Service.contentBucket}/${s3Paths.base}/`,
+      inputURL: this.sourceInputUrl(exercise),
+      outputS3Folder: this.contentOutputFolder(exercise),
     });
     if (!mediaConvertJob) {
       return false;
@@ -476,6 +488,44 @@ export class ExercisesApiService {
       status: ExerciseStatus.ASSETS_PENDING,
     });
     return true;
+  }
+
+  private sourceInputUrl(exercise: Exercise): string {
+    return `s3://${exercise.video_s3_bucket}/${exercise.video_s3_key}`;
+  }
+
+  private contentOutputFolder(exercise: Exercise): string {
+    const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
+    return `s3://${this.s3Service.contentBucket}/${s3Paths.base}/`;
+  }
+
+  /**
+   * Background: ask Rekognition to frame the person, then submit the
+   * MediaConvert job with that crop applied to the 16:9 wide outputs.
+   * Best-effort — a null crop (no person / disabled / error) simply
+   * letterboxes the wide rendition. Marks ASSETS_FAILED if the job can't be
+   * created at all.
+   */
+  private async runSmartCropProcessing(exercise: Exercise): Promise<void> {
+    try {
+      const wideCrop = await this.smartCropService.detectPersonCrop({
+        bucket: exercise.video_s3_bucket!,
+        key: exercise.video_s3_key!,
+        targetAspect: 16 / 9,
+      });
+      const job = await this.mediaConvertService.createJob({
+        inputURL: this.sourceInputUrl(exercise),
+        outputS3Folder: this.contentOutputFolder(exercise),
+        wideCrop: wideCrop ? { X: wideCrop.x, Y: wideCrop.y, Width: wideCrop.width, Height: wideCrop.height } : null,
+      });
+      if (job) {
+        await this.exerciseRepo.updateById(exercise.id, { media_convert_job_id: job.Id });
+      } else {
+        await this.exerciseRepo.updateById(exercise.id, { status: ExerciseStatus.ASSETS_FAILED });
+      }
+    } catch {
+      await this.exerciseRepo.updateById(exercise.id, { status: ExerciseStatus.ASSETS_FAILED });
+    }
   }
 
   async getExerciseChain(req: AuthedRequest, id: string): Promise<ExerciseChainResponse | null> {

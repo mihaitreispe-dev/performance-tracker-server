@@ -168,6 +168,12 @@ export class Env extends BoostrapEnv {
   @Matches('^Y|N$', 'i')
   DISABLE_MEDIA_CONVERT: string;
 
+  // Smart crop (Rekognition body-detect) — optional, defaults off.
+  @IsString()
+  @Matches('^Y|N$', 'i')
+  @IsOptional()
+  ENABLE_SMART_CROP?: string;
+
   // Garmin Integration
 
   @IsString()

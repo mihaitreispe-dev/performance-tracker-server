@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-mediaconvert": "^3.981.0",
+    "@aws-sdk/client-rekognition": "^3.1054.0",
     "@aws-sdk/client-s3": "^3.980.0",
     "@aws-sdk/cloudfront-signer": "^3.978.0",
     "@aws-sdk/lib-storage": "^3.980.0",

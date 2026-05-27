@@ -180,6 +180,14 @@ export class AppConfigService {
     return this.configService.get('DISABLE_MEDIA_CONVERT') === 'Y';
   }
 
+  /**
+   * Opt-in Rekognition body-detect smart crop for cross-orientation
+   * renditions. Off by default — when disabled the encoder letterboxes.
+   */
+  get enableSmartCrop(): boolean {
+    return this.configService.get('ENABLE_SMART_CROP') === 'Y';
+  }
+
   // Generic getter for optional config
 
   get<K extends keyof Env>(key: K): Env[K] | undefined {

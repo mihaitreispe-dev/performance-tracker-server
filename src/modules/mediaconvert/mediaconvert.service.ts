@@ -10,6 +10,7 @@ import {
   type AudioDescription,
   type Output,
   type OutputGroup,
+  type Rectangle,
 } from '@aws-sdk/client-mediaconvert';
 import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from 'src/modules/config/app-config.service';
@@ -79,7 +80,7 @@ export class MediaConvertService {
     ];
   }
 
-  private hlsVideoOutput(rung: VideoRung): Output {
+  private hlsVideoOutput(rung: VideoRung, crop?: Rectangle): Output {
     return {
       ContainerSettings: {
         Container: 'M3U8',
@@ -88,6 +89,10 @@ export class MediaConvertService {
       VideoDescription: {
         Width: rung.width,
         Height: rung.height,
+        // Per-output crop frames the person for cross-orientation renditions
+        // (smart crop). Absent → MediaConvert preserves source aspect and
+        // pill/letterboxes to fit.
+        ...(crop ? { Crop: crop } : {}),
         CodecSettings: {
           Codec: 'H_264',
           H264Settings: {
@@ -106,11 +111,11 @@ export class MediaConvertService {
   }
 
   /** An HLS variant ladder writing its master + variants to `destination`. */
-  private hlsGroup(customName: string, destination: string, rungs: VideoRung[]): OutputGroup {
+  private hlsGroup(customName: string, destination: string, rungs: VideoRung[], crop?: Rectangle): OutputGroup {
     return {
       CustomName: customName,
       Name: 'Apple HLS',
-      Outputs: rungs.map((rung) => this.hlsVideoOutput(rung)),
+      Outputs: rungs.map((rung) => this.hlsVideoOutput(rung, crop)),
       OutputGroupSettings: {
         Type: 'HLS_GROUP_SETTINGS',
         HlsGroupSettings: {
@@ -153,6 +158,7 @@ export class MediaConvertService {
     width: number,
     height: number,
     nameModifier: string,
+    crop?: Rectangle,
   ): OutputGroup {
     return {
       CustomName: customName,
@@ -165,6 +171,8 @@ export class MediaConvertService {
           VideoDescription: {
             Width: width,
             Height: height,
+            // Match the video crop so the still frames the person identically.
+            ...(crop ? { Crop: crop } : {}),
             CodecSettings: {
               Codec: 'FRAME_CAPTURE',
               FrameCaptureSettings: {
@@ -199,18 +207,19 @@ export class MediaConvertService {
    *   wide/video_thumbnail.*.jpg
    * so the two never collide and the wide URLs are equally derivable.
    */
-  private buildOutputGroups(outputS3Folder: string): OutputGroup[] {
+  private buildOutputGroups(outputS3Folder: string, wideCrop?: Rectangle): OutputGroup[] {
     const wideFolder = `${outputS3Folder}wide/`;
     return [
-      // 9:16 primary (unchanged keys)
+      // 9:16 primary (unchanged keys, never cropped — it is the source orientation)
       this.hlsGroup('video', outputS3Folder, PORTRAIT_RUNGS),
       this.audioGroup(outputS3Folder),
       this.frameCaptureGroup('poster', outputS3Folder, 720, 1280, '_poster'),
       this.frameCaptureGroup('thumbnail', outputS3Folder, 180, 320, '_thumbnail'),
-      // 16:9 companion under wide/
-      this.hlsGroup('video_wide', wideFolder, WIDE_RUNGS),
-      this.frameCaptureGroup('poster_wide', wideFolder, 1280, 720, '_poster'),
-      this.frameCaptureGroup('thumbnail_wide', wideFolder, 320, 180, '_thumbnail'),
+      // 16:9 companion under wide/ — cropped to frame the person when a smart
+      // crop rect is supplied, else aspect-preserving (letterboxed).
+      this.hlsGroup('video_wide', wideFolder, WIDE_RUNGS, wideCrop),
+      this.frameCaptureGroup('poster_wide', wideFolder, 1280, 720, '_poster', wideCrop),
+      this.frameCaptureGroup('thumbnail_wide', wideFolder, 320, 180, '_thumbnail', wideCrop),
     ];
   }
 
@@ -218,10 +227,13 @@ export class MediaConvertService {
     inputURL,
     outputS3Folder,
     watermarkURL,
+    wideCrop,
   }: {
     inputURL: string;
     outputS3Folder: string;
     watermarkURL?: string;
+    /** Crop rect (source px) applied to the 16:9 wide outputs for smart framing. */
+    wideCrop?: Rectangle | null;
   }) {
     if (this.configService.disableMediaConvert) {
       return null;
@@ -252,7 +264,7 @@ export class MediaConvertService {
         TimecodeConfig: {
           Source: 'ZEROBASED',
         },
-        OutputGroups: this.buildOutputGroups(outputS3Folder),
+        OutputGroups: this.buildOutputGroups(outputS3Folder, wideCrop ?? undefined),
         FollowSource: 1,
         Inputs: [
           {

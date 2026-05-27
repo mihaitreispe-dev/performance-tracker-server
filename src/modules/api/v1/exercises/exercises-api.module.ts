@@ -3,6 +3,7 @@ import { AppAccessControlModule } from 'src/modules/app-access-control/app-acces
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
 import { VimeoModule } from 'src/modules/vimeo/vimeo.module';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
@@ -27,6 +28,7 @@ export class ExercisesApiModule {
           AppAccessControlModule.register(),
           MediaConvertModule.register(),
           VimeoModule.register(),
+          SmartCropModule.register(),
         ],
         providers: [
           ExercisesApiService,
