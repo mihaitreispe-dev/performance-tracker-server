@@ -613,14 +613,22 @@ export class ExercisesApiService {
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
 
     if (exercise.status === ExerciseStatus.ASSETS_DONE) {
-      // Three modes, in priority order:
-      //   1. disableCdn (local dev / no CDN): everything goes through S3
-      //      presigned URLs against the content bucket. The CDN_URL path
-      //      below doesn't work locally because (a) MinIO needs the bucket
-      //      in the URL and (b) anonymous reads are blocked by default.
-      //   2. CloudFront signing on: serve via CloudFront with signed URLs.
-      //   3. Plain CDN: public CDN, no signing — concatenate cdnUrl + key.
-      const [videoUrl, posterUrl, thumbnailUrl, audioUrl] = await this.resolveContentUrls(s3Paths);
+      // Resolve every content key through the same three-mode strategy
+      // (local-MinIO public URL / CloudFront signed / plain CDN). Two
+      // oriented HLS renditions are emitted: 9:16 portrait (primary, first)
+      // and 16:9 wide. Portrait stays first so existing readers that grab
+      // the first video asset are unchanged; orientation-aware players use
+      // `aspectRatio` to pick the wide clip on landscape viewports.
+      const [videoUrl, posterUrl, thumbnailUrl, audioUrl, videoWideUrl, posterWideUrl, thumbnailWideUrl] =
+        await Promise.all([
+          this.resolveContentUrl(s3Paths.video),
+          this.resolveContentUrl(s3Paths.poster),
+          this.resolveContentUrl(s3Paths.thumbnail),
+          this.resolveContentUrl(s3Paths.audio),
+          this.resolveContentUrl(s3Paths.videoWide),
+          this.resolveContentUrl(s3Paths.posterWide),
+          this.resolveContentUrl(s3Paths.thumbnailWide),
+        ]);
 
       return [
         {
@@ -628,6 +636,14 @@ export class ExercisesApiService {
           poster: posterUrl,
           thumbnail: thumbnailUrl,
           mimeType: 'application/x-mpegURL',
+          aspectRatio: '9:16',
+        },
+        {
+          url: videoWideUrl,
+          poster: posterWideUrl,
+          thumbnail: thumbnailWideUrl,
+          mimeType: 'application/x-mpegURL',
+          aspectRatio: '16:9',
         },
         {
           url: audioUrl,
@@ -651,55 +667,28 @@ export class ExercisesApiService {
   }
 
   /**
-   * Resolves the four content URLs (video / poster / thumbnail / audio)
-   * for a processed exercise, picking between S3 presigned, CloudFront
-   * signed, and plain CDN URLs based on config. Returned as a fixed-order
-   * tuple so the caller doesn't have to know which strategy was used.
+   * Resolves a single content-bucket key to a playable URL, picking
+   * between three strategies based on config:
+   *   1. disableCdn (local dev / MinIO): plain `${endpoint}/${bucket}/${key}`.
+   *      We don't sign — the .m3u8 playlist references its segments by
+   *      relative path and hls.js fetches them with no query string, so a
+   *      signed playlist URL would leave the segment GETs unsigned and
+   *      MinIO 403s them. The content bucket is public-read (minio-init),
+   *      so playlist + segments + stills all share the same anonymous path.
+   *      s3Endpoint can be undefined; fall back to cdnUrl so we never emit
+   *      `undefined/...`.
+   *   2. CloudFront signing on: serve via CloudFront with a signed URL.
+   *   3. Plain CDN: public CDN, no signing — concatenate cdnUrl + key.
    */
-  private async resolveContentUrls(s3Paths: ReturnType<typeof s3Keys.content.exercise>): Promise<[string, string, string, string]> {
+  private async resolveContentUrl(key: string): Promise<string> {
     if (this.configService.disableCdn) {
-      // Local dev (MinIO): we previously signed each URL, but that broke
-      // HLS playback — the .m3u8 playlist references its segments by
-      // relative path, hls.js fetches them off the playlist's base URL
-      // with no query string, and MinIO 403s the unsigned segment GET.
-      //
-      // The fix is to make the content bucket public-read (handled by
-      // the `minio-init` service in docker-compose) and emit plain
-      // `${endpoint}/${bucket}/${key}` URLs from here. Playlist +
-      // segments + thumbnail all use the same anonymous path then. This
-      // mirrors the production model — CloudFront serves the content
-      // bucket publicly; signed access is reserved for the upload
-      // bucket where pre-processing assets live.
-      // s3Endpoint is `string | undefined` — falling back to cdnUrl keeps
-      // anyone running with DISABLE_CDN=Y but no local endpoint (e.g.
-      // an unusual prod-staging hybrid) from emitting `undefined/...`.
       const endpoint = this.configService.s3Endpoint ?? this.configService.cdnUrl;
-      const base = `${endpoint}/${this.configService.s3ContentBucket}`;
-      return [
-        `${base}/${s3Paths.video}`,
-        `${base}/${s3Paths.poster}`,
-        `${base}/${s3Paths.thumbnail}`,
-        `${base}/${s3Paths.audio}`,
-      ];
+      return `${endpoint}/${this.configService.s3ContentBucket}/${key}`;
     }
-
     if (this.configService.isCloudFrontSigningEnabled) {
-      const [video, poster, thumbnail, audio] = await Promise.all([
-        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.video }),
-        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.poster }),
-        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail }),
-        this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.audio }),
-      ]);
-      return [video, poster, thumbnail, audio];
+      return await this.s3Service.getCloudFrontSignedUrlGET({ key });
     }
-
-    const cdnUrl = this.configService.cdnUrl;
-    return [
-      `${cdnUrl}/${s3Paths.video}`,
-      `${cdnUrl}/${s3Paths.poster}`,
-      `${cdnUrl}/${s3Paths.thumbnail}`,
-      `${cdnUrl}/${s3Paths.audio}`,
-    ];
+    return `${this.configService.cdnUrl}/${key}`;
   }
 
   /**

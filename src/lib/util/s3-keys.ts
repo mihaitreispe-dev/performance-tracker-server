@@ -51,12 +51,18 @@ export const s3Keys = {
   content: {
     exercise: ({ userId, exerciseId }: { userId: string; exerciseId: string }) => {
       const base = `exercises/${userId}/${exerciseId}`;
+      const wide = `${base}/wide`;
       return {
         base,
+        // 9:16 portrait (primary) — historical layout, unchanged.
         video: `${base}/video.m3u8`,
         audio: `${base}/video_audio.mp4`,
         poster: `${base}/video_poster.0000000.jpg`,
         thumbnail: `${base}/video_thumbnail.0000000.jpg`,
+        // 16:9 wide companion — mirrors the portrait layout under wide/.
+        videoWide: `${wide}/video.m3u8`,
+        posterWide: `${wide}/video_poster.0000000.jpg`,
+        thumbnailWide: `${wide}/video_thumbnail.0000000.jpg`,
       };
     },
   },

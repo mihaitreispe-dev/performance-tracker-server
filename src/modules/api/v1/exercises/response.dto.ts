@@ -33,6 +33,17 @@ export class MediaAssetDTO {
   @ApiProperty()
   @IsString()
   mimeType: string;
+
+  /**
+   * Orientation of this rendition, e.g. '9:16' (portrait, primary) or
+   * '16:9' (wide). Absent for non-oriented assets (e.g. the audio track).
+   * Lets orientation-aware players pick the rendition that fits the
+   * viewport instead of always letterboxing the portrait clip.
+   */
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  aspectRatio?: string;
 }
 
 export class EquipmentDTO {
