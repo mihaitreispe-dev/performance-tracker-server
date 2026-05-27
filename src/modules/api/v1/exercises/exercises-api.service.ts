@@ -420,22 +420,62 @@ export class ExercisesApiService {
     }
 
     await this.exerciseRepo.updateById(params.id, { status: ExerciseStatus.UPLOAD_DONE });
+    await this.startAssetProcessing(exercise);
 
+    const updated = await this.exerciseRepo.findById(params.id);
+    return { data: await this.mapExerciseToDTO(updated!) };
+  }
+
+  /**
+   * Re-runs the MediaConvert pipeline against an exercise's existing source
+   * video. Used to backfill renditions added after the original encode —
+   * e.g. the 16:9 companion. The source clip lives in the upload bucket and
+   * is retained after processing, so re-encoding needs no re-upload.
+   */
+  async reprocessAssets(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
+    await this.requireAdmin(req.user.id);
+    const organisationId = assertActiveOrg(req);
+    const exercise = await this.loadEditable(params.id, organisationId);
+
+    if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
+      throw new UnprocessableEntityException('Exercise has no source video to re-process');
+    }
+
+    const started = await this.startAssetProcessing(exercise);
+    if (!started) {
+      throw new UnprocessableEntityException(
+        'Could not start media processing — MediaConvert is disabled or the job could not be created',
+      );
+    }
+
+    const updated = await this.exerciseRepo.findById(params.id);
+    return { data: await this.mapExerciseToDTO(updated!) };
+  }
+
+  /**
+   * Kicks off a MediaConvert job for an exercise's source video and, on
+   * success, records the job id + flips status to ASSETS_PENDING (the cron
+   * watches it to completion). Returns false when MediaConvert is disabled
+   * (local dev) or the job couldn't be created. Single source of truth for
+   * both the initial upload-completion path and re-processing.
+   */
+  private async startAssetProcessing(exercise: Exercise): Promise<boolean> {
+    if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
+      return false;
+    }
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
     const mediaConvertJob = await this.mediaConvertService.createJob({
       inputURL: `s3://${exercise.video_s3_bucket}/${exercise.video_s3_key}`,
       outputS3Folder: `s3://${this.s3Service.contentBucket}/${s3Paths.base}/`,
     });
-
-    if (mediaConvertJob) {
-      await this.exerciseRepo.updateById(params.id, {
-        media_convert_job_id: mediaConvertJob.Id,
-        status: ExerciseStatus.ASSETS_PENDING,
-      });
+    if (!mediaConvertJob) {
+      return false;
     }
-
-    const updated = await this.exerciseRepo.findById(params.id);
-    return { data: await this.mapExerciseToDTO(updated!) };
+    await this.exerciseRepo.updateById(exercise.id, {
+      media_convert_job_id: mediaConvertJob.Id,
+      status: ExerciseStatus.ASSETS_PENDING,
+    });
+    return true;
   }
 
   async getExerciseChain(req: AuthedRequest, id: string): Promise<ExerciseChainResponse | null> {

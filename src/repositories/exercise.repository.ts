@@ -156,4 +156,20 @@ export class ExerciseRepository {
       .execute();
     return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
   }
+
+  /**
+   * System / backfill path: every exercise that still has its uploaded
+   * source clip, across all tenants — optionally narrowed to specific
+   * statuses. Used by the reprocess-assets backfill script to re-encode the
+   * existing library through a newer MediaConvert pipeline. Do NOT use from
+   * request paths.
+   */
+  async findAllWithSourceVideo(statuses?: ExerciseStatus[]): Promise<Exercise[]> {
+    let query = this.db.selectFrom('exercises').where('video_s3_key', 'is not', null).selectAll();
+    if (statuses && statuses.length > 0) {
+      query = query.where('status', 'in', statuses);
+    }
+    const results = await query.execute();
+    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+  }
 }

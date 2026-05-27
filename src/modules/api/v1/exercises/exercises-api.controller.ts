@@ -164,6 +164,29 @@ export class ExercisesApiController {
 
   @Version('1')
   @Roles(UserRole.ADMIN)
+  @ApiOperation({
+    summary:
+      'Re-process an exercise video (admin only). Re-runs MediaConvert against the existing source clip to backfill renditions added after the original encode (e.g. the 16:9 companion). Status returns to ASSETS_PENDING.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    type: ErrorResponse,
+    description: 'No source video, or MediaConvert disabled / job creation failed',
+  })
+  @Post(':id/reprocess')
+  async reprocessAssets(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+  ): Promise<ExerciseResponse> {
+    return this.service.reprocessAssets(req, params);
+  }
+
+  @Version('1')
+  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete exercise (admin only)' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
