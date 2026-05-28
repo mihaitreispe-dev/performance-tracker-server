@@ -5,6 +5,7 @@ import { ScheduledPromptsModule } from 'src/modules/api/v1/coaching/scheduled-pr
 import { NotificationsApiModule } from 'src/modules/api/v1/notifications/notifications-api.module';
 import { RacePredictionApiModule } from 'src/modules/api/v1/race-prediction/race-prediction-api.module';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
+import { LocalTranscodeModule } from 'src/modules/local-transcode/local-transcode.module';
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { OpenWearablesModule } from 'src/modules/openwearables/openwearables.module';
 import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
@@ -37,6 +38,7 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     AppConfigModule.register(),
     MediaConvertModule.register(),
     SmartCropModule.register(),
+    LocalTranscodeModule.register(),
     OpenWearablesModule.register(),
     ScheduledPromptsModule.register(),
     NotificationsApiModule.register(),

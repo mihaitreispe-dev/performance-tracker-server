@@ -42,24 +42,24 @@ export class LocalTranscodeService {
   }
 
   /**
-   * Fire-and-forget transcode (ffmpeg takes seconds–minutes, so we don't block
-   * the upload-completion request). Sets assets_done on success, assets_failed
-   * on error. Local-dev only — if the process restarts mid-transcode, re-run
-   * via the reprocess endpoint.
+   * Claim a queued exercise and transcode it to completion. Called by the
+   * cron — startAssetProcessing only sets `local_transcode_pending=true` and
+   * returns; this method does the actual work. Durable because the claim
+   * (`local_transcode_started_at`) and the pending flag live on the row, so
+   * a process restart mid-transcode is picked back up by the next cron tick
+   * after the claim timeout.
+   *
+   * Success: clears the pending flag + claim, sets ASSETS_DONE.
+   * Failure: clears the pending flag + claim, sets ASSETS_FAILED (caller in
+   * the cron rethrows after logging if it wants per-tick visibility).
    */
-  transcodeInBackground(exercise: Exercise): void {
-    void this.transcode(exercise).catch(async (err) => {
-      this.logger.error(`Local transcode failed for exercise ${exercise.id}: ${(err as Error).message}`);
-      await this.exerciseRepo
-        .updateById(exercise.id, { status: ExerciseStatus.ASSETS_FAILED })
-        .catch(() => undefined);
-    });
-  }
-
   async transcode(exercise: Exercise): Promise<void> {
     if (!exercise.video_s3_bucket || !exercise.video_s3_key) {
       throw new Error('Exercise has no source video to transcode');
     }
+    // Stamp the claim so concurrent cron ticks skip this row.
+    await this.exerciseRepo.updateById(exercise.id, { local_transcode_started_at: new Date() });
+
     const workDir = join(tmpdir(), `local-xcode-${exercise.id}-${Date.now()}`);
     await mkdir(workDir, { recursive: true });
     try {
@@ -85,12 +85,23 @@ export class LocalTranscodeService {
 
       await this.exerciseRepo.updateById(exercise.id, {
         status: ExerciseStatus.ASSETS_DONE,
+        local_transcode_pending: false,
+        local_transcode_started_at: null,
         media_convert_job_id: null,
         rekognition_job_id: null,
       });
       this.logger.log(
         `Local transcode complete for exercise ${exercise.id} (${artifacts.length} artifacts, wide-mode ${this.wideMode})`,
       );
+    } catch (err) {
+      await this.exerciseRepo
+        .updateById(exercise.id, {
+          status: ExerciseStatus.ASSETS_FAILED,
+          local_transcode_pending: false,
+          local_transcode_started_at: null,
+        })
+        .catch(() => undefined);
+      throw err;
     } finally {
       await rm(workDir, { recursive: true, force: true });
     }

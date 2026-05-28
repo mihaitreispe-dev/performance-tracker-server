@@ -468,16 +468,18 @@ export class ExercisesApiService {
       return false;
     }
 
-    // Local-dev path (env split): ffmpeg stands in for MediaConvert. Flip to
-    // ASSETS_PENDING and transcode in the background, mirroring how the AWS
-    // path returns immediately while a job runs out of band.
+    // Local-dev path (env split): ffmpeg stands in for MediaConvert. Just
+    // mark the row as needing local transcode and let the cron pick it up,
+    // mirroring how the AWS path returns immediately while a job runs out of
+    // band. Durable across restarts because the pending flag lives on the row.
     if (this.localTranscodeService.enabled) {
       await this.exerciseRepo.updateById(exercise.id, {
         status: ExerciseStatus.ASSETS_PENDING,
+        local_transcode_pending: true,
+        local_transcode_started_at: null,
         media_convert_job_id: null,
         rekognition_job_id: null,
       });
-      this.localTranscodeService.transcodeInBackground(exercise);
       return true;
     }
 

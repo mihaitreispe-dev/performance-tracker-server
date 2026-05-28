@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Exercise, ExerciseStatus } from 'src/database/interfaces';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
+import { LocalTranscodeService } from 'src/modules/local-transcode/local-transcode.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { WearableSyncService } from 'src/modules/openwearables/wearable-sync.service';
 import type { PixelRect } from 'src/modules/smart-crop/crop-geometry';
@@ -24,6 +25,7 @@ export class CronService {
     private readonly wearableConnectionRepo: WearableProviderConnectionRepository,
     private readonly smartCropService: SmartCropService,
     private readonly configService: AppConfigService,
+    private readonly localTranscodeService: LocalTranscodeService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -129,6 +131,30 @@ export class CronService {
       );
     } else {
       await this.exerciseRepo.updateById(exercise.id, { status: ExerciseStatus.ASSETS_FAILED });
+    }
+  }
+
+  /**
+   * Local-dev: drain the local-transcode queue. Mirrors the smart-crop /
+   * MediaConvert crons in shape — claim a small batch of rows that asked for
+   * local ffmpeg encoding, run each to completion (or assets_failed). Durable
+   * because the claim + pending flag live on the row, so a process restart
+   * mid-transcode is picked back up after the 10-minute claim timeout.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async syncLocalTranscode() {
+    if (!this.localTranscodeService.enabled) return;
+    const pending = await this.exerciseRepo.findManyLocalTranscodePending();
+    for (const exercise of pending) {
+      try {
+        await this.localTranscodeService.transcode(exercise);
+      } catch (error) {
+        // transcode() already flips the row to assets_failed + clears the
+        // pending flag; this catch is just for cron-tick visibility.
+        this.logger.error(
+          `Local transcode failed for exercise ${exercise.id}: ${(error as Error).message}`,
+        );
+      }
     }
   }
 

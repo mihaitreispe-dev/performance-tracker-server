@@ -62,6 +62,16 @@ export interface ExercisesTable {
   rekognition_job_id: string | null;
   /** When smart-crop analysis began — drives the analysis-timeout fallback. */
   smart_crop_started_at: Timestamp | null;
+  /**
+   * Local-transcode state (dev-only, mirrors smart-crop's pattern). When
+   * `local_transcode_pending = true` and `status = assets_pending`, the
+   * exercise is waiting for the local ffmpeg cron to claim and transcode it.
+   * The cron stamps `local_transcode_started_at` on claim and skips rows
+   * claimed in the last 10 minutes, so a process restart resumes after the
+   * timeout rather than spinning two ffmpegs on the same row.
+   */
+  local_transcode_pending: ColumnType<boolean, boolean | undefined, boolean>;
+  local_transcode_started_at: Timestamp | null;
   intro_content_item_id: string | null;
   /** Inline intro markers on the exercise's main demo video — used by the player's Skip-intro affordance. */
   intro_start_seconds: number | null;

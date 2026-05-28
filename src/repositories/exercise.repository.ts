@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import {
   Database,
@@ -153,6 +153,31 @@ export class ExerciseRepository {
       .selectFrom('exercises')
       .where('status', '=', ExerciseStatus.ASSETS_PENDING)
       .selectAll()
+      .execute();
+    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+  }
+
+  /**
+   * System / background-worker path: rows waiting for the local ffmpeg cron
+   * to claim and transcode them. Skips rows claimed within the last 10
+   * minutes (a process restart resumes after that window, while a single
+   * still-running cron tick won't double-claim its own queue). Limited so a
+   * tick doesn't lock the worker on a huge backlog. Do NOT use from request
+   * paths.
+   */
+  async findManyLocalTranscodePending(limit = 3): Promise<Exercise[]> {
+    const results = await this.db
+      .selectFrom('exercises')
+      .where('local_transcode_pending', '=', true)
+      .where('status', '=', ExerciseStatus.ASSETS_PENDING)
+      .where((eb) =>
+        eb.or([
+          eb('local_transcode_started_at', 'is', null),
+          eb('local_transcode_started_at', '<', sql<Date>`now() - interval '10 minutes'`),
+        ]),
+      )
+      .selectAll()
+      .limit(limit)
       .execute();
     return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
   }
