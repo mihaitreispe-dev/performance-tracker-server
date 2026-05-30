@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
 import { OrganisationType } from 'src/database/interfaces';
 
@@ -47,6 +47,24 @@ export class UpdateOrganisationDto {
   @MaxLength(100)
   @Matches(SLUG_REGEX, { message: 'slug must be lowercase alphanumeric with hyphens' })
   slug?: string;
+
+  /**
+   * Opt in to general-population self-signup on the client-app subdomain.
+   * 1:1 athletes (client_type='athlete') still require invitations regardless.
+   */
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  allowsSelfSignup?: boolean;
+}
+
+export class SlugParam {
+  @ApiProperty({ description: 'Organisation slug' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  @Matches(SLUG_REGEX, { message: 'slug must be lowercase alphanumeric with hyphens' })
+  slug: string;
 }
 
 export class OrganisationIdParam {

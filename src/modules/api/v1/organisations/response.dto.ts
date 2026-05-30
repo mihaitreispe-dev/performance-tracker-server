@@ -21,8 +21,44 @@ export class OrganisationDTO {
   })
   orgType: OrganisationType;
 
+  @ApiProperty({
+    description:
+      'When true, the client-app subdomain shows a self-signup form for general-population clients.',
+  })
+  allowsSelfSignup: boolean;
+
   @ApiProperty()
   createdAt: string;
+}
+
+/**
+ * Public, anonymous-safe view of an org used by the client-app signup page.
+ * Returns just enough to render branding (logo + name) + whether the visitor
+ * is allowed to self-register. No member counts, ids of related rows, etc.
+ */
+export class PublicOrganisationDTO {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  slug: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  logoUrl: string | null;
+
+  @ApiProperty({ enum: OrganisationType })
+  orgType: OrganisationType;
+
+  @ApiProperty()
+  allowsSelfSignup: boolean;
+}
+
+export class PublicOrganisationResponse {
+  @ApiProperty({ type: PublicOrganisationDTO })
+  data: PublicOrganisationDTO;
 }
 
 export class OrganisationResponse {

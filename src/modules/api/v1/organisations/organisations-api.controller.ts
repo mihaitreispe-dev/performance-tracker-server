@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } fro
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
-import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
+import { DisableJwtAuthGuard, JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { OrganisationsApiService } from './organisations-api.service';
@@ -11,6 +11,7 @@ import {
   CreateOrganisationDto,
   OrganisationIdParam,
   RequestLogoUploadDto,
+  SlugParam,
   UpdateOrganisationDto,
 } from './request.dto';
 import {
@@ -18,6 +19,7 @@ import {
   MyOrganisationsListResponse,
   OrganisationResponse,
   PendingInvitationsListResponse,
+  PublicOrganisationResponse,
 } from './response.dto';
 
 @ApiTags('Organisations')
@@ -54,6 +56,32 @@ export class OrganisationsApiController {
     @Req() req: Request & { user: AuthUser },
   ): Promise<PendingInvitationsListResponse> {
     return this.orgsService.listPendingInvitations(req);
+  }
+
+  @Get('by-slug/:slug')
+  @SkipActiveOrg()
+  @DisableJwtAuthGuard()
+  @ApiOperation({
+    summary:
+      'Anonymous lookup of an org by URL slug. Powers the client-app subdomain signup page — returns branding (name + logo) and whether self-signup is enabled. 404 for unknown slugs.',
+  })
+  @ApiOkResponse({ type: PublicOrganisationResponse })
+  async getOrganisationBySlug(@Param() params: SlugParam): Promise<PublicOrganisationResponse> {
+    return this.orgsService.getPublicBySlug(params.slug);
+  }
+
+  @Post('by-slug/:slug/join')
+  @SkipActiveOrg()
+  @ApiOperation({
+    summary:
+      'Self-register the authenticated user as a general-population client of the org. Requires the org to have allows_self_signup=true. Idempotent — already-members get their existing membership back. 1:1 athletes still need an admin invite.',
+  })
+  @ApiOkResponse({ type: OrganisationResponse })
+  async joinAsClient(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: SlugParam,
+  ): Promise<OrganisationResponse> {
+    return this.orgsService.selfRegisterAsClient(req, params.slug);
   }
 
   @Get(':id')

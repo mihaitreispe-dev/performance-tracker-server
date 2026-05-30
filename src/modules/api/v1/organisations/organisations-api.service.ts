@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Organisation, OrganisationRole, OrganisationType } from 'src/database/interfaces';
+import { ClientType, Organisation, OrganisationRole, OrganisationType } from 'src/database/interfaces';
 import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
 
+import { ClientProvisioningService } from './client-profiles/client-provisioning.service';
 import { CreateOrganisationDto, RequestLogoUploadDto, UpdateOrganisationDto } from './request.dto';
 import {
   LogoUploadResponse,
@@ -27,6 +28,8 @@ import {
   OrganisationResponse,
   PendingInvitationDTO,
   PendingInvitationsListResponse,
+  PublicOrganisationDTO,
+  PublicOrganisationResponse,
 } from './response.dto';
 
 const ADMIN_ROLES: OrganisationRole[] = [OrganisationRole.OWNER, OrganisationRole.ADMIN];
@@ -59,6 +62,7 @@ export class OrganisationsApiService {
     private readonly themeRepo: OrganisationThemeRepository,
     private readonly userRepo: UserRepository,
     private readonly s3Service: S3Service,
+    private readonly provisioningService: ClientProvisioningService,
   ) {}
 
   async createOrganisation(
@@ -198,6 +202,7 @@ export class OrganisationsApiService {
     const updated = await this.orgRepo.updateById(id, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.slug !== undefined ? { slug: dto.slug } : {}),
+      ...(dto.allowsSelfSignup !== undefined ? { allows_self_signup: dto.allowsSelfSignup } : {}),
     });
     return { data: await this.mapToDTO(updated) };
   }
@@ -306,6 +311,80 @@ export class OrganisationsApiService {
     return base ? `${base}-${suffix}` : suffix;
   }
 
+  /**
+   * Anonymous lookup of an org by its URL slug. Returns just enough for the
+   * client-app subdomain's signup page to render branding and decide whether
+   * to show the self-signup form. Throws 404 for unknown slugs so an open
+   * subdomain doesn't leak the existence of registered orgs.
+   */
+  async getPublicBySlug(slug: string): Promise<PublicOrganisationResponse> {
+    const org = await this.orgRepo.findBySlug(slug);
+    if (!org) {
+      throw new NotFoundException('Organisation not found');
+    }
+    const data: PublicOrganisationDTO = {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      logoUrl:
+        org.logo_s3_bucket && org.logo_s3_key
+          ? await this.s3Service.getSignedUrlGET({ bucket: org.logo_s3_bucket, key: org.logo_s3_key, expires: 3600 })
+          : null,
+      orgType: org.org_type,
+      allowsSelfSignup: org.allows_self_signup,
+    };
+    return { data };
+  }
+
+  /**
+   * Self-register the authenticated user as a general-population client of
+   * the org identified by its slug. Idempotent: if the user is already a
+   * member (any role), the existing membership is returned untouched —
+   * self-signup never silently changes someone's role. Refuses with 403 when
+   * the org hasn't opted in to self-signup (allows_self_signup=false), so
+   * removing the toggle in admin closes the door immediately.
+   */
+  async selfRegisterAsClient(
+    req: Request & { user: AuthUser },
+    slug: string,
+  ): Promise<OrganisationResponse> {
+    const org = await this.orgRepo.findBySlug(slug);
+    if (!org) {
+      throw new NotFoundException('Organisation not found');
+    }
+    if (!org.allows_self_signup) {
+      throw new ForbiddenException('This organisation does not accept self-signup.');
+    }
+
+    const existing = await this.membershipRepo.findByUserAndOrg(req.user.id, org.id);
+    if (existing) {
+      // Idempotent — already a member, even as a different role.
+      return { data: await this.mapToDTO(org) };
+    }
+
+    await this.membershipRepo.create({
+      organisation_id: org.id,
+      user_id: req.user.id,
+      role: OrganisationRole.ATHLETE,
+      client_type: ClientType.GENERAL,
+      // Self-signup is pre-accepted — no invitation to confirm.
+      accepted_at: new Date(),
+    });
+
+    // Fire-and-forget defaults (same pattern as inviteMember). Provisioning
+    // errors don't block the signup from succeeding — the user lands in the
+    // org regardless and the admin can re-run defaults later.
+    await this.provisioningService
+      .applyClientTypeDefaults({
+        organisationId: org.id,
+        athleteUserId: req.user.id,
+        clientType: ClientType.GENERAL,
+      })
+      .catch(() => undefined);
+
+    return { data: await this.mapToDTO(org) };
+  }
+
   private async mapToDTO(o: Organisation): Promise<OrganisationDTO> {
     return {
       id: o.id,
@@ -316,6 +395,7 @@ export class OrganisationsApiService {
           ? await this.s3Service.getSignedUrlGET({ bucket: o.logo_s3_bucket, key: o.logo_s3_key, expires: 3600 })
           : null,
       orgType: o.org_type,
+      allowsSelfSignup: o.allows_self_signup,
       createdAt: o.created_at instanceof Date ? o.created_at.toISOString() : String(o.created_at),
     };
   }

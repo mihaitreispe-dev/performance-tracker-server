@@ -25,6 +25,14 @@ export interface OrganisationsTable {
   logo_s3_key: string | null;
   created_by_user_id: string | null;
   org_type: Generated<OrganisationType>;
+  /**
+   * When true, visitors to the org's client-app subdomain can self-register
+   * as general-population clients (creates the Firebase account + an
+   * ATHLETE membership with client_type='general', pre-accepted). One-to-one
+   * athletes (client_type='athlete') still require an admin-issued invite.
+   * Off by default; toggled from the org's Members tab.
+   */
+  allows_self_signup: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
