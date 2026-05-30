@@ -150,6 +150,12 @@ services:
       # Allow browser-origin PUTs to presigned URLs (snack/course/exercise-intro uploads, org logo).
       # Defaults to `*` for local dev; lock down to your actual client origin(s) in production.
       - MINIO_API_CORS_ALLOW_ORIGIN=${MINIO_CORS_ALLOW_ORIGIN:-*}
+      # When a browser hits the API port, MinIO 307s to its idea of the console
+      # URL. Without this it falls back to localhost:9001, which on a dev box
+      # running multiple MinIOs collides with whichever instance bound that
+      # port first — pin the redirect at this project's console so the
+      # browser lands on the right UI even when other MinIOs are running.
+      - MINIO_BROWSER_REDIRECT_URL=${MINIO_BROWSER_REDIRECT_URL:-http://localhost:9003}
     ports:
       - "${MINIO_API_PORT:-9002}:9000"
       - "${MINIO_CONSOLE_PORT:-9003}:9001"
