@@ -35,6 +35,23 @@ export class OrganisationMembershipRepository {
       .execute();
   }
 
+  /**
+   * Admin path: group counts across many orgs in one round-trip so the admin
+   * org list doesn't fan out to N count queries. Returns a Map of orgId →
+   * member count; orgs with zero memberships are absent (callers should
+   * default to 0).
+   */
+  async countMembersByOrgs(organisationIds: string[]): Promise<Map<string, number>> {
+    if (organisationIds.length === 0) return new Map();
+    const rows = await this.db
+      .selectFrom('organisation_memberships')
+      .where('organisation_id', 'in', organisationIds)
+      .select(({ fn }) => ['organisation_id as id', fn.countAll<string>().as('count')])
+      .groupBy('organisation_id')
+      .execute();
+    return new Map(rows.map((r) => [r.id as string, Number(r.count)]));
+  }
+
   async listByUser(userId: string): Promise<OrganisationMembership[]> {
     return this.db
       .selectFrom('organisation_memberships')

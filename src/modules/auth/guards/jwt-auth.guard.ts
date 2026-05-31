@@ -44,8 +44,13 @@ export class JwtAuthGuard implements CanActivate {
     try {
       const payload = await this.authService.verifyAccessToken(token);
       // 💡 We're assigning the payload to the request object here
-      // so that we can access it in our route handlers
-      request['user'] = { id: payload.sub } as AuthUser;
+      // so that we can access it in our route handlers. `imp` is set when a
+      // platform admin minted an impersonation token (see AdminApiService);
+      // it surfaces as request.user.impersonatorId so banners + audit reads
+      // can distinguish "acting as" calls from genuine ones.
+      const rawImp = (payload as unknown as { imp?: unknown }).imp;
+      const imp = typeof rawImp === 'string' ? rawImp : undefined;
+      request['user'] = { id: payload.sub, ...(imp ? { impersonatorId: imp } : {}) } as AuthUser;
     } catch {
       if (jwtIsOptional) {
         return true;

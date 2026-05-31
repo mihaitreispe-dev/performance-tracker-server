@@ -13,7 +13,15 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  public generateTokens(userId: string) {
+  public generateTokens(userId: string, opts?: { impersonatorId?: string | null }) {
+    // `imp` (impersonator id) sits alongside the standard `sub` so a platform
+    // admin acting as another user can be tracked end-to-end (audit logs read
+    // the claim, the client UI surfaces a "you are impersonating X" banner
+    // off it). Absent for normal logins. Propagated through refresh too so
+    // the impersonation context survives a token rotation.
+    const baseClaims: Record<string, string> = { sub: userId };
+    if (opts?.impersonatorId) baseClaims.imp = opts.impersonatorId;
+
     const accessTokenExpiresIn = this.configService.jwtAccessTokenExpiry;
     let accessTokenExpiresInMs: number | undefined;
     if (accessTokenExpiresIn) {
@@ -23,13 +31,10 @@ export class AuthService {
         accessTokenExpiresInMs = accessTokenExpiresIn;
       }
     }
-    const accessToken = this.jwtService.sign(
-      { sub: userId },
-      {
-        secret: this.configService.jwtAccessTokenSecret,
-        ...(accessTokenExpiresIn ? { expiresIn: accessTokenExpiresIn as StringValue } : {}),
-      },
-    );
+    const accessToken = this.jwtService.sign(baseClaims, {
+      secret: this.configService.jwtAccessTokenSecret,
+      ...(accessTokenExpiresIn ? { expiresIn: accessTokenExpiresIn as StringValue } : {}),
+    });
 
     const refreshTokenExpiresIn = this.configService.jwtRefreshTokenExpiry;
     let refreshTokenExpiresInMs: number | undefined;
@@ -40,13 +45,10 @@ export class AuthService {
         refreshTokenExpiresInMs = refreshTokenExpiresIn;
       }
     }
-    const refreshToken = this.jwtService.sign(
-      { sub: userId },
-      {
-        secret: this.configService.jwtRefreshTokenSecret,
-        ...(refreshTokenExpiresIn ? { expiresIn: refreshTokenExpiresIn as StringValue } : {}),
-      },
-    );
+    const refreshToken = this.jwtService.sign(baseClaims, {
+      secret: this.configService.jwtRefreshTokenSecret,
+      ...(refreshTokenExpiresIn ? { expiresIn: refreshTokenExpiresIn as StringValue } : {}),
+    });
 
     return {
       accessToken,

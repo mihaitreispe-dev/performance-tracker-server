@@ -13,6 +13,7 @@ import { OrganisationApiUsageRepository } from 'src/repositories/organisation-ap
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
+import { AdminApiModule } from './admin/admin-api.module';
 import { AdvancedMetricsApiModule } from './advanced-metrics/advanced-metrics-api.module';
 import { AnalyticsApiModule } from './analytics/analytics-api.module';
 import { WorkoutComparisonModule } from './analytics/workout-comparison/workout-comparison.module';
@@ -65,6 +66,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     AnalyticsApiModule.register(),
     WorkoutComparisonModule.register(),
     AdvancedMetricsApiModule.register(),
+    AdminApiModule.register(),
     IntegrationsApiModule.register(),
     WorkoutPlansApiModule.register(),
     PersonalRecordsApiModule.register(),

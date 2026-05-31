@@ -96,4 +96,27 @@ export class UserRepository {
 
     return results.map((r) => ({ ...r, roles: parseSQLArray(r.roles) }));
   }
+
+  /**
+   * Platform-admin search across all users — picker for the impersonation
+   * UI. Filters by case-insensitive substring against email / display_name /
+   * first_name / last_name. Limited so a typo doesn't pull every row.
+   * Do NOT use from request paths without an admin-role check above it.
+   */
+  async findManyForAdmin(query: string | undefined, limit = 25): Promise<User[]> {
+    let q = this.db.selectFrom('users').selectAll().orderBy('created_at', 'desc').limit(limit);
+    if (query && query.trim()) {
+      const needle = `%${query.trim().toLowerCase()}%`;
+      q = q.where((eb) =>
+        eb.or([
+          eb(sql`lower(email)`, 'like', needle),
+          eb(sql`lower(coalesce(display_name, ''))`, 'like', needle),
+          eb(sql`lower(coalesce(first_name, ''))`, 'like', needle),
+          eb(sql`lower(coalesce(last_name, ''))`, 'like', needle),
+        ]),
+      );
+    }
+    const results = await q.execute();
+    return results.map((r) => ({ ...r, roles: parseSQLArray(r.roles) }));
+  }
 }
