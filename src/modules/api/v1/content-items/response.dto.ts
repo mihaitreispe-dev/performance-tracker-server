@@ -58,6 +58,16 @@ export class ContentItemWithUploadDTO extends ContentItemDTO {
     description: 'Presigned PUT URL for the video upload. Null if no videoMimeType was supplied.',
   })
   uploadUrl: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      "Presigned PUT URL for an image/jpeg poster frame captured client-side. Best-effort: " +
+      'omit and the row stays thumbnail-less; the card UI falls back to a placeholder. ' +
+      "Pinned at create time so the thumbnail can be uploaded in parallel with the video. " +
+      'Null if no videoMimeType was supplied (no upload slot).',
+  })
+  thumbnailUploadUrl: string | null;
 }
 
 export class CreateContentItemResponse {

@@ -32,6 +32,10 @@ const VIDEO_EXT: Record<string, string> = {
   'video/x-m4v': 'm4v',
 };
 
+// Thumbnails are always JPEG — the client captures via <canvas>.toBlob('image/jpeg').
+// Cheap to store, universal browser support, no transparency needed for a poster frame.
+const THUMBNAIL_MIME = 'image/jpeg';
+
 @Injectable()
 export class ContentItemsApiService {
   constructor(
@@ -68,9 +72,16 @@ export class ContentItemsApiService {
     const filename = dto.videoMimeType
       ? `${uuidv4()}.${VIDEO_EXT[dto.videoMimeType] ?? 'bin'}`
       : null;
-    const videoKey = filename
-      ? s3Keys.upload.contentItem({ organisationId, contentItemId: itemId, filename }).video
+    const keys = filename
+      ? s3Keys.upload.contentItem({ organisationId, contentItemId: itemId, filename })
       : null;
+    const videoKey = keys?.video ?? null;
+    // Stage a thumbnail PUT URL too — the client captures a first-frame
+    // JPEG via <canvas> and uploads it in parallel with the video. The
+    // resulting key is NOT written to the DB row here: only after the
+    // object actually lands (verified in markUploadComplete) do we
+    // persist it, so rows never reference a phantom thumbnail.
+    const thumbnailKey = keys?.thumbnail ?? null;
 
     const item = await this.contentRepo.create({
       id: itemId,
@@ -88,6 +99,7 @@ export class ContentItemsApiService {
     });
 
     let uploadUrl: string | null = null;
+    let thumbnailUploadUrl: string | null = null;
     if (videoKey && dto.videoMimeType) {
       uploadUrl = await this.s3Service.getSignedUrlPUT({
         bucket: this.s3Service.uploadBucket,
@@ -96,8 +108,16 @@ export class ContentItemsApiService {
         expires: 3600,
       });
     }
+    if (thumbnailKey) {
+      thumbnailUploadUrl = await this.s3Service.getSignedUrlPUT({
+        bucket: this.s3Service.uploadBucket,
+        key: thumbnailKey,
+        contentType: THUMBNAIL_MIME,
+        expires: 3600,
+      });
+    }
 
-    return { data: { ...(await this.mapToDTO(item)), uploadUrl } };
+    return { data: { ...(await this.mapToDTO(item)), uploadUrl, thumbnailUploadUrl } };
   }
 
   async update(
@@ -138,8 +158,44 @@ export class ContentItemsApiService {
     if (!exists) {
       throw new BadRequestException('No object found at the expected upload location yet');
     }
-    const updated = await this.contentRepo.updateById(id, { status: ContentItemStatus.READY });
+    // Best-effort thumbnail attach: the create endpoint hands the client
+    // a pinned thumbnail upload slot at a deterministic key derived from
+    // the video filename. If the client successfully PUT the first-frame
+    // JPEG (typical happy path), it'll be sitting there now. If it
+    // didn't (older clients, or the canvas capture failed), the row just
+    // stays thumbnail-less and the UI shows its placeholder icon. We
+    // never block the video on the thumbnail.
+    const patch: { status: ContentItemStatus; thumbnail_s3_bucket?: string; thumbnail_s3_key?: string } = {
+      status: ContentItemStatus.READY,
+    };
+    const thumbnailKey = this.deriveThumbnailKey(existing.video_s3_key);
+    if (thumbnailKey) {
+      const thumbnailBucket = existing.video_s3_bucket;
+      const thumbnailExists = await this.s3Service.objectExists({
+        bucket: thumbnailBucket,
+        key: thumbnailKey,
+      });
+      if (thumbnailExists) {
+        patch.thumbnail_s3_bucket = thumbnailBucket;
+        patch.thumbnail_s3_key = thumbnailKey;
+      }
+    }
+    const updated = await this.contentRepo.updateById(id, patch);
     return { data: await this.mapToDTO(updated) };
+  }
+
+  /**
+   * Mirror of the s3Keys.upload.contentItem({...}).thumbnail naming used at
+   * create time: `${dir}/thumbnail-${filename}`. We can't reuse the helper
+   * directly here because the input is the full video key, not the parts
+   * — but the convention is small and stable, so we recompose it inline.
+   */
+  private deriveThumbnailKey(videoKey: string): string | null {
+    const lastSlash = videoKey.lastIndexOf('/');
+    if (lastSlash < 0) return null;
+    const dir = videoKey.slice(0, lastSlash);
+    const filename = videoKey.slice(lastSlash + 1);
+    return `${dir}/thumbnail-${filename}`;
   }
 
   async delete(req: AuthedRequest, id: string): Promise<void> {
