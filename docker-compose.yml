@@ -20,9 +20,13 @@ services:
       - JWT_ACCESS_TOKEN_EXPIRY=${JWT_ACCESS_TOKEN_EXPIRY:-15m}
       - JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET}
       - JWT_REFRESH_TOKEN_EXPIRY=${JWT_REFRESH_TOKEN_EXPIRY:-}
-      # Database
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
+      # Database. DB_PORT is the in-container postgres port (always 5432);
+      # the host-side mapping lives under DB_EXTERNAL_PORT on the db service.
+      # We deliberately don't propagate the .env DB_PORT (which is what
+      # host-side scripts use to reach the mapped host port) into the
+      # container — otherwise the api would try `db:5433` and fail.
+      - DB_HOST=db
+      - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
@@ -104,8 +108,11 @@ services:
       dockerfile: Dockerfile
     container_name: performance-tracker-migrate
     environment:
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
+      # In-container values — see the same note on the `api` service. The
+      # host-side DB_PORT is irrelevant in-network; postgres always speaks
+      # 5432 inside the docker bridge.
+      - DB_HOST=db
+      - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
