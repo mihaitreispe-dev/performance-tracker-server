@@ -49,6 +49,17 @@ export class S3Service {
       // the host's IP. Real AWS leaves endpoint undefined, where the
       // option is moot and the SDK picks the optimal style itself.
       forcePathStyle: !!endpoint,
+      // SDK v3 (≥3.730) injects `x-amz-checksum-mode=ENABLED` into the
+      // canonical query string for GET presigns by default. MinIO can't
+      // verify the resulting signature and 403s with SignatureDoesNotMatch
+      // (PUT works because its checksum params are tolerated). Pinning
+      // both knobs to WHEN_REQUIRED removes the offending query params for
+      // presigned GETs without disabling integrity checks for streaming
+      // SDK calls that explicitly opt in. AWS itself ignores both knobs,
+      // so this is safe in prod too. See:
+      //   https://github.com/aws/aws-sdk-js-v3/issues/5409
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     };
 
     this.s3Client = new S3(s3Opts);
