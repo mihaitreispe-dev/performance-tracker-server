@@ -9,6 +9,7 @@ import {
   ExerciseInstanceTempo,
   WorkoutDifficulty,
   WorkoutType,
+  WorkoutVisibility,
 } from 'src/database/interfaces';
 import { type SortOptions, SortParam } from 'src/lib/http/decorators/sort-param';
 import { SearchableQuery } from 'src/lib/http/dto/page-request.dto';
@@ -26,6 +27,16 @@ export class ListWorkoutsQuery extends SearchableQuery {
   @IsEnumString(WorkoutDifficulty)
   @IsOptional()
   difficulty?: WorkoutDifficulty;
+
+  @ApiPropertyOptional({
+    enum: WorkoutVisibility,
+    description:
+      'Optional visibility filter. Omit to get the caller\'s default scope (own + org-library); ' +
+      'pass `personal` to narrow to drafts you own, `org_library` to see only published library rows.',
+  })
+  @IsEnumString(WorkoutVisibility)
+  @IsOptional()
+  visibility?: WorkoutVisibility;
 
   @SortParam(WorkoutSortField)
   sort?: SortOptions<'name' | 'created_at' | 'updated_at'>;
@@ -458,6 +469,17 @@ export class CreateWorkoutBody {
   @IsOptional()
   cardioCategoryId?: string;
 
+  @ApiPropertyOptional({
+    enum: WorkoutVisibility,
+    description:
+      'Visibility for the new row. Defaults to `personal` (creator-only). `org_library` makes ' +
+      'the workout visible to every org member; the service rejects this value for athlete-role ' +
+      'callers (coaches / admins / owners only).',
+  })
+  @IsEnumString(WorkoutVisibility)
+  @IsOptional()
+  visibility?: WorkoutVisibility;
+
   @ApiProperty({ type: [WorkoutItemBody], description: 'Workout items' })
   @IsArray()
   @ValidateNested({ each: true })
@@ -490,6 +512,16 @@ export class UpdateWorkoutBody {
   @IsUUID()
   @IsOptional()
   cardioCategoryId?: string;
+
+  @ApiPropertyOptional({
+    enum: WorkoutVisibility,
+    description:
+      'Promote a personal draft to the org library (or pull it back). Athlete-role callers ' +
+      'cannot set `org_library`; the service rejects.',
+  })
+  @IsEnumString(WorkoutVisibility)
+  @IsOptional()
+  visibility?: WorkoutVisibility;
 
   @ApiPropertyOptional({ type: [WorkoutItemBody], description: 'Workout items (replaces all existing)' })
   @IsArray()

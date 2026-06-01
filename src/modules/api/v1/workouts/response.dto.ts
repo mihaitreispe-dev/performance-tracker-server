@@ -9,6 +9,7 @@ import {
   ExerciseInstanceTempo,
   WorkoutDifficulty,
   WorkoutType,
+  WorkoutVisibility,
 } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
@@ -269,6 +270,15 @@ export class WorkoutDTO {
   @ApiProperty({ enum: WorkoutType })
   @IsEnumString(WorkoutType)
   type: WorkoutType;
+
+  @ApiProperty({
+    enum: WorkoutVisibility,
+    description:
+      '`personal` (creator-only, plus org admins / coaches with a relationship) or `org_library` ' +
+      '(visible to every org member). Defaults to `personal`.',
+  })
+  @IsEnumString(WorkoutVisibility)
+  visibility: WorkoutVisibility;
 
   @ApiProperty()
   @IsUUID()

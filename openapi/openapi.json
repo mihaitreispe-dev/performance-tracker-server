@@ -169,6 +169,62 @@
         ]
       }
     },
+    "/v1/inline-images/request-upload": {
+      "post": {
+        "operationId": "InlineImagesApiController_requestUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestInlineImageUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestInlineImageUploadResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mint an upload slot for an inline image embedded in a rich-text description.",
+        "tags": [
+          "inline-images"
+        ]
+      }
+    },
+    "/v1/inline-images/{id}/view": {
+      "get": {
+        "operationId": "InlineImagesApiController_view",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stable image proxy. Resolves a stored inline-image id to a freshly-signed S3 URL and 302-redirects, so HTML with `<img src=\"${API}/v1/inline-images/${id}/view\">` keeps working past S3 signature expiry. Unauthenticated by design — the URL is the capability.",
+        "tags": [
+          "inline-images"
+        ]
+      }
+    },
     "/v1/hook/no-op": {
       "post": {
         "operationId": "HookApiController_noOpHook",
@@ -1155,6 +1211,83 @@
         ]
       }
     },
+    "/v1/exercises/{id}/reprocess": {
+      "post": {
+        "operationId": "ExercisesApiController_reprocessAssets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Exercise ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No source video, or MediaConvert disabled / job creation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Re-process an exercise video (admin only). Re-runs MediaConvert against the existing source clip to backfill renditions added after the original encode (e.g. the 16:9 companion). Status returns to ASSETS_PENDING.",
+        "tags": [
+          "exercises"
+        ]
+      }
+    },
     "/v1/exercises/{id}/chain": {
       "get": {
         "operationId": "ExercisesApiController_getChain",
@@ -1418,6 +1551,19 @@
                 "moderate",
                 "hard",
                 "extreme"
+              ]
+            }
+          },
+          {
+            "name": "visibility",
+            "required": false,
+            "in": "query",
+            "description": "Optional visibility filter. Omit to get the caller's default scope (own + org-library); pass `personal` to narrow to drafts you own, `org_library` to see only published library rows.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "personal",
+                "org_library"
               ]
             }
           },
@@ -7150,6 +7296,107 @@
         "summary": "Get athlete's stroke type breakdown (COACH only)",
         "tags": [
           "coaching"
+        ]
+      }
+    },
+    "/v1/admin/organisations": {
+      "get": {
+        "operationId": "AdminApiController_listAllOrganisations",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrganisationListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List every organisation on the platform with the caller's own membership role (null when they are dropping in as platform admin).",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/users": {
+      "get": {
+        "operationId": "AdminApiController_listUsers",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive substring matched against email + display name + first/last name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Search every user on the platform (substring against email + display name + first/last). Limited result set; meant to back the impersonation picker.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/impersonate": {
+      "post": {
+        "operationId": "AdminApiController_impersonate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImpersonateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Mint a session for the target user with an `imp` claim pointing at the calling admin. The client swaps its stored tokens in to \"act as\" the user; the impersonation banner reads from `imp` to surface this.",
+        "tags": [
+          "Admin"
         ]
       }
     },
@@ -18071,6 +18318,80 @@
         ]
       }
     },
+    "/v1/organisations/by-slug/{slug}": {
+      "get": {
+        "operationId": "OrganisationsApiController_getOrganisationBySlug",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "Organisation slug",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicOrganisationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anonymous lookup of an org by URL slug. Powers the client-app subdomain signup page — returns branding (name + logo) and whether self-signup is enabled. 404 for unknown slugs.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/by-slug/{slug}/join": {
+      "post": {
+        "operationId": "OrganisationsApiController_joinAsClient",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "Organisation slug",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganisationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Self-register the authenticated user as a general-population client of the org. Requires the org to have allows_self_signup=true. Idempotent — already-members get their existing membership back. 1:1 athletes still need an admin invite.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}": {
       "get": {
         "operationId": "OrganisationsApiController_getOrganisation",
@@ -18358,7 +18679,7 @@
             "bearer": []
           }
         ],
-        "summary": "Invite an existing user into this organisation (admin/owner only)",
+        "summary": "Invite an existing user into this organisation (coach/admin/owner — role-ceiling applies). Rate-limited per user.",
         "tags": [
           "Organisations"
         ]
@@ -19672,6 +19993,200 @@
         ]
       }
     },
+    "/v1/organisations/{id}/resources/{resourceType}/{resourceId}/entitlements": {
+      "get": {
+        "operationId": "EntitlementsApiController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "path",
+            "description": "Kind of resource being gated",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "workout",
+                "content_item",
+                "course"
+              ]
+            }
+          },
+          {
+            "name": "resourceId",
+            "required": true,
+            "in": "path",
+            "description": "Resource id (workout / content_item / course)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the subscription tiers that unlock a single resource. Empty `data` means the resource is free.",
+        "tags": [
+          "Organisations"
+        ]
+      },
+      "put": {
+        "operationId": "EntitlementsApiController_replace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "path",
+            "description": "Kind of resource being gated",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "workout",
+                "content_item",
+                "course"
+              ]
+            }
+          },
+          {
+            "name": "resourceId",
+            "required": true,
+            "in": "path",
+            "description": "Resource id (workout / content_item / course)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceEntitlementsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntitlementsListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace the tier set that unlocks a single resource. Any-of semantics — a client with an active subscription to any listed product gets access. Empty array clears the gate.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
+    "/v1/organisations/{id}/resources/{resourceType}/{resourceId}/entitlements/lock-status": {
+      "get": {
+        "operationId": "EntitlementsApiController_lockStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceType",
+            "required": true,
+            "in": "path",
+            "description": "Kind of resource being gated",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "workout",
+                "content_item",
+                "course"
+              ]
+            }
+          },
+          {
+            "name": "resourceId",
+            "required": true,
+            "in": "path",
+            "description": "Resource id (workout / content_item / course)",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LockStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lock status for the calling user against a specific resource. Any active org member can call. Returns `{ locked, requiredTiers }`.",
+        "tags": [
+          "Organisations"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
@@ -20583,6 +21098,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, the response's `lock.locked` flag reflects whether THIS client has an active subscription unlocking the resource. Omitted = lock metadata reflects \"is this resource gated\" only.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -20595,7 +21120,7 @@
             "apiKey": []
           }
         ],
-        "summary": "List the organisation's workouts.",
+        "summary": "List the organisation's workouts. Pass `clientId` to have the response's `lock` reflect that specific client's access.",
         "tags": [
           "Public"
         ]
@@ -20604,7 +21129,18 @@
     "/v1/public/workouts/{id}": {
       "get": {
         "operationId": "PublicApiController_getWorkout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, locked resources return HTTP 402 with a tier payload instead of the resource body. Omit to browse the catalogue without enforcement (the `lock` field on the response still indicates whether the resource is gated).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -20615,7 +21151,7 @@
             "apiKey": []
           }
         ],
-        "summary": "Fetch a single workout.",
+        "summary": "Fetch a single workout. Pass `clientId` to enforce access — locked resources respond HTTP 402 with a tier payload instead of the workout body.",
         "tags": [
           "Public"
         ]
@@ -20661,6 +21197,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, the response's `lock.locked` flag reflects whether THIS client has an active subscription unlocking the resource. Omitted = lock metadata reflects \"is this resource gated\" only.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -20673,7 +21219,7 @@
             "apiKey": []
           }
         ],
-        "summary": "List the organisation's published courses.",
+        "summary": "List the organisation's published courses. Pass `clientId` for client-specific lock state.",
         "tags": [
           "Public"
         ]
@@ -20682,7 +21228,18 @@
     "/v1/public/courses/{id}": {
       "get": {
         "operationId": "PublicApiController_getCourse",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, locked resources return HTTP 402 with a tier payload instead of the resource body. Omit to browse the catalogue without enforcement (the `lock` field on the response still indicates whether the resource is gated).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -20693,7 +21250,7 @@
             "apiKey": []
           }
         ],
-        "summary": "Fetch a single published course.",
+        "summary": "Fetch a single published course. Pass `clientId` to enforce access (HTTP 402 if locked).",
         "tags": [
           "Public"
         ]
@@ -20739,6 +21296,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, the response's `lock.locked` flag reflects whether THIS client has an active subscription unlocking the resource. Omitted = lock metadata reflects \"is this resource gated\" only.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -20751,7 +21318,7 @@
             "apiKey": []
           }
         ],
-        "summary": "List the organisation's movement snacks.",
+        "summary": "List the organisation's movement snacks. Pass `clientId` for client-specific lock state.",
         "tags": [
           "Public"
         ]
@@ -20760,7 +21327,18 @@
     "/v1/public/movement-snacks/{id}": {
       "get": {
         "operationId": "PublicApiController_getMovementSnack",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, locked resources return HTTP 402 with a tier payload instead of the resource body. Omit to browse the catalogue without enforcement (the `lock` field on the response still indicates whether the resource is gated).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -20771,7 +21349,7 @@
             "apiKey": []
           }
         ],
-        "summary": "Fetch a single movement snack.",
+        "summary": "Fetch a single movement snack. Pass `clientId` to enforce access (HTTP 402 if locked).",
         "tags": [
           "Public"
         ]
@@ -20815,6 +21393,16 @@
             "in": "query",
             "description": "Tag filter (movement snacks only).",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "required": false,
+            "in": "query",
+            "description": "User id of the consuming client. When provided, the response's `lock.locked` flag reflects whether THIS client has an active subscription unlocking the resource. Omitted = lock metadata reflects \"is this resource gated\" only.",
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -24833,6 +25421,68 @@
       }
     },
     "schemas": {
+      "RequestInlineImageUploadDto": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "image/gif"
+            ]
+          },
+          "sizeBytes": {
+            "type": "number",
+            "description": "Source file size in bytes, informational only."
+          }
+        },
+        "required": [
+          "mimeType"
+        ]
+      },
+      "InlineImageUploadSlotDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Row id; also part of the stable viewUrl."
+          },
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned PUT URL to stream the image to."
+          },
+          "viewUrl": {
+            "type": "string",
+            "description": "Stable URL the client embeds as <img src=...>. Resolves via a server redirect that signs a fresh S3 GET each time, so the link in stored HTML keeps working past S3 expiry."
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "uploadUrl",
+          "viewUrl",
+          "bucket",
+          "key"
+        ]
+      },
+      "RequestInlineImageUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InlineImageUploadSlotDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "CreateTokensBody": {
         "type": "object",
         "properties": {
@@ -25449,6 +26099,9 @@
             "type": "string"
           },
           "mimeType": {
+            "type": "string"
+          },
+          "aspectRatio": {
             "type": "string"
           }
         },
@@ -26221,6 +26874,14 @@
               "walking"
             ]
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "org_library"
+            ],
+            "description": "`personal` (creator-only, plus org admins / coaches with a relationship) or `org_library` (visible to every org member). Defaults to `personal`."
+          },
           "userId": {
             "type": "string"
           },
@@ -26248,6 +26909,7 @@
           "name",
           "difficulty",
           "type",
+          "visibility",
           "userId",
           "items",
           "createdAt",
@@ -26643,6 +27305,14 @@
             "type": "string",
             "description": "Cardio category ID (for run/cycling/swimming workouts)"
           },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "org_library"
+            ],
+            "description": "Visibility for the new row. Defaults to `personal` (creator-only). `org_library` makes the workout visible to every org member; the service rejects this value for athlete-role callers (coaches / admins / owners only)."
+          },
           "items": {
             "description": "Workout items",
             "type": "array",
@@ -26698,6 +27368,14 @@
           "cardioCategoryId": {
             "type": "string",
             "description": "Cardio category ID (for run/cycling/swimming workouts)"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "org_library"
+            ],
+            "description": "Promote a personal draft to the org library (or pull it back). Athlete-role callers cannot set `org_library`; the service rejects."
           },
           "items": {
             "description": "Workout items (replaces all existing)",
@@ -32976,6 +33654,136 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "AdminOrganisationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "myRole": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "coach",
+              "athlete"
+            ],
+            "nullable": true,
+            "description": "Your membership role, or null if you are not a member (admin bypass)."
+          },
+          "memberCount": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "myRole",
+          "memberCount",
+          "createdAt"
+        ]
+      },
+      "AdminOrganisationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminOrganisationDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminUserDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "picture": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user",
+                "coach"
+              ]
+            }
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "roles",
+          "createdAt"
+        ]
+      },
+      "AdminUserListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ImpersonateDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User id to impersonate."
+          }
+        },
+        "required": [
+          "userId"
         ]
       },
       "UserIntegrationDTO": {
@@ -41151,6 +41959,10 @@
             ],
             "description": "Signup track. UI gating (e.g. hiding the Team tab on individual orgs) keys off this."
           },
+          "allowsSelfSignup": {
+            "type": "boolean",
+            "description": "When true, the client-app subdomain shows a self-signup form for general-population clients."
+          },
           "createdAt": {
             "type": "string"
           }
@@ -41160,6 +41972,7 @@
           "name",
           "slug",
           "orgType",
+          "allowsSelfSignup",
           "createdAt"
         ]
       },
@@ -41198,6 +42011,10 @@
             ],
             "description": "Signup track. UI gating (e.g. hiding the Team tab on individual orgs) keys off this."
           },
+          "allowsSelfSignup": {
+            "type": "boolean",
+            "description": "When true, the client-app subdomain shows a self-signup form for general-population clients."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -41216,6 +42033,7 @@
           "name",
           "slug",
           "orgType",
+          "allowsSelfSignup",
           "createdAt",
           "myRole"
         ]
@@ -41287,6 +42105,52 @@
           "data"
         ]
       },
+      "PublicOrganisationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "orgType": {
+            "type": "string",
+            "enum": [
+              "organisation",
+              "individual"
+            ]
+          },
+          "allowsSelfSignup": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "orgType",
+          "allowsSelfSignup"
+        ]
+      },
+      "PublicOrganisationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicOrganisationDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "UpdateOrganisationDto": {
         "type": "object",
         "properties": {
@@ -41295,6 +42159,9 @@
           },
           "slug": {
             "type": "string"
+          },
+          "allowsSelfSignup": {
+            "type": "boolean"
           }
         }
       },
@@ -42580,6 +43447,125 @@
           "toggles"
         ]
       },
+      "TierPriceHintResponse": {
+        "type": "object",
+        "properties": {
+          "stripePriceId": {
+            "type": "string"
+          },
+          "unitAmount": {
+            "type": "number",
+            "description": "Smallest currency unit (cents for USD)."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "interval": {
+            "type": "string",
+            "description": "'month' | 'year' for recurring prices."
+          }
+        },
+        "required": [
+          "stripePriceId",
+          "unitAmount",
+          "currency",
+          "interval"
+        ]
+      },
+      "TierResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Local stripe_products.id."
+          },
+          "stripeProductId": {
+            "type": "string",
+            "description": "Bare Stripe product id (prod_…)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "cheapestPrice": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TierPriceHintResponse"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "stripeProductId",
+          "name",
+          "description",
+          "cheapestPrice"
+        ]
+      },
+      "EntitlementsListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TierResponse"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ReplaceEntitlementsDto": {
+        "type": "object",
+        "properties": {
+          "stripeProductIds": {
+            "description": "Local stripe_products.id values that should unlock this resource. Empty array removes all gating.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "stripeProductIds"
+        ]
+      },
+      "LockStatusBody": {
+        "type": "object",
+        "properties": {
+          "locked": {
+            "type": "boolean"
+          },
+          "requiredTiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TierResponse"
+            }
+          }
+        },
+        "required": [
+          "locked",
+          "requiredTiers"
+        ]
+      },
+      "LockStatusResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LockStatusBody"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "ModuleDTO": {
         "type": "object",
         "properties": {
@@ -42771,6 +43757,11 @@
             "type": "object",
             "nullable": true
           },
+          "videoPortraitUrl": {
+            "type": "object",
+            "nullable": true,
+            "description": "9:16 portrait companion of videoUrl, signed read URL. Populated some time after upload by the transcode pipeline; null until then. Phone-portrait viewers prefer this asset over videoUrl; everyone else uses videoUrl (16:9)."
+          },
           "thumbnailUrl": {
             "type": "object",
             "nullable": true
@@ -42906,6 +43897,11 @@
             "type": "object",
             "nullable": true
           },
+          "videoPortraitUrl": {
+            "type": "object",
+            "nullable": true,
+            "description": "9:16 portrait companion of videoUrl, signed read URL. Populated some time after upload by the transcode pipeline; null until then. Phone-portrait viewers prefer this asset over videoUrl; everyone else uses videoUrl (16:9)."
+          },
           "thumbnailUrl": {
             "type": "object",
             "nullable": true
@@ -42939,6 +43935,11 @@
             "type": "object",
             "nullable": true,
             "description": "Presigned PUT URL for the video upload. Null if no videoMimeType was supplied."
+          },
+          "thumbnailUploadUrl": {
+            "type": "object",
+            "nullable": true,
+            "description": "Presigned PUT URL for an image/jpeg poster frame captured client-side. Best-effort: omit and the row stays thumbnail-less; the card UI falls back to a placeholder. Pinned at create time so the thumbnail can be uploaded in parallel with the video. Null if no videoMimeType was supplied (no upload slot)."
           }
         },
         "required": [

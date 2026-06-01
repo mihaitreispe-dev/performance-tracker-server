@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
 import {
   CardioCategory,
@@ -15,6 +15,7 @@ import {
   OrganisationRole,
   Workout,
   WorkoutItem,
+  WorkoutVisibility,
 } from 'src/database/interfaces';
 import { CoachAthleteStatus } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
@@ -74,14 +75,40 @@ export class WorkoutsApiService {
 
   async list(req: AuthedRequest, query: ListWorkoutsQuery): Promise<WorkoutListResponse> {
     const organisationId = assertActiveOrg(req);
-    const { q, offset = 0, limit = 20, type, difficulty, sort } = query;
+    const { q, offset = 0, limit = 20, type, difficulty, visibility, sort } = query;
+    const role = req.activeOrg?.role;
+    const isOrgAdminOrAbove = role === OrganisationRole.OWNER || role === OrganisationRole.ADMIN;
 
-    const filter = {
-      userId: req.user.id,
-      type,
-      difficulty,
-      search: q,
-    };
+    // Default scope: own rows + org_library rows, in one paginated
+    // page. Athletes can't see other people's personal drafts; coaches
+    // see their own personal + everyone's library. Admins / owners
+    // (and platform admins via the synthesised OrganisationRole.ADMIN)
+    // see every row in the org regardless of visibility — they're
+    // managing the whole tenant.
+    let filter;
+    if (isOrgAdminOrAbove && !visibility) {
+      filter = { type, difficulty, search: q };
+    } else if (visibility === WorkoutVisibility.PERSONAL) {
+      // Explicit narrow to own personal drafts.
+      filter = {
+        userId: req.user.id,
+        visibility: WorkoutVisibility.PERSONAL,
+        type,
+        difficulty,
+        search: q,
+      };
+    } else if (visibility === WorkoutVisibility.ORG_LIBRARY) {
+      // Explicit narrow to the library.
+      filter = { visibility: WorkoutVisibility.ORG_LIBRARY, type, difficulty, search: q };
+    } else {
+      // Default for non-admin callers: own ∪ org_library.
+      filter = {
+        visibleTo: { userId: req.user.id, libraryVisibility: WorkoutVisibility.ORG_LIBRARY },
+        type,
+        difficulty,
+        search: q,
+      };
+    }
 
     const [workouts, totalCount] = await Promise.all([
       this.workoutRepo.findMany({ organisationId, filter, sort, offset, limit }),
@@ -109,6 +136,22 @@ export class WorkoutsApiService {
 
     // Allow access if user owns the workout
     if (workout.user_id === req.user.id) {
+      return { data: await this.mapWorkoutToDTO(workout) };
+    }
+
+    // Org-library rows are visible to every member of the org. The
+    // tenancy preflight above (organisation_id match) is the only
+    // remaining check for library rows.
+    if (workout.visibility === WorkoutVisibility.ORG_LIBRARY) {
+      return { data: await this.mapWorkoutToDTO(workout) };
+    }
+
+    // Admins / owners (and platform admins via ActiveOrgGuard's
+    // synthesised OrganisationRole.ADMIN) see any personal row in
+    // the org — they're the tenancy operators and need full read
+    // for moderation / audit purposes.
+    const role = req.activeOrg?.role;
+    if (role === OrganisationRole.OWNER || role === OrganisationRole.ADMIN) {
       return { data: await this.mapWorkoutToDTO(workout) };
     }
 
@@ -430,6 +473,7 @@ export class WorkoutsApiService {
 
   async create(req: AuthedRequest, body: CreateWorkoutBody): Promise<WorkoutResponse> {
     const organisationId = assertActiveOrg(req);
+    const visibility = this.resolveVisibilityForWrite(req, body.visibility);
     const workout = await this.workoutRepo.create({
       organisation_id: organisationId,
       name: body.name,
@@ -438,11 +482,40 @@ export class WorkoutsApiService {
       type: body.type,
       user_id: req.user.id,
       cardio_category_id: body.cardioCategoryId ?? null,
+      visibility,
     });
 
     await this.createWorkoutItems(workout.id, body.items);
 
     return { data: await this.mapWorkoutToDTO(workout) };
+  }
+
+  /**
+   * Visibility gate for create + update. Defaults to PERSONAL (the
+   * safe default — won't accidentally leak a draft into the library).
+   * Setting ORG_LIBRARY is restricted to coach/admin/owner; athletes
+   * publishing to the library would let any athlete advertise content
+   * to the whole org. Platform admins ride
+   * req.activeOrg.role = OrganisationRole.ADMIN through the same
+   * gate.
+   */
+  private resolveVisibilityForWrite(
+    req: AuthedRequest,
+    requested: WorkoutVisibility | undefined,
+  ): WorkoutVisibility {
+    if (!requested) return WorkoutVisibility.PERSONAL;
+    if (requested === WorkoutVisibility.PERSONAL) return WorkoutVisibility.PERSONAL;
+    const role = req.activeOrg?.role;
+    if (
+      role !== OrganisationRole.OWNER &&
+      role !== OrganisationRole.ADMIN &&
+      role !== OrganisationRole.COACH
+    ) {
+      throw new ForbiddenException(
+        'Only coaches, admins or owners can publish a workout to the org library',
+      );
+    }
+    return WorkoutVisibility.ORG_LIBRARY;
   }
 
   async update(req: Request & { user: AuthUser }, id: string, body: UpdateWorkoutBody): Promise<WorkoutResponse> {
@@ -460,6 +533,9 @@ export class WorkoutsApiService {
     if (body.difficulty !== undefined) update.difficulty = body.difficulty;
     if (body.type !== undefined) update.type = body.type;
     if (body.cardioCategoryId !== undefined) update.cardio_category_id = body.cardioCategoryId;
+    if (body.visibility !== undefined) {
+      update.visibility = this.resolveVisibilityForWrite(req as AuthedRequest, body.visibility);
+    }
 
     let workout = existing;
     if (Object.keys(update).length > 0) {
@@ -758,6 +834,7 @@ export class WorkoutsApiService {
       description: workout.description,
       difficulty: workout.difficulty,
       type: workout.type,
+      visibility: workout.visibility,
       userId: workout.user_id,
       cardioCategoryId: workout.cardio_category_id,
       cardioCategory,

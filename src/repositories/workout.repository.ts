@@ -10,10 +10,25 @@ import {
   WorkoutItem,
   WorkoutType,
   WorkoutUpdate,
+  WorkoutVisibility,
 } from 'src/database/interfaces';
 
 export interface WorkoutFilter {
+  /** Restrict to rows authored by this user. */
   userId?: string;
+  /** Restrict to a specific visibility (personal | org_library). */
+  visibility?: WorkoutVisibility;
+  /**
+   * Visibility/ownership "OR" — show rows where EITHER the caller is
+   * the author OR the row's visibility is org_library. Lets athletes
+   * see their own personal drafts alongside the org library in one
+   * paginated list. Mutually exclusive with `userId` / `visibility`
+   * filters; when supplied, those are ignored.
+   */
+  visibleTo?: {
+    userId: string;
+    libraryVisibility: WorkoutVisibility;
+  };
   type?: WorkoutType;
   difficulty?: WorkoutDifficulty;
   search?: string;
@@ -58,8 +73,22 @@ export class WorkoutRepository {
       .where('organisation_id', '=', organisationId)
       .selectAll();
 
-    if (filter?.userId) {
-      query = query.where('user_id', '=', filter.userId);
+    // visibleTo composes ownership with library visibility in one
+    // OR group; if the caller passed it, the more granular userId /
+    // visibility filters are dropped (they'd shrink the result set
+    // below the intended union).
+    if (filter?.visibleTo) {
+      const { userId, libraryVisibility } = filter.visibleTo;
+      query = query.where((eb) =>
+        eb.or([eb('user_id', '=', userId), eb('visibility', '=', libraryVisibility)]),
+      );
+    } else {
+      if (filter?.userId) {
+        query = query.where('user_id', '=', filter.userId);
+      }
+      if (filter?.visibility) {
+        query = query.where('visibility', '=', filter.visibility);
+      }
     }
     if (filter?.type) {
       query = query.where('type', '=', filter.type);
@@ -95,8 +124,18 @@ export class WorkoutRepository {
       .where('organisation_id', '=', organisationId)
       .select((eb) => eb.fn.countAll<number>().as('count'));
 
-    if (filter?.userId) {
-      query = query.where('user_id', '=', filter.userId);
+    if (filter?.visibleTo) {
+      const { userId, libraryVisibility } = filter.visibleTo;
+      query = query.where((eb) =>
+        eb.or([eb('user_id', '=', userId), eb('visibility', '=', libraryVisibility)]),
+      );
+    } else {
+      if (filter?.userId) {
+        query = query.where('user_id', '=', filter.userId);
+      }
+      if (filter?.visibility) {
+        query = query.where('visibility', '=', filter.visibility);
+      }
     }
     if (filter?.type) {
       query = query.where('type', '=', filter.type);
