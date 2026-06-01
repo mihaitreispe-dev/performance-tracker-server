@@ -42297,6 +42297,17 @@
           "acceptedAt": {
             "type": "object",
             "nullable": true
+          },
+          "coachRelationshipStatus": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "declined",
+              "removed"
+            ],
+            "nullable": true,
+            "description": "Coach-athlete relationship status between the caller (when the caller is a coach) and this athlete row. Null otherwise."
           }
         },
         "required": [

@@ -73,7 +73,29 @@ export class MembershipsApiService {
     const userIds = memberships.map((m) => m.user_id);
     const users = await this.userRepo.findByIds(userIds);
     const usersById = new Map(users.map((u) => [u.id, u]));
-    return { data: memberships.map((m) => this.mapToDTO(m, usersById.get(m.user_id))) };
+
+    // Decorate athlete rows with the caller↔athlete relationship status
+    // when the caller is a coach in this org. Owners / admins / athlete
+    // viewers see `coachRelationshipStatus: null` on every row — they
+    // don't have a 1:1 coaching binding to surface here. We only need
+    // *one* org-scoped query for the caller's full coach roster; an
+    // org with thousands of athletes per coach is still a single
+    // indexed lookup on (organisation_id, coach_id).
+    const callerMembership = memberships.find((m) => m.user_id === req.user.id);
+    let relationshipByAthleteId: Map<string, CoachAthleteStatus> | null = null;
+    if (callerMembership?.role === OrganisationRole.COACH) {
+      const relationships = await this.coachAthleteRepo.findMany({
+        organisationId: orgId,
+        coachId: req.user.id,
+      });
+      relationshipByAthleteId = new Map(relationships.map((r) => [r.athlete_id, r.status]));
+    }
+
+    return {
+      data: memberships.map((m) =>
+        this.mapToDTO(m, usersById.get(m.user_id), relationshipByAthleteId?.get(m.user_id) ?? null),
+      ),
+    };
   }
 
   async inviteMember(
@@ -361,7 +383,11 @@ export class MembershipsApiService {
     }
   }
 
-  private mapToDTO(m: OrganisationMembership, user?: User): MembershipDTO {
+  private mapToDTO(
+    m: OrganisationMembership,
+    user?: User,
+    coachRelationshipStatus: CoachAthleteStatus | null = null,
+  ): MembershipDTO {
     return {
       id: m.id,
       organisationId: m.organisation_id,
@@ -379,6 +405,9 @@ export class MembershipsApiService {
           ? m.accepted_at.toISOString()
           : String(m.accepted_at)
         : null,
+      // Only set on athlete rows when the caller is a coach with a
+      // relationship row for this athlete; null everywhere else.
+      coachRelationshipStatus: m.role === OrganisationRole.ATHLETE ? coachRelationshipStatus : null,
     };
   }
 }

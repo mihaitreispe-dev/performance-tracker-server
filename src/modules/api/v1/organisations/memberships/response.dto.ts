@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ClientType, OrganisationRole } from 'src/database/interfaces';
+import { ClientType, CoachAthleteStatus, OrganisationRole } from 'src/database/interfaces';
 
 export class MembershipDTO {
   @ApiProperty()
@@ -46,6 +46,26 @@ export class MembershipDTO {
 
   @ApiPropertyOptional({ nullable: true })
   acceptedAt: string | null;
+
+  /**
+   * Coach-athlete relationship status between the *caller* and this
+   * member, scoped to the current org. Present only when (a) the
+   * caller is a COACH in this org, (b) this row is an ATHLETE, and
+   * (c) a row exists in coach_athlete_relationships for the pair.
+   * Null everywhere else — including owner/admin viewers, since they
+   * don't have a 1:1 coaching binding to surface.
+   *
+   * Lets the Members tab disambiguate "athlete accepted the org
+   * invite but hasn't acknowledged the coaching relationship yet"
+   * (PENDING) from "fully linked" (ACTIVE).
+   */
+  @ApiPropertyOptional({
+    enum: CoachAthleteStatus,
+    nullable: true,
+    description:
+      "Coach-athlete relationship status between the caller (when the caller is a coach) and this athlete row. Null otherwise.",
+  })
+  coachRelationshipStatus: CoachAthleteStatus | null;
 }
 
 export class MembershipResponse {
