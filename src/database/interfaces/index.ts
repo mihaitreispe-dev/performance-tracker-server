@@ -86,3 +86,4 @@ export * from './resource-entitlements-table.interface';
 export * from './modules-table.interface';
 export * from './content-items-table.interface';
 export * from './courses-table.interface';
+export * from './inline-images-table.interface';

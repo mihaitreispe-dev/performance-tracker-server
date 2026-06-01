@@ -27,6 +27,7 @@ import { DataImportApiModule } from './data-import/data-import.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { ExploreApiModule } from './explore/explore-api.module';
 import { HealthApiModule } from './health/health-api.module';
+import { InlineImagesApiModule } from './inline-images/inline-images-api.module';
 import { HookApiModule } from './hook/hook-api.module';
 import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
@@ -53,6 +54,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
 @Module({
   imports: [
     HealthApiModule.register(),
+    InlineImagesApiModule.register(),
     HookApiModule.register(),
     IndexApiModule.register(),
     AuthModule.register(),

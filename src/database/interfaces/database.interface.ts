@@ -36,6 +36,7 @@ import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
 import { IllnessLogsTable } from './illness-logs-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
 import { ContentItemsTable } from './content-items-table.interface';
+import { InlineImagesTable } from './inline-images-table.interface';
 import {
   CourseCompletionsTable,
   CourseLessonsTable,
@@ -236,6 +237,8 @@ export interface Database {
 
   // Content layer (snacks, courses, exercise intros)
   content_items: ContentItemsTable;
+  // Inline images embedded in rich-text descriptions.
+  inline_images: InlineImagesTable;
   courses: CoursesTable;
   course_lessons: CourseLessonsTable;
   course_completions: CourseCompletionsTable;
