@@ -151,3 +151,44 @@ async function pushHls(artifacts: TranscodeArtifact[], dir: string, prefix: stri
     artifacts.push({ relKey: `${prefix}${seg}`, localPath: join(dir, seg), contentType: 'video/mp2t' });
   }
 }
+
+/**
+ * Produce a single 9:16 mp4 companion for a snack from its uploaded
+ * source. Snacks are short coached clips delivered over HTTP Range
+ * — no need for the full HLS dance the exercise pipeline runs. Audio
+ * is preserved (unlike the silent exercise demos), centre-crop is the
+ * fit (`crop` mode) so the typical subject in the centre stays visible
+ * instead of getting letterboxed into a stamp. `+faststart` puts the
+ * moov atom at the head so the browser can seek immediately.
+ *
+ * Returns the path to the produced file; caller uploads + sets the
+ * resulting key on content_items.video_portrait_s3_*.
+ */
+export async function transcodeSnackPortrait(opts: {
+  sourcePath: string;
+  outPath: string;
+}): Promise<string> {
+  await runFfmpeg([
+    '-y',
+    '-i',
+    opts.sourcePath,
+    '-vf',
+    fitFilter(720, 1280, 'crop'),
+    '-c:v',
+    'libx264',
+    '-profile:v',
+    'main',
+    '-preset',
+    'fast',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-movflags',
+    '+faststart',
+    opts.outPath,
+  ]);
+  return opts.outPath;
+}

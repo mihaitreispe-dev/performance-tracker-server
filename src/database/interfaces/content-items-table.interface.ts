@@ -27,6 +27,22 @@ export interface ContentItemsTable {
   video_mime_type: string | null;
   thumbnail_s3_bucket: string | null;
   thumbnail_s3_key: string | null;
+  /**
+   * Companion 9:16 cut produced by the local-transcode pipeline (or
+   * MediaConvert in prod). Populated some time after the source
+   * upload finishes; null until then. Phone-portrait viewers prefer
+   * this asset; landscape / desktop viewers fall back to `video_s3_*`.
+   */
+  video_portrait_s3_bucket: string | null;
+  video_portrait_s3_key: string | null;
+  /**
+   * Durable claim for the local-transcode worker. The API flips
+   * `transcode_pending` true in markUploadComplete; the cron stamps
+   * `transcode_started_at` to claim the row (10-minute timeout, then
+   * a stale claim can be re-taken). Mirror of exercises.local_transcode_*.
+   */
+  transcode_pending: ColumnType<boolean, boolean | undefined, boolean>;
+  transcode_started_at: Timestamp | null;
   duration_seconds: number | null;
   status: ContentItemStatus;
   tags: ColumnType<string[], string[] | undefined, string[]>;

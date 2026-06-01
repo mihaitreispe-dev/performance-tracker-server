@@ -13,6 +13,7 @@ import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.reposit
 import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { CoachScheduledPromptRepository } from 'src/repositories/coach-scheduled-prompt.repository';
+import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { FitnessMetricsRepository } from 'src/repositories/fitness-metrics.repository';
 import { PainLogRepository } from 'src/repositories/pain-log.repository';
@@ -56,6 +57,7 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     AthleteRaceRepository,
     CoachAthleteRelationshipRepository,
     CoachScheduledPromptRepository,
+    ContentItemRepository,
     ExerciseRepository,
     FitnessMetricsRepository,
     PainLogRepository,

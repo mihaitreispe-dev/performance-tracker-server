@@ -23,6 +23,15 @@ export class ContentItemDTO {
   @ApiPropertyOptional({ nullable: true })
   videoUrl: string | null;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      '9:16 portrait companion of videoUrl, signed read URL. Populated some time ' +
+      'after upload by the transcode pipeline; null until then. Phone-portrait viewers ' +
+      'prefer this asset over videoUrl; everyone else uses videoUrl (16:9).',
+  })
+  videoPortraitUrl: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   thumbnailUrl: string | null;
 

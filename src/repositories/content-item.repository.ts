@@ -89,4 +89,31 @@ export class ContentItemRepository {
   async deleteById(id: string): Promise<void> {
     await this.db.deleteFrom('content_items').where('id', '=', id).execute();
   }
+
+  /**
+   * Cron-facing claim query: rows where the local-transcode worker
+   * needs to produce the 9:16 companion. Pulls `pending=true` rows
+   * whose claim is either fresh-null or stale-past-the-timeout, so a
+   * dead worker doesn't strand a row. Caller is responsible for
+   * stamping `transcode_started_at` to actually claim — this just
+   * surfaces the queue.
+   */
+  async findManyTranscodePending(claimTimeoutMinutes = 10): Promise<ContentItem[]> {
+    // sql<Date> typed so the where-clause type-checks against the
+    // transcode_started_at column without resorting to `as any`. interval
+    // is hand-rendered (sql.raw) because the value is a known integer
+    // constant, not user input — keeps Kysely's parameter binder out of
+    // the way of Postgres's interval-literal grammar.
+    const staleCutoff = sql<Date>`now() - interval '${sql.raw(String(claimTimeoutMinutes))} minutes'`;
+    return this.db
+      .selectFrom('content_items')
+      .selectAll()
+      .where('transcode_pending', '=', true)
+      .where((eb) =>
+        eb.or([eb('transcode_started_at', 'is', null), eb('transcode_started_at', '<', staleCutoff)]),
+      )
+      .orderBy('created_at', 'asc')
+      .limit(5)
+      .execute();
+  }
 }

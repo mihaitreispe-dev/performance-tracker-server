@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ContentItem, ContentItemStatus, OrganisationRole } from 'src/database/interfaces';
+import { ContentItem, ContentItemKind, ContentItemStatus, OrganisationRole } from 'src/database/interfaces';
 import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
+import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,6 +42,7 @@ export class ContentItemsApiService {
   constructor(
     private readonly contentRepo: ContentItemRepository,
     private readonly s3Service: S3Service,
+    private readonly config: AppConfigService,
   ) {}
 
   async list(req: AuthedRequest, query: ListContentItemsQuery): Promise<ContentItemsListResponse> {
@@ -165,7 +167,12 @@ export class ContentItemsApiService {
     // didn't (older clients, or the canvas capture failed), the row just
     // stays thumbnail-less and the UI shows its placeholder icon. We
     // never block the video on the thumbnail.
-    const patch: { status: ContentItemStatus; thumbnail_s3_bucket?: string; thumbnail_s3_key?: string } = {
+    const patch: {
+      status: ContentItemStatus;
+      thumbnail_s3_bucket?: string;
+      thumbnail_s3_key?: string;
+      transcode_pending?: boolean;
+    } = {
       status: ContentItemStatus.READY,
     };
     const thumbnailKey = this.deriveThumbnailKey(existing.video_s3_key);
@@ -179,6 +186,16 @@ export class ContentItemsApiService {
         patch.thumbnail_s3_bucket = thumbnailBucket;
         patch.thumbnail_s3_key = thumbnailKey;
       }
+    }
+    // Enqueue the 9:16 portrait companion for snacks when local
+    // transcode is on. The cron picks the row up on its next tick and
+    // ffmpegs the source into a centre-cropped 720x1280 mp4 alongside
+    // the original. We don't queue it for course lessons / exercise
+    // intros — those are course-shell or workout-overlay content,
+    // played on the org-app surface that's always landscape. Snacks
+    // are the surface that lands on phones in portrait.
+    if (existing.kind === ContentItemKind.SNACK && this.config.enableLocalTranscode) {
+      patch.transcode_pending = true;
     }
     const updated = await this.contentRepo.updateById(id, patch);
     return { data: await this.mapToDTO(updated) };
@@ -232,6 +249,11 @@ export class ContentItemsApiService {
       description: item.description,
       ownerUserId: item.owner_user_id,
       videoUrl: await this.buildSignedReadUrl(item.video_s3_bucket, item.video_s3_key),
+      // Phone-portrait viewers prefer this one; landscape/desktop
+      // viewers fall back to videoUrl. Null until the local-transcode
+      // cron (or MediaConvert) produces the 9:16 cut — the client
+      // shows the rotate-phone nudge in that interim.
+      videoPortraitUrl: await this.buildSignedReadUrl(item.video_portrait_s3_bucket, item.video_portrait_s3_key),
       thumbnailUrl: await this.buildSignedReadUrl(item.thumbnail_s3_bucket, item.thumbnail_s3_key),
       durationSeconds: item.duration_seconds,
       status: item.status,

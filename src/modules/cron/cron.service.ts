@@ -8,6 +8,7 @@ import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.servi
 import { WearableSyncService } from 'src/modules/openwearables/wearable-sync.service';
 import type { PixelRect } from 'src/modules/smart-crop/crop-geometry';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
+import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { WearableProviderConnectionRepository } from 'src/repositories/wearable-provider-connection.repository';
 
@@ -26,6 +27,7 @@ export class CronService {
     private readonly smartCropService: SmartCropService,
     private readonly configService: AppConfigService,
     private readonly localTranscodeService: LocalTranscodeService,
+    private readonly contentItemRepo: ContentItemRepository,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -153,6 +155,29 @@ export class CronService {
         // pending flag; this catch is just for cron-tick visibility.
         this.logger.error(
           `Local transcode failed for exercise ${exercise.id}: ${(error as Error).message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Local-dev: drain the snack portrait-cut queue. Mirrors the exercise
+   * local-transcode tick. Cheap enough to run every minute because the
+   * claim window + the limit-5 batch on the find query keep the worker
+   * bounded per tick. Failure on a row just clears its pending flag —
+   * we never block playback on the portrait cut, and the rotate-nudge
+   * UX is the graceful fallback for missing variants.
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async syncSnackPortraitTranscode() {
+    if (!this.localTranscodeService.enabled) return;
+    const pending = await this.contentItemRepo.findManyTranscodePending();
+    for (const item of pending) {
+      try {
+        await this.localTranscodeService.transcodeSnack(item);
+      } catch (error) {
+        this.logger.error(
+          `Snack portrait transcode failed for content_item ${item.id}: ${(error as Error).message}`,
         );
       }
     }

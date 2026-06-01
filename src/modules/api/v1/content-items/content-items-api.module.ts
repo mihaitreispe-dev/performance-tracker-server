@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
+import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 
@@ -14,7 +15,7 @@ export class ContentItemsApiModule {
     if (!this.instance) {
       this.instance = {
         module: ContentItemsApiModule,
-        imports: [AuthModule.register(), S3Module.register()],
+        imports: [AuthModule.register(), AppConfigModule.register(), S3Module.register()],
         providers: [ContentItemsApiService, ContentItemRepository],
         controllers: [ContentItemsApiController],
         exports: [ContentItemsApiService, ContentItemRepository],
