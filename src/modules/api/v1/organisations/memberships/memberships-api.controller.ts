@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
+import { RateLimit, RateLimitGuard, RateLimitPresets } from 'src/lib/guards/rate-limit.guard';
 import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
@@ -28,8 +29,21 @@ export class MembershipsApiController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Invite an existing user into this organisation (admin/owner only)' })
+  @ApiOperation({
+    summary:
+      'Invite an existing user into this organisation (coach/admin/owner — role-ceiling applies). Rate-limited per user.',
+  })
   @ApiOkResponse({ type: MembershipResponse })
+  // Per-user rate limit: 20 invites per hour. Stops a compromised
+  // coach account from being used to mass-invite spam, and keeps
+  // honest mistake rate within reason ("did my click register?
+  // let me click it 50 more times"). Pre-existing OWNER/ADMIN
+  // accounts don't escape the limit — same bucket. Platform admins
+  // are intentionally NOT exempted; if a support engineer is
+  // moving more than 20 users an hour in one org they should be
+  // using a different tool.
+  @UseGuards(RateLimitGuard)
+  @RateLimit(RateLimitPresets.INVITE_MEMBER)
   async inviteMember(
     @Req() req: Request & { user: AuthUser },
     @Param() params: OrganisationIdParam,

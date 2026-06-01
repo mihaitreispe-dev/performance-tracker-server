@@ -46,6 +46,24 @@ export const RateLimitPresets = {
   },
   /** General API: 100 requests per minute */
   GENERAL: { limit: 100, windowSeconds: 60, message: 'Rate limit exceeded. Please slow down your requests.' },
+  /**
+   * Member invitations: 20 invites per hour, scoped per authenticated
+   * user (not per IP — coaches behind a NAT shouldn't share a bucket
+   * with their athletes). Enough headroom for a coach onboarding a
+   * class in one sitting; slow enough that a compromised account
+   * can't mass-invite spam. Authenticated routes only; the
+   * keyGenerator falls back to IP if req.user is somehow unset.
+   */
+  INVITE_MEMBER: {
+    limit: 20,
+    windowSeconds: 3600,
+    message:
+      'Too many invitations sent in the last hour. Please wait a bit before sending more.',
+    keyGenerator: (req: Request) => {
+      const userId = (req as Request & { user?: { id?: string } }).user?.id;
+      return userId ? `invite:${userId}` : `invite:ip:${req.ip ?? 'unknown'}`;
+    },
+  },
 } as const;
 
 /**
