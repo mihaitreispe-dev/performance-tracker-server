@@ -12,6 +12,7 @@ import {
   ExerciseInstanceGroupItem,
   ExerciseInstanceMode,
   ExerciseStatus,
+  OrganisationRole,
   Workout,
   WorkoutItem,
 } from 'src/database/interfaces';
@@ -446,7 +447,10 @@ export class WorkoutsApiService {
 
   async update(req: Request & { user: AuthUser }, id: string, body: UpdateWorkoutBody): Promise<WorkoutResponse> {
     const existing = await this.workoutRepo.findById(id);
-    if (!existing || existing.user_id !== req.user.id) {
+    if (!existing) {
+      throw new NotFoundException();
+    }
+    if (!this.canMutateWorkout(req as AuthedRequest, existing)) {
       throw new NotFoundException();
     }
 
@@ -472,12 +476,41 @@ export class WorkoutsApiService {
 
   async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
     const existing = await this.workoutRepo.findById(id);
-    if (!existing || existing.user_id !== req.user.id) {
+    if (!existing) {
+      throw new NotFoundException();
+    }
+    if (!this.canMutateWorkout(req as AuthedRequest, existing)) {
       throw new NotFoundException();
     }
 
     await this.deleteExistingWorkoutItems(id);
     await this.workoutRepo.deleteById(id);
+  }
+
+  /**
+   * Workouts have two ownership concepts: the row's user_id (creator)
+   * and the row's organisation_id (tenant). An athlete creates their
+   * own workouts in the athlete app — they own them by user_id and
+   * only they can edit/delete (matches the pre-existing behaviour).
+   * Coaches/admins/owners in the same org can also edit/delete any
+   * workout in that org, since the org-library / coach-curates-for-
+   * athlete model wants the coach to be able to tweak a workout the
+   * athlete (or another coach) authored.
+   *
+   * Tenancy is preflighted by ActiveOrgGuard via the
+   * X-Organisation-Id header → only members of the row's org reach
+   * here. We still cross-check organisation_id below in case the row
+   * was deleted-and-rewritten in a different tenant between requests.
+   */
+  private canMutateWorkout(req: AuthedRequest, row: Workout): boolean {
+    if (req.activeOrg?.organisationId !== row.organisation_id) return false;
+    if (row.user_id === req.user.id) return true;
+    const role = req.activeOrg?.role;
+    return (
+      role === OrganisationRole.OWNER ||
+      role === OrganisationRole.ADMIN ||
+      role === OrganisationRole.COACH
+    );
   }
 
   private async createWorkoutItems(workoutId: string, items: WorkoutItemBody[]): Promise<void> {
