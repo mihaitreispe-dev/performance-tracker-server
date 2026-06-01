@@ -15,9 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
-import { UserRole } from 'src/database/interfaces';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
-import { Roles } from 'src/modules/auth/decorators/roles.decorator';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { ExercisesApiService } from './exercises-api.service';
@@ -55,7 +53,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Get exercise by ID (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -67,7 +64,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Create exercise (admin only)' })
   @ApiResponse({ status: HttpStatus.CREATED, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -78,7 +74,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Create exercise from a Vimeo source (admin only). Returns immediately; status moves through UPLOAD_PENDING → UPLOAD_DONE asynchronously.',
   })
@@ -95,7 +90,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Retry a previously-failed Vimeo import (admin only). Re-fetches rendition links and restarts the background streaming task.',
   })
@@ -117,7 +111,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update exercise (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -133,7 +126,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Get exercise video upload URL (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseUploadUrlResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -148,7 +140,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Mark exercise video upload as complete (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -163,7 +154,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary:
       'Re-process an exercise video (admin only). Re-runs MediaConvert against the existing source clip to backfill renditions added after the original encode (e.g. the 16:9 companion). Status returns to ASSETS_PENDING.',
@@ -186,7 +176,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete exercise (admin only)' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -199,7 +188,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Get exercise progression chain (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseChainResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -214,7 +202,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Update exercise progression chain (admin only)' })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseChainResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
@@ -230,7 +217,6 @@ export class ExercisesApiController {
   }
 
   @Version('1')
-  @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Remove exercise from its chain (admin only)' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })

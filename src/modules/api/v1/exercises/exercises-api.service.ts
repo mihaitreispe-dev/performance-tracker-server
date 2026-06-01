@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,7 +14,7 @@ import {
   ExerciseLevel,
   ExerciseStatus,
   ExerciseVisibility,
-  UserRole,
+  OrganisationRole,
 } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
 import { assertActiveOrg } from 'src/lib/util/active-org';
@@ -103,7 +104,9 @@ export class ExercisesApiService {
   }
 
   async getById(req: AuthedRequest, id: string): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    // No role check — any member of the org can read the exercises
+    // their org owns (or public exercises from other orgs).
+    // loadReadable enforces the org-or-public tenancy boundary.
     const organisationId = assertActiveOrg(req);
     const exercise = await this.loadReadable(id, organisationId);
     return { data: await this.mapExerciseToDTO(exercise) };
@@ -131,7 +134,7 @@ export class ExercisesApiService {
   }
 
   async create(req: AuthedRequest, body: CreateExerciseBody): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
 
     // Every exercise is a video asset. The thumbnail is extracted from that
@@ -193,7 +196,7 @@ export class ExercisesApiService {
    * can run on demand via markUploadComplete).
    */
   async importFromVimeo(req: AuthedRequest, body: ImportExerciseFromVimeoBody): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
 
     const videoId = this.vimeoService.parseVideoId(body.vimeoUrl);
@@ -233,7 +236,7 @@ export class ExercisesApiService {
    * anything or wrote a partial blob that the new stream will overwrite).
    */
   async retryVimeoImport(req: AuthedRequest, exerciseId: string): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     const existing = await this.loadEditable(exerciseId, organisationId);
 
@@ -289,7 +292,7 @@ export class ExercisesApiService {
   }
 
   async update(req: AuthedRequest, id: string, body: UpdateExerciseBody): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     const existing = await this.loadEditable(id, organisationId);
 
@@ -390,14 +393,14 @@ export class ExercisesApiService {
   }
 
   async delete(req: AuthedRequest, id: string): Promise<void> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     await this.loadEditable(id, organisationId);
     await this.exerciseRepo.deleteById(id);
   }
 
   async getUploadUrl(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseUploadUrlResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     const exercise = await this.loadEditable(params.id, organisationId);
 
@@ -415,7 +418,7 @@ export class ExercisesApiService {
   }
 
   async markUploadComplete(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     const exercise = await this.loadEditable(params.id, organisationId);
 
@@ -437,7 +440,7 @@ export class ExercisesApiService {
    * is retained after processing, so re-encoding needs no re-upload.
    */
   async reprocessAssets(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     const exercise = await this.loadEditable(params.id, organisationId);
 
@@ -526,7 +529,8 @@ export class ExercisesApiService {
   }
 
   async getExerciseChain(req: AuthedRequest, id: string): Promise<ExerciseChainResponse | null> {
-    await this.requireAdmin(req.user.id);
+    // Read — any org member can see the chain a readable exercise
+    // belongs to. loadReadable handles tenancy.
     const organisationId = assertActiveOrg(req);
     await this.loadReadable(id, organisationId);
 
@@ -549,7 +553,7 @@ export class ExercisesApiService {
     id: string,
     body: UpdateExerciseChainBody,
   ): Promise<ExerciseChainResponse> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     await this.loadEditable(id, organisationId);
 
@@ -600,7 +604,7 @@ export class ExercisesApiService {
   }
 
   async removeFromChain(req: Request & { user: AuthUser }, id: string): Promise<void> {
-    await this.requireAdmin(req.user.id);
+    this.requireWriteRole(req);
 
     const exercise = await this.exerciseRepo.findById(id);
     if (!exercise) {
@@ -628,8 +632,33 @@ export class ExercisesApiService {
     };
   }
 
-  private async requireAdmin(userId: string): Promise<void> {
-    await this.accessControlService.hasOneOfRolesOrThrow({ userId, roles: [UserRole.ADMIN] });
+  /**
+   * Org-level write gate. Mutation methods (create, update, delete,
+   * upload-completion, reprocess, chain edit) used to require
+   * UserRole.ADMIN — platform support only. Coaches and org-admins
+   * couldn't curate their own org's exercise library at all. We widen
+   * to anyone in [OWNER, ADMIN, COACH] of the active org, OR a
+   * platform admin dropping in via the ActiveOrgGuard bypass
+   * (req.activeOrg.role is synthesised to OrganisationRole.ADMIN for
+   * them, so the role check already passes).
+   *
+   * Athletes are still locked out — exercise library curation is
+   * coach-and-up.
+   *
+   * Tenancy is enforced separately by loadEditable() against
+   * organisation_id, so this only filters by role.
+   */
+  private requireWriteRole(req: AuthedRequest): void {
+    const role = req.activeOrg?.role;
+    if (
+      role !== OrganisationRole.OWNER &&
+      role !== OrganisationRole.ADMIN &&
+      role !== OrganisationRole.COACH
+    ) {
+      throw new ForbiddenException(
+        'You need to be coach, admin or owner to manage exercises in this organisation',
+      );
+    }
   }
 
   private async mapExerciseToDTO(exercise: Exercise): Promise<ExerciseDTO> {
