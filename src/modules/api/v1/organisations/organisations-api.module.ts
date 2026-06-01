@@ -14,6 +14,7 @@ import { OrganisationMembershipRepository } from 'src/repositories/organisation-
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 
@@ -71,6 +72,11 @@ export class OrganisationsApiModule {
           ContentItemRepository,
           ModuleRepository,
           UserRepository,
+          // Memberships auto-create a coach_athlete_relationships row
+          // when a coach invites an athlete, so the coach can read
+          // that athlete's data through the relationship-gated
+          // endpoints (workouts/executions/metrics).
+          CoachAthleteRelationshipRepository,
         ],
         controllers: [
           OrganisationsApiController,

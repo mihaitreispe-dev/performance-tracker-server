@@ -6,9 +6,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { ClientType, OrganisationMembership, OrganisationRole, User } from 'src/database/interfaces';
+import {
+  CoachAthleteStatus,
+  ClientType,
+  OrganisationMembership,
+  OrganisationRole,
+  User,
+} from 'src/database/interfaces';
 import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
@@ -16,7 +23,32 @@ import { ClientProvisioningService } from '../client-profiles/client-provisionin
 import { InviteMemberDto, UpdateMembershipRoleDto } from './request.dto';
 import { MembershipDTO, MembershipResponse, MembershipsListResponse } from './response.dto';
 
-const ADMIN_ROLES: OrganisationRole[] = [OrganisationRole.OWNER, OrganisationRole.ADMIN];
+/**
+ * Numeric rank for role-ceiling checks. Higher = more authority.
+ * Used so an inviter can only target a role at or below their own —
+ * a coach can't promote themselves to admin via the invite endpoint,
+ * an admin can't elevate someone past their own admin tier, etc.
+ * Platform admins bypass this scale entirely; they're staff support.
+ */
+const ROLE_RANK: Record<OrganisationRole, number> = {
+  [OrganisationRole.OWNER]: 4,
+  [OrganisationRole.ADMIN]: 3,
+  [OrganisationRole.COACH]: 2,
+  [OrganisationRole.ATHLETE]: 1,
+};
+
+/**
+ * Roles allowed to invite / remove / update memberships. Coach is in
+ * this list — the per-call role-ceiling check below is what stops a
+ * coach from inviting peers as owners/admins. (Pre-coach-invite the
+ * gate was OWNER|ADMIN only; widening the gate without the ceiling
+ * would have been a privilege-escalation vector.)
+ */
+const MANAGE_MEMBERSHIP_ROLES: OrganisationRole[] = [
+  OrganisationRole.OWNER,
+  OrganisationRole.ADMIN,
+  OrganisationRole.COACH,
+];
 
 @Injectable()
 export class MembershipsApiService {
@@ -24,6 +56,7 @@ export class MembershipsApiService {
     private readonly membershipRepo: OrganisationMembershipRepository,
     private readonly userRepo: UserRepository,
     private readonly provisioningService: ClientProvisioningService,
+    private readonly coachAthleteRepo: CoachAthleteRelationshipRepository,
   ) {}
 
   async listMembers(req: Request & { user: AuthUser }, orgId: string): Promise<MembershipsListResponse> {
@@ -43,7 +76,11 @@ export class MembershipsApiService {
     orgId: string,
     dto: InviteMemberDto,
   ): Promise<MembershipResponse> {
-    await this.ensureRole(req.user.id, orgId, ADMIN_ROLES);
+    // Gate widens to include COACH; the per-call ceiling below stops
+    // coaches inviting peers as admins/owners and admins inviting
+    // peers as owners.
+    const inviterRole = await this.resolveActorRole(req.user.id, orgId, MANAGE_MEMBERSHIP_ROLES);
+    this.assertCanTargetRole(inviterRole, dto.role);
 
     const invitee = await this.userRepo.findByEmail(dto.email);
     if (!invitee) {
@@ -79,6 +116,28 @@ export class MembershipsApiService {
       });
     }
 
+    // When a coach invites an athlete, auto-create the coach-athlete
+    // relationship in PENDING — without it the coach can't read the
+    // athlete's workouts / executions / metrics (the dedicated guards
+    // gate on coach_athlete_relationships, not on org membership).
+    // Owners / admins inviting athletes skip this auto-link; they
+    // manage clients at the org level, not through a coach binding.
+    if (
+      inviterRole === OrganisationRole.COACH &&
+      dto.role === OrganisationRole.ATHLETE &&
+      req.user.id !== invitee.id
+    ) {
+      await this.coachAthleteRepo
+        .create({
+          organisation_id: orgId,
+          coach_id: req.user.id,
+          athlete_id: invitee.id,
+          status: CoachAthleteStatus.PENDING,
+          invitation_message: dto.invitationMessage?.trim() || null,
+        })
+        .catch(() => undefined); // best-effort — duplicate rows are not fatal
+    }
+
     return { data: this.mapToDTO(membership, invitee) };
   }
 
@@ -88,7 +147,7 @@ export class MembershipsApiService {
     membershipId: string,
     dto: UpdateMembershipRoleDto,
   ): Promise<MembershipResponse> {
-    await this.ensureRole(req.user.id, orgId, ADMIN_ROLES);
+    const inviterRole = await this.resolveActorRole(req.user.id, orgId, MANAGE_MEMBERSHIP_ROLES);
 
     const membership = await this.membershipRepo.findById(membershipId);
     if (!membership || membership.organisation_id !== orgId) {
@@ -97,6 +156,11 @@ export class MembershipsApiService {
     if (membership.user_id === req.user.id && membership.role === OrganisationRole.OWNER) {
       throw new BadRequestException('Owners cannot demote themselves');
     }
+    // Both the current role of the target AND the new role must be at
+    // or below the actor's own role. Otherwise a coach could demote
+    // an owner just because their own role outranks 'athlete'.
+    this.assertCanTargetRole(inviterRole, membership.role);
+    this.assertCanTargetRole(inviterRole, dto.role);
 
     const updated = await this.membershipRepo.updateById(membershipId, { role: dto.role });
     const user = await this.userRepo.findById(updated.user_id);
@@ -108,7 +172,7 @@ export class MembershipsApiService {
     orgId: string,
     membershipId: string,
   ): Promise<void> {
-    await this.ensureRole(req.user.id, orgId, ADMIN_ROLES);
+    const inviterRole = await this.resolveActorRole(req.user.id, orgId, MANAGE_MEMBERSHIP_ROLES);
 
     const membership = await this.membershipRepo.findById(membershipId);
     if (!membership || membership.organisation_id !== orgId) {
@@ -117,6 +181,11 @@ export class MembershipsApiService {
     if (membership.user_id === req.user.id && membership.role === OrganisationRole.OWNER) {
       throw new BadRequestException('Owners cannot remove themselves');
     }
+    // Removal follows the same ceiling as invite / role-change: a
+    // coach can remove athletes but not peers / admins / owners; an
+    // admin can remove anyone below or at admin tier but not the
+    // owner.
+    this.assertCanTargetRole(inviterRole, membership.role);
     await this.membershipRepo.deleteById(membershipId);
   }
 
@@ -162,6 +231,42 @@ export class MembershipsApiService {
     if (ok) return;
     if (await isPlatformAdmin(this.userRepo, userId)) return;
     throw new ForbiddenException('Insufficient permissions in this organisation');
+  }
+
+  /**
+   * Look up the caller's role in the org. Platform admins (no
+   * membership row at all) get an `OWNER`-equivalent placeholder
+   * since they have full authority via ActiveOrgGuard's bypass.
+   * Returns the role so per-call ceiling checks can do their work;
+   * throws Forbidden otherwise.
+   */
+  private async resolveActorRole(
+    userId: string,
+    orgId: string,
+    allowed: OrganisationRole[],
+  ): Promise<OrganisationRole> {
+    const membership = await this.membershipRepo.findByUserAndOrg(userId, orgId);
+    if (membership && allowed.includes(membership.role)) {
+      return membership.role;
+    }
+    if (await isPlatformAdmin(this.userRepo, userId)) {
+      return OrganisationRole.OWNER;
+    }
+    throw new ForbiddenException('Insufficient permissions in this organisation');
+  }
+
+  /**
+   * Reject if the actor would be acting on a role that outranks them.
+   * Coach → can target ATHLETE only; admin → ATHLETE, COACH, or
+   * ADMIN; owner → anything. The check uses the ROLE_RANK ordering so
+   * adding a new role only needs one line update in that table.
+   */
+  private assertCanTargetRole(actor: OrganisationRole, target: OrganisationRole): void {
+    if (ROLE_RANK[target] > ROLE_RANK[actor]) {
+      throw new ForbiddenException(
+        `You don't have permission to act on a ${target} membership at your role`,
+      );
+    }
   }
 
   private mapToDTO(m: OrganisationMembership, user?: User): MembershipDTO {
