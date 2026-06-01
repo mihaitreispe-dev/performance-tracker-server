@@ -11276,7 +11276,23 @@
     "/v1/coaching/athletes": {
       "get": {
         "operationId": "CoachingApiController_getAthletes",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by relationship status. Omit for the default active+pending roster view; pass `declined` or `removed` to see historical cohorts.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "active",
+                "declined",
+                "removed"
+              ]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",

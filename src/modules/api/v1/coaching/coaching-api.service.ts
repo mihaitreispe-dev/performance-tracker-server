@@ -71,6 +71,7 @@ import {
   InviteAthleteBody,
   ListAthleteLabelsQuery,
   ListAthleteSchedulesQuery,
+  ListAthletesQuery,
   ListMessagesQuery,
   SendMessageBody,
   UpdateAthleteIntakeBody,
@@ -285,12 +286,20 @@ export class CoachingApiService {
   }
 
   // Coach's Athletes
-  async getAthletes(req: AuthedRequest): Promise<AthleteListResponse> {
+  async getAthletes(req: AuthedRequest, query?: ListAthletesQuery): Promise<AthleteListResponse> {
     const organisationId = assertActiveOrg(req);
+    // The org-app team page tabs hit this endpoint with the
+    // status param explicitly set (active / pending / declined /
+    // removed). Calls without a status default to the historical
+    // "roster" view (active + pending) so existing consumers
+    // (athlete detail, scheduling flows) don't change.
+    const status: CoachAthleteStatus[] = query?.status
+      ? [query.status]
+      : [CoachAthleteStatus.ACTIVE, CoachAthleteStatus.PENDING];
     const relationships = await this.relationshipRepo.findMany({
       organisationId,
       coachId: req.user.id,
-      status: [CoachAthleteStatus.ACTIVE, CoachAthleteStatus.PENDING],
+      status,
     });
 
     const data: AthleteDTO[] = [];

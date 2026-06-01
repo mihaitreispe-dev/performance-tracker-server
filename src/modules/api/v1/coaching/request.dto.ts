@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEmail,
+  IsEnum,
   IsIn,
   IsInt,
   IsNumber,
@@ -14,6 +15,25 @@ import {
   Max,
   Min,
 } from 'class-validator';
+import { CoachAthleteStatus } from 'src/database/interfaces';
+
+/**
+ * Filter for GET /coaching/athletes. Defaults to active + pending
+ * server-side when omitted — that's the historical "roster" view.
+ * Pass a specific status to surface the declined / removed cohorts
+ * separately in the org-app team tabs.
+ */
+export class ListAthletesQuery {
+  @ApiPropertyOptional({
+    enum: CoachAthleteStatus,
+    description:
+      'Filter by relationship status. Omit for the default active+pending roster view; ' +
+      'pass `declined` or `removed` to see historical cohorts.',
+  })
+  @IsOptional()
+  @IsEnum(CoachAthleteStatus)
+  status?: CoachAthleteStatus;
+}
 
 export class InviteAthleteBody {
   @ApiProperty({ description: 'Email of the athlete to invite' })

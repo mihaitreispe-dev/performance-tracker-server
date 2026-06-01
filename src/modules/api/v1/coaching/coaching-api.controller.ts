@@ -66,6 +66,7 @@ import {
   LabelIdParam,
   ListAthleteLabelsQuery,
   ListAthleteSchedulesQuery,
+  ListAthletesQuery,
   ListMessagesQuery,
   ScheduleIdParam,
   SendMessageBody,
@@ -178,8 +179,11 @@ export class CoachingApiController {
   @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Not a coach' })
   @Roles(UserRole.COACH)
   @Get('athletes')
-  async getAthletes(@Req() req: Request & { user: AuthUser }): Promise<AthleteListResponse> {
-    return this.service.getAthletes(req);
+  async getAthletes(
+    @Req() req: Request & { user: AuthUser },
+    @Query() query: ListAthletesQuery,
+  ): Promise<AthleteListResponse> {
+    return this.service.getAthletes(req, query);
   }
 
   @Version('1')
