@@ -37,6 +37,7 @@ import { IllnessLogsTable } from './illness-logs-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
 import { ContentItemsTable } from './content-items-table.interface';
 import { InlineImagesTable } from './inline-images-table.interface';
+import { MembershipAuditLogTable } from './membership-audit-log-table.interface';
 import {
   CourseCompletionsTable,
   CourseLessonsTable,
@@ -239,6 +240,8 @@ export interface Database {
   content_items: ContentItemsTable;
   // Inline images embedded in rich-text descriptions.
   inline_images: InlineImagesTable;
+  // Append-only log of membership mutations for ops forensics.
+  membership_audit_log: MembershipAuditLogTable;
   courses: CoursesTable;
   course_lessons: CourseLessonsTable;
   course_completions: CourseCompletionsTable;

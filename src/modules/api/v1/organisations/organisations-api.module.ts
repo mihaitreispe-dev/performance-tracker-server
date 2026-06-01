@@ -15,6 +15,7 @@ import { OrganisationThemeRepository } from 'src/repositories/organisation-theme
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
+import { MembershipAuditLogRepository } from 'src/repositories/membership-audit-log.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 
@@ -77,6 +78,9 @@ export class OrganisationsApiModule {
           // that athlete's data through the relationship-gated
           // endpoints (workouts/executions/metrics).
           CoachAthleteRelationshipRepository,
+          // Append-only audit log written on every membership
+          // mutation (invite/accept/role_changed/removed/self_left).
+          MembershipAuditLogRepository,
         ],
         controllers: [
           OrganisationsApiController,

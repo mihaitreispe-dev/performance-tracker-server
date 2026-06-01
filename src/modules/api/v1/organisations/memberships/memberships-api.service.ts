@@ -16,6 +16,7 @@ import {
 import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
+import { MembershipAuditLogRepository } from 'src/repositories/membership-audit-log.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
@@ -57,6 +58,7 @@ export class MembershipsApiService {
     private readonly userRepo: UserRepository,
     private readonly provisioningService: ClientProvisioningService,
     private readonly coachAthleteRepo: CoachAthleteRelationshipRepository,
+    private readonly auditRepo: MembershipAuditLogRepository,
   ) {}
 
   async listMembers(req: Request & { user: AuthUser }, orgId: string): Promise<MembershipsListResponse> {
@@ -138,6 +140,18 @@ export class MembershipsApiService {
         .catch(() => undefined); // best-effort — duplicate rows are not fatal
     }
 
+    await this.auditRepo.record({
+      organisation_id: orgId,
+      actor_user_id: req.user.id,
+      target_user_id: invitee.id,
+      membership_id: membership.id,
+      action: 'invited',
+      from_role: null,
+      to_role: dto.role,
+      actor_role: inviterRole,
+      metadata: { clientType: clientType ?? null, hasMessage: !!dto.invitationMessage?.trim() },
+    });
+
     return { data: this.mapToDTO(membership, invitee) };
   }
 
@@ -164,6 +178,17 @@ export class MembershipsApiService {
 
     const updated = await this.membershipRepo.updateById(membershipId, { role: dto.role });
     const user = await this.userRepo.findById(updated.user_id);
+    await this.auditRepo.record({
+      organisation_id: orgId,
+      actor_user_id: req.user.id,
+      target_user_id: updated.user_id,
+      membership_id: updated.id,
+      action: 'role_changed',
+      from_role: membership.role,
+      to_role: dto.role,
+      actor_role: inviterRole,
+      metadata: {},
+    });
     return { data: this.mapToDTO(updated, user ?? undefined) };
   }
 
@@ -187,6 +212,17 @@ export class MembershipsApiService {
     // owner.
     this.assertCanTargetRole(inviterRole, membership.role);
     await this.membershipRepo.deleteById(membershipId);
+    await this.auditRepo.record({
+      organisation_id: orgId,
+      actor_user_id: req.user.id,
+      target_user_id: membership.user_id,
+      membership_id: membership.id,
+      action: 'removed',
+      from_role: membership.role,
+      to_role: null,
+      actor_role: inviterRole,
+      metadata: {},
+    });
   }
 
   async acceptInvitation(
@@ -200,6 +236,21 @@ export class MembershipsApiService {
     }
     const accepted = await this.membershipRepo.accept(membershipId);
     const user = await this.userRepo.findById(accepted.user_id);
+    await this.auditRepo.record({
+      organisation_id: orgId,
+      actor_user_id: req.user.id,
+      target_user_id: accepted.user_id,
+      membership_id: accepted.id,
+      action: 'accepted',
+      from_role: null,
+      to_role: accepted.role,
+      // The accepter IS the target, so actor_role mirrors the
+      // accepted role at the time. We don't run resolveActorRole here
+      // because the caller may not yet have other-org membership the
+      // helper expects.
+      actor_role: accepted.role,
+      metadata: {},
+    });
     return { data: this.mapToDTO(accepted, user ?? undefined) };
   }
 
@@ -217,6 +268,17 @@ export class MembershipsApiService {
       );
     }
     await this.membershipRepo.deleteById(membership.id);
+    await this.auditRepo.record({
+      organisation_id: orgId,
+      actor_user_id: req.user.id,
+      target_user_id: req.user.id,
+      membership_id: membership.id,
+      action: 'self_left',
+      from_role: membership.role,
+      to_role: null,
+      actor_role: membership.role,
+      metadata: {},
+    });
   }
 
   private async ensureMember(userId: string, orgId: string): Promise<void> {
