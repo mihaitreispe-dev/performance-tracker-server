@@ -215,6 +215,23 @@ export class CoachingApiService {
       invitation_message: body.message ?? null,
     });
 
+    // Notify the athlete that a coach invited them. Fire-and-forget
+    // through the same path used by messages / workout-assignments —
+    // the SSE channel pushes to any live athlete-app session, and
+    // /notifications/list picks it up on next mount. Errors must NOT
+    // roll the invite back; we swallow so a notification hiccup
+    // doesn't strand a usable relationship row.
+    const coachName = coach.display_name || coach.email || 'Your new coach';
+    await this.notificationsService
+      .createNotification(
+        athlete.id,
+        NotificationType.INVITATION_RECEIVED,
+        `${coachName} invited you to coach you`,
+        body.message?.trim() || undefined,
+        { coachId: coach.id, relationshipId: relationship.id, senderName: coachName },
+      )
+      .catch(() => undefined);
+
     return {
       data: this.mapToInvitationDTO(relationship, coach),
     };
@@ -262,6 +279,27 @@ export class CoachingApiService {
       coach_id: updated.coach_id,
     });
 
+    // Notify the coach that their invitation was accepted. Same
+    // fire-and-forget shape as the invite path — the accept must
+    // succeed for the athlete regardless of notification status.
+    const athlete = await this.userRepo.findById(req.user.id);
+    if (athlete) {
+      const athleteName = athlete.display_name || athlete.email || 'Your new athlete';
+      await this.notificationsService
+        .createNotification(
+          updated.coach_id,
+          NotificationType.INVITATION_ACCEPTED,
+          `${athleteName} accepted your invitation`,
+          undefined,
+          {
+            athleteId: athlete.id,
+            relationshipId: updated.id,
+            athleteName,
+          },
+        )
+        .catch(() => undefined);
+    }
+
     return {
       data: this.mapToInvitationDTO(updated, coach!),
     };
@@ -279,6 +317,26 @@ export class CoachingApiService {
 
     const updated = await this.relationshipRepo.respond(id, CoachAthleteStatus.DECLINED);
     const coach = await this.userRepo.findById(updated.coach_id);
+
+    // Tell the coach the invitation was declined so they don't sit
+    // refreshing the team page waiting. Same fire-and-forget shape.
+    const athlete = await this.userRepo.findById(req.user.id);
+    if (athlete) {
+      const athleteName = athlete.display_name || athlete.email || 'The athlete';
+      await this.notificationsService
+        .createNotification(
+          updated.coach_id,
+          NotificationType.INVITATION_DECLINED,
+          `${athleteName} declined your invitation`,
+          undefined,
+          {
+            athleteId: athlete.id,
+            relationshipId: updated.id,
+            athleteName,
+          },
+        )
+        .catch(() => undefined);
+    }
 
     return {
       data: this.mapToInvitationDTO(updated, coach!),

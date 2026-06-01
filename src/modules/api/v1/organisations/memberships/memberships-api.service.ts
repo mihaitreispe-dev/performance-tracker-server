@@ -9,6 +9,7 @@ import { Request } from 'express';
 import {
   CoachAthleteStatus,
   ClientType,
+  NotificationType,
   OrganisationMembership,
   OrganisationRole,
   User,
@@ -21,6 +22,7 @@ import { OrganisationMembershipRepository } from 'src/repositories/organisation-
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { ClientProvisioningService } from '../client-profiles/client-provisioning.service';
+import { NotificationsApiService } from '../../notifications/notifications-api.service';
 import { InviteMemberDto, UpdateMembershipRoleDto } from './request.dto';
 import { MembershipDTO, MembershipResponse, MembershipsListResponse } from './response.dto';
 
@@ -59,6 +61,7 @@ export class MembershipsApiService {
     private readonly provisioningService: ClientProvisioningService,
     private readonly coachAthleteRepo: CoachAthleteRelationshipRepository,
     private readonly auditRepo: MembershipAuditLogRepository,
+    private readonly notificationsService: NotificationsApiService,
   ) {}
 
   async listMembers(req: Request & { user: AuthUser }, orgId: string): Promise<MembershipsListResponse> {
@@ -124,12 +127,16 @@ export class MembershipsApiService {
     // gate on coach_athlete_relationships, not on org membership).
     // Owners / admins inviting athletes skip this auto-link; they
     // manage clients at the org level, not through a coach binding.
+    // The relationship-create is best-effort: duplicate rows on a
+    // re-invite aren't fatal; we capture the row ID for the
+    // INVITATION_RECEIVED notification on success.
+    let coachAthleteRelationshipId: string | null = null;
     if (
       inviterRole === OrganisationRole.COACH &&
       dto.role === OrganisationRole.ATHLETE &&
       req.user.id !== invitee.id
     ) {
-      await this.coachAthleteRepo
+      const created = await this.coachAthleteRepo
         .create({
           organisation_id: orgId,
           coach_id: req.user.id,
@@ -137,7 +144,30 @@ export class MembershipsApiService {
           status: CoachAthleteStatus.PENDING,
           invitation_message: dto.invitationMessage?.trim() || null,
         })
-        .catch(() => undefined); // best-effort — duplicate rows are not fatal
+        .catch(() => null);
+      coachAthleteRelationshipId = created?.id ?? null;
+
+      // Notify the athlete — same shape the /coaching/invitations
+      // path uses, so the athlete-app sees one consistent stream
+      // regardless of which entry point the coach used. Swallowed
+      // because a notification hiccup shouldn't fail the invite.
+      if (coachAthleteRelationshipId) {
+        const coach = await this.userRepo.findById(req.user.id);
+        const coachName = coach?.display_name || coach?.email || 'Your new coach';
+        await this.notificationsService
+          .createNotification(
+            invitee.id,
+            NotificationType.INVITATION_RECEIVED,
+            `${coachName} invited you to coach you`,
+            dto.invitationMessage?.trim() || undefined,
+            {
+              coachId: req.user.id,
+              relationshipId: coachAthleteRelationshipId,
+              senderName: coachName,
+            },
+          )
+          .catch(() => undefined);
+      }
     }
 
     await this.auditRepo.record({
