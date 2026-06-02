@@ -299,3 +299,138 @@ describe('WorkoutExecutionsApiService.getSummary', () => {
     expect(data.totalVolume).toBeNull();
   });
 });
+
+describe('WorkoutExecutionsApiService.update — finish idempotency (A3)', () => {
+  let service: WorkoutExecutionsApiService;
+  let workoutExecutionRepo: jest.Mocked<WorkoutExecutionRepository>;
+  let workoutScheduleRepo: jest.Mocked<WorkoutScheduleRepository>;
+  let workoutRepo: jest.Mocked<WorkoutRepository>;
+  let prDetectionService: jest.Mocked<PersonalRecordsDetectionService>;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        WorkoutExecutionsApiService,
+        {
+          provide: WorkoutExecutionRepository,
+          useValue: { findById: jest.fn(), updateById: jest.fn() },
+        },
+        { provide: SetCompletionRepository, useValue: {} },
+        { provide: CardioMetricsRepository, useValue: {} },
+        { provide: WorkoutRouteRepository, useValue: { findByExecutionId: jest.fn() } },
+        {
+          provide: WorkoutScheduleRepository,
+          useValue: { findById: jest.fn(), updateById: jest.fn() },
+        },
+        { provide: WorkoutRepository, useValue: { findById: jest.fn() } },
+        {
+          provide: PersonalRecordsDetectionService,
+          useValue: { detectAndStorePRs: jest.fn().mockResolvedValue(undefined) },
+        },
+        { provide: WeatherService, useValue: {} },
+        { provide: ExecutionWeatherRepository, useValue: {} },
+        { provide: CoachAthleteRelationshipRepository, useValue: {} },
+        { provide: AthletePrivacySettingsRepository, useValue: {} },
+        { provide: RpeTssTrackingRepository, useValue: {} },
+        { provide: TrainingStressRepository, useValue: {} },
+        { provide: ExerciseInstanceRepository, useValue: {} },
+        { provide: ExerciseRepository, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get(WorkoutExecutionsApiService);
+    workoutExecutionRepo = module.get(WorkoutExecutionRepository);
+    workoutScheduleRepo = module.get(WorkoutScheduleRepository);
+    workoutRepo = module.get(WorkoutRepository);
+    prDetectionService = module.get(PersonalRecordsDetectionService);
+  });
+
+  // A double-tap on Finish or a multi-device race should fire the
+  // completion side-effects (PR detection, schedule completion,
+  // weather fetch) exactly once — the spec's F-06 contract.
+
+  it('runs completion side-effects on the first finish', async () => {
+    const pending = { ...baseExecution, completed_at: null, workout_schedule_id: 'sched-1' } as WorkoutExecution;
+    workoutExecutionRepo.findById.mockResolvedValue(pending);
+    workoutExecutionRepo.updateById.mockResolvedValue({
+      ...pending,
+      completed_at: new Date('2026-05-19T11:00:00Z'),
+      duration_seconds: 3600,
+    } as WorkoutExecution);
+    workoutScheduleRepo.findById.mockResolvedValue({
+      id: 'sched-1',
+      workout_id: 'workout-1',
+    } as never);
+    workoutRepo.findById.mockResolvedValue(undefined as never);
+
+    await service.update(reqFor(), executionId, {
+      completedAt: '2026-05-19T11:00:00Z',
+      durationSeconds: 3600,
+    });
+
+    // completed_at made it into the patch
+    expect(workoutExecutionRepo.updateById).toHaveBeenCalledWith(
+      executionId,
+      expect.objectContaining({ completed_at: expect.any(Date), duration_seconds: 3600 }),
+    );
+    // schedule got marked finished
+    expect(workoutScheduleRepo.updateById).toHaveBeenCalledWith(
+      'sched-1',
+      expect.objectContaining({ completed_at: expect.any(Date) }),
+    );
+    // PR detection fired
+    expect(prDetectionService.detectAndStorePRs).toHaveBeenCalledWith(executionId, userId);
+  });
+
+  it('skips completion side-effects when execution is already finished (multi-device race)', async () => {
+    const alreadyDone = {
+      ...baseExecution,
+      completed_at: new Date('2026-05-19T10:45:00Z'),
+      workout_schedule_id: 'sched-1',
+    } as WorkoutExecution;
+    workoutExecutionRepo.findById.mockResolvedValue(alreadyDone);
+    workoutRepo.findById.mockResolvedValue(undefined as never);
+
+    await service.update(reqFor(), executionId, {
+      completedAt: '2026-05-19T11:15:00Z',
+      durationSeconds: 4500,
+    });
+
+    // No write to the execution row at all — completedAt + duration
+    // were both rejected because alreadyFinished, and there are no
+    // other patch fields in this body.
+    expect(workoutExecutionRepo.updateById).not.toHaveBeenCalled();
+    // No schedule write
+    expect(workoutScheduleRepo.updateById).not.toHaveBeenCalled();
+    // No PR re-detection
+    expect(prDetectionService.detectAndStorePRs).not.toHaveBeenCalled();
+  });
+
+  it('still allows notes edit after finish (notes are not part of the completion snapshot)', async () => {
+    const alreadyDone = {
+      ...baseExecution,
+      completed_at: new Date('2026-05-19T10:45:00Z'),
+      workout_schedule_id: null,
+    } as WorkoutExecution;
+    workoutExecutionRepo.findById.mockResolvedValue(alreadyDone);
+    workoutExecutionRepo.updateById.mockResolvedValue({
+      ...alreadyDone,
+      notes: 'felt great',
+    } as WorkoutExecution);
+    workoutRepo.findById.mockResolvedValue(undefined as never);
+
+    await service.update(reqFor(), executionId, {
+      // Important: caller may also re-send completedAt; we must drop
+      // it from the patch but still process notes.
+      completedAt: '2026-05-19T11:15:00Z',
+      notes: 'felt great',
+    });
+
+    expect(workoutExecutionRepo.updateById).toHaveBeenCalledWith(
+      executionId,
+      // Only notes — no completed_at, no duration_seconds.
+      { notes: 'felt great' },
+    );
+    expect(prDetectionService.detectAndStorePRs).not.toHaveBeenCalled();
+  });
+});

@@ -402,23 +402,51 @@ export class WorkoutExecutionsApiService {
       throw new ForbiddenException('Access denied');
     }
 
+    // F-06 idempotency: the completion side-effects (writing
+    // completed_at, finishing the schedule, detecting PRs, fetching
+    // weather) must fire EXACTLY once per execution even if the
+    // client double-taps Finish, two devices race the same execution,
+    // or an offline-queued call lands after the canonical completion.
+    //
+    // The canonical "is this already finished?" signal is
+    // `execution.completed_at != null` — we snapshot it BEFORE we
+    // call updateById so a concurrent write doesn't lie to us, and
+    // we drop completedAt from the patch when it's already set so
+    // the timestamp stays anchored to the first finisher. The rest
+    // of the patch (notes, durationSeconds) is still honoured because
+    // those are legitimately editable after finish.
+    const alreadyFinished = execution.completed_at != null;
+
     const updateData: Record<string, unknown> = {};
-    if (body.completedAt !== undefined) {
+    if (body.completedAt !== undefined && !alreadyFinished) {
       updateData.completed_at = new Date(body.completedAt);
     }
-    if (body.durationSeconds !== undefined) {
+    if (body.durationSeconds !== undefined && !alreadyFinished) {
+      // durationSeconds is part of the completion snapshot; once
+      // anchored, we don't let later writes shift it either.
       updateData.duration_seconds = body.durationSeconds;
     }
     if (body.notes !== undefined) {
       updateData.notes = body.notes;
     }
 
-    const updatedExecution = await this.workoutExecutionRepository.updateById(id, updateData as any);
+    // If alreadyFinished AND the patch was *only* completion fields,
+    // updateData ends up empty — return the existing row instead of
+    // running a no-op SQL update. This keeps the response idempotent
+    // (same DTO back as the first finisher saw) without an extra
+    // round trip.
+    const updatedExecution =
+      Object.keys(updateData).length > 0
+        ? await this.workoutExecutionRepository.updateById(id, updateData as any)
+        : execution;
 
-    // Also mark the schedule as completed if the execution is completed
-    // and move the scheduled_date to the completion date if they differ
-    if (body.completedAt && updatedExecution.workout_schedule_id) {
-      const completionDate = new Date(body.completedAt);
+    // The schedule update + PR detection + weather fetch are the
+    // "first-finisher only" side effects. Skip them if we just
+    // observed alreadyFinished — they ran for the original caller.
+    const isFirstFinish = !alreadyFinished && body.completedAt;
+
+    if (isFirstFinish && updatedExecution.workout_schedule_id) {
+      const completionDate = new Date(body.completedAt!);
       // Use UTC methods to avoid timezone issues
       const completionDateOnly = new Date(
         Date.UTC(completionDate.getUTCFullYear(), completionDate.getUTCMonth(), completionDate.getUTCDate()),
@@ -430,13 +458,16 @@ export class WorkoutExecutionsApiService {
       });
     }
 
-    // Trigger PR detection asynchronously when workout is completed
-    if (body.completedAt) {
+    // Trigger PR detection + weather fetch only on the first finish.
+    // Both are best-effort fire-and-forget; we still want them
+    // gated so a second finisher doesn't risk a double-insert in
+    // the detector (depends on its own dedup, which we shouldn't rely
+    // on from this layer).
+    if (isFirstFinish) {
       this.personalRecordsDetectionService.detectAndStorePRs(id, req.user.id).catch((error) => {
         this.logger.error(`Failed to detect PRs for execution ${id}:`, error);
       });
 
-      // Trigger weather fetch asynchronously for workouts with route data
       this.triggerWeatherFetch(id, updatedExecution.started_at);
     }
 
