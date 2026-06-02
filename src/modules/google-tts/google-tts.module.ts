@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 
+import { AppConfigService } from '../config/app-config.service';
 import { GoogleTtsService } from './google-tts.service';
 
 /**
@@ -10,7 +11,7 @@ import { GoogleTtsService } from './google-tts.service';
  */
 @Global()
 @Module({
-  providers: [GoogleTtsService],
+  providers: [GoogleTtsService, AppConfigService],
   exports: [GoogleTtsService],
 })
 export class GoogleTtsModule {}

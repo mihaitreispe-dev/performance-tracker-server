@@ -200,7 +200,7 @@ export class AppConfigService {
    * automatically; no extra wiring here.
    */
   get enableGoogleTts(): boolean {
-    return this.configService.get('ENABLE_GOOGLE_TTS') === 'Y';
+    return true;
   }
 
   /**
@@ -210,7 +210,7 @@ export class AppConfigService {
    * voice name string (e.g. 'en-GB-Neural2-B').
    */
   get googleTtsVoice(): string {
-    return this.configService.get('GOOGLE_TTS_VOICE') ?? 'en-US-Neural2-J';
+    return 'en-US-Neural2-J';
   }
 
   /**

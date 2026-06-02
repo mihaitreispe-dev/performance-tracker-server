@@ -21,10 +21,10 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { ExercisesApiService } from './exercises-api.service';
 import {
   CreateExerciseBody,
-  ImportExerciseFromVimeoBody,
   ExerciseIdParam,
-  ListExercisesQuery,
   GenerateExerciseVoiceoverBody,
+  ImportExerciseFromVimeoBody,
+  ListExercisesQuery,
   RequestExerciseVoiceoverUploadBody,
   UpdateExerciseBody,
   UpdateExerciseChainBody,
@@ -77,12 +77,17 @@ export class ExercisesApiController {
 
   @Version('1')
   @ApiOperation({
-    summary: 'Create exercise from a Vimeo source (admin only). Returns immediately; status moves through UPLOAD_PENDING → UPLOAD_DONE asynchronously.',
+    summary:
+      'Create exercise from a Vimeo source (admin only). Returns immediately; status moves through UPLOAD_PENDING → UPLOAD_DONE asynchronously.',
   })
   @ApiResponse({ status: HttpStatus.CREATED, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
-  @ApiResponse({ status: HttpStatus.UNPROCESSABLE_ENTITY, type: ErrorResponse, description: 'Vimeo error (bad URL, no access, no progressive renditions)' })
+  @ApiResponse({
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    type: ErrorResponse,
+    description: 'Vimeo error (bad URL, no access, no progressive renditions)',
+  })
   @Post('from-vimeo')
   async importFromVimeo(
     @Req() req: Request & { user: AuthUser },
@@ -93,7 +98,8 @@ export class ExercisesApiController {
 
   @Version('1')
   @ApiOperation({
-    summary: 'Retry a previously-failed Vimeo import (admin only). Re-fetches rendition links and restarts the background streaming task.',
+    summary:
+      'Retry a previously-failed Vimeo import (admin only). Re-fetches rendition links and restarts the background streaming task.',
   })
   @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })

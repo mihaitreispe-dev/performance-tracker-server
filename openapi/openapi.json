@@ -1144,6 +1144,86 @@
         ]
       }
     },
+    "/v1/exercises/{id}/voiceover/upload-url": {
+      "post": {
+        "operationId": "ExercisesApiController_getVoiceoverUploadUrl",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Exercise ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestExerciseVoiceoverUploadBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "400": {
+            "description": "Unsupported mime type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Get exercise voice-over upload URL (admin only)",
+        "tags": [
+          "exercises"
+        ]
+      }
+    },
     "/v1/exercises/{id}/upload-completion": {
       "post": {
         "operationId": "ExercisesApiController_markUploadComplete",
@@ -26410,6 +26490,26 @@
             "nullable": true,
             "description": "Vimeo source video id, if imported from Vimeo."
           },
+          "voiceoverMode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "recorded",
+              "generated_from_cues"
+            ]
+          },
+          "voiceoverUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "voiceoverMimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "voiceoverScript": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -26429,6 +26529,7 @@
           "equipment",
           "primaryMuscles",
           "secondaryMuscles",
+          "voiceoverMode",
           "createdAt",
           "updatedAt"
         ]
@@ -26652,6 +26753,18 @@
             "type": "number",
             "nullable": true,
             "description": "Inline intro end marker (seconds into the main video). The Skip-intro button skips to this point."
+          },
+          "voiceoverMode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "recorded",
+              "generated_from_cues"
+            ]
+          },
+          "voiceoverScript": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -26675,6 +26788,18 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "RequestExerciseVoiceoverUploadBody": {
+        "type": "object",
+        "properties": {
+          "mimeType": {
+            "type": "string",
+            "description": "Audio MIME type — audio/mpeg, audio/mp4, audio/webm, audio/wav are accepted."
+          }
+        },
+        "required": [
+          "mimeType"
         ]
       },
       "ExerciseChainMemberDTO": {
