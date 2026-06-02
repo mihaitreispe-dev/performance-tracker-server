@@ -3,6 +3,24 @@ export const s3Keys = {
     exercise: ({ visitorId, filename }: { visitorId: string; filename: string }) => ({
       video: `exercises/${visitorId}/${filename}`,
     }),
+    /**
+     * Per-exercise voice-over recording. Lives under the same per-user
+     * uploads prefix as the video so storage policies / cleanup tasks
+     * cover it uniformly. `voiceover-` filename prefix keeps it
+     * trivially distinguishable from the video file in S3 console
+     * listings.
+     */
+    exerciseVoiceover: ({
+      visitorId,
+      exerciseId,
+      filename,
+    }: {
+      visitorId: string;
+      exerciseId: string;
+      filename: string;
+    }) => ({
+      audio: `exercises/${visitorId}/${exerciseId}/voiceover-${filename}`,
+    }),
     workoutImport: ({ userId, filename }: { userId: string; filename: string }) => ({
       file: `workout-imports/${userId}/${filename}`,
     }),

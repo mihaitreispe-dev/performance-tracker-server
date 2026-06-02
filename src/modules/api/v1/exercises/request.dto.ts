@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { ExerciseLevel, ExerciseVisibility } from 'src/database/interfaces';
+import { ExerciseLevel, ExerciseVisibility, ExerciseVoiceoverMode } from 'src/database/interfaces';
 import { type SortOptions, SortParam } from 'src/lib/http/decorators/sort-param';
 import { SearchableQuery } from 'src/lib/http/dto/page-request.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -170,6 +170,44 @@ export class UpdateExerciseBody {
   @Min(0)
   @IsOptional()
   introEndSeconds?: number | null;
+
+  /**
+   * Voice-over mode. Setting to 'off' clears any previously uploaded
+   * recording; setting to 'recorded' requires a separate upload via
+   * the voice-over upload-URL endpoint OR a previous upload already
+   * on file. Setting to 'generated_from_cues' is free — the client
+   * generates speech locally from cues at playback time.
+   */
+  @ApiPropertyOptional({ enum: ExerciseVoiceoverMode })
+  @IsEnumString(ExerciseVoiceoverMode)
+  @IsOptional()
+  voiceoverMode?: ExerciseVoiceoverMode;
+
+  /**
+   * Override script for generated-from-cues mode. Pass null to clear
+   * back to the cues-joined default. Ignored when mode is 'off' or
+   * 'recorded'.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsString()
+  @IsOptional()
+  voiceoverScript?: string | null;
+}
+
+/**
+ * Request body for the voice-over upload URL endpoint. Mirror of
+ * RequestExerciseVideoUploadBody but for the recorded VO audio file.
+ * The caller PUTs the bytes to the returned presigned URL; the server
+ * stamps voiceover_s3_* + flips mode to 'recorded' once the upload
+ * completes.
+ */
+export class RequestExerciseVoiceoverUploadBody {
+  @ApiProperty({
+    type: String,
+    description: 'Audio MIME type — audio/mpeg, audio/mp4, audio/webm, audio/wav are accepted.',
+  })
+  @IsString()
+  mimeType: string;
 }
 
 export class ImportExerciseFromVimeoBody {

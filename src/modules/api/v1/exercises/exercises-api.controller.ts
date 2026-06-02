@@ -24,6 +24,7 @@ import {
   ImportExerciseFromVimeoBody,
   ExerciseIdParam,
   ListExercisesQuery,
+  RequestExerciseVoiceoverUploadBody,
   UpdateExerciseBody,
   UpdateExerciseChainBody,
 } from './request.dto';
@@ -137,6 +138,28 @@ export class ExercisesApiController {
     @Param() params: ExerciseIdParam,
   ): Promise<ExerciseUploadUrlResponse> {
     return this.service.getUploadUrl(req, params);
+  }
+
+  /**
+   * Voice-over upload URL — atomically stamps the S3 pointer + flips
+   * the exercise to voiceover_mode='recorded' so the next read
+   * surfaces the URL. Client PUTs the audio bytes to the returned
+   * URL.
+   */
+  @Version('1')
+  @ApiOperation({ summary: 'Get exercise voice-over upload URL (admin only)' })
+  @ApiResponse({ status: HttpStatus.OK })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'Unsupported mime type' })
+  @Post(':id/voiceover/upload-url')
+  async getVoiceoverUploadUrl(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+    @Body() body: RequestExerciseVoiceoverUploadBody,
+  ): Promise<{ data: { audio: string } }> {
+    return this.service.getVoiceoverUploadUrl(req, params, body);
   }
 
   @Version('1')

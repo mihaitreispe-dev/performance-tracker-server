@@ -10,7 +10,12 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { ExerciseLevel, ExerciseStatus, ExerciseVisibility } from 'src/database/interfaces';
+import {
+  ExerciseLevel,
+  ExerciseStatus,
+  ExerciseVisibility,
+  ExerciseVoiceoverMode,
+} from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -185,6 +190,45 @@ export class ExerciseDTO {
   })
   @IsOptional()
   vimeoVideoId?: string | null;
+
+  /**
+   * Per-exercise voice-over config. The player consumes these to
+   * decide whether to play an audio cue when the exercise becomes
+   * active.
+   */
+  @ApiProperty({ enum: ExerciseVoiceoverMode })
+  @IsEnumString(ExerciseVoiceoverMode)
+  voiceoverMode: ExerciseVoiceoverMode;
+
+  /**
+   * Signed playback URL for the recorded voice-over audio file.
+   * Non-null only when `voiceoverMode === 'recorded'` AND the upload
+   * has finished. Same signing strategy as `picture` / `assets`.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsUrl()
+  @IsOptional()
+  voiceoverUrl?: string | null;
+
+  /**
+   * MIME type of the recorded voice-over file (e.g. `audio/mp4`,
+   * `audio/mpeg`, `audio/webm`). Null when no recording exists.
+   * Lets the client pick an appropriate `<audio>` decoder hint.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsString()
+  @IsOptional()
+  voiceoverMimeType?: string | null;
+
+  /**
+   * Override script for generated-from-cues mode. Null → the client
+   * joins this exercise's `cues` array as the script verbatim. Set →
+   * client speaks this text. Ignored when mode is 'off' or 'recorded'.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsString()
+  @IsOptional()
+  voiceoverScript?: string | null;
 
   @ApiProperty()
   @IsString()

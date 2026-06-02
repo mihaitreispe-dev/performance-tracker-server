@@ -23,6 +23,24 @@ export enum ExerciseStatus {
   ASSETS_CANCELED = 'assets_canceled',
 }
 
+/**
+ * Per-exercise voice-over modes (1774403200000 migration).
+ *
+ *  - 'off'                  → no voice-over; player suppresses any VO
+ *  - 'recorded'             → coach uploaded an audio file; the S3
+ *                              pointer trio (bucket/key/mime) is
+ *                              guaranteed non-null by a DB CHECK
+ *  - 'generated_from_cues'  → client renders the cues (or override
+ *                              script) via the browser's
+ *                              speechSynthesis API at playback time;
+ *                              no server-side TTS, no cost
+ */
+export enum ExerciseVoiceoverMode {
+  OFF = 'off',
+  RECORDED = 'recorded',
+  GENERATED_FROM_CUES = 'generated_from_cues',
+}
+
 export interface ExercisesTable {
   id: Generated<string>;
   organisation_id: string;
@@ -78,6 +96,23 @@ export interface ExercisesTable {
   intro_end_seconds: number | null;
   /** Vimeo source video id, when this exercise was imported via the Vimeo flow. */
   vimeo_video_id: string | null;
+  /**
+   * Voice-over configuration (see ExerciseVoiceoverMode + the
+   * 1774403200000 migration). Defaults to 'off' on every row;
+   * coaches opt in per-exercise from the editor.
+   */
+  voiceover_mode: ColumnType<ExerciseVoiceoverMode, ExerciseVoiceoverMode | undefined, ExerciseVoiceoverMode>;
+  /** S3 pointer for the recorded voice-over file (recorded mode only). */
+  voiceover_s3_bucket: string | null;
+  voiceover_s3_key: string | null;
+  voiceover_mime_type: string | null;
+  /**
+   * Optional override script for generated-from-cues mode. Null →
+   * the client joins the exercise's `cues` array as the script. Set
+   * → the client speaks this text verbatim (lets coaches author a
+   * different narration without losing the on-screen cue chips).
+   */
+  voiceover_script: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

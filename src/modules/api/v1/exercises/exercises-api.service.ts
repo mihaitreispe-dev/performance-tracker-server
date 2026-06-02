@@ -14,6 +14,7 @@ import {
   ExerciseLevel,
   ExerciseStatus,
   ExerciseVisibility,
+  ExerciseVoiceoverMode,
   OrganisationRole,
 } from 'src/database/interfaces';
 import { buildPageLinks } from 'src/lib/http/mappers/build-page-links';
@@ -352,6 +353,33 @@ export class ExercisesApiService {
       throw new BadRequestException('introStartSeconds must be less than introEndSeconds');
     }
 
+    // Voice-over config. Flipping mode to 'recorded' without an
+    // already-uploaded file would violate the
+    // exercises_voiceover_recorded_chk CHECK constraint — guard
+    // here so the user gets a friendly error rather than a Postgres
+    // 23514. The upload-URL endpoint is the only happy path that
+    // populates the S3 pointer + flips the mode in one step.
+    if (body.voiceoverMode !== undefined) {
+      if (body.voiceoverMode === ExerciseVoiceoverMode.RECORDED) {
+        if (!existing.voiceover_s3_bucket || !existing.voiceover_s3_key) {
+          throw new BadRequestException(
+            "Can't set voiceoverMode to 'recorded' without uploading an audio file first " +
+              '(call POST /exercises/:id/voiceover/upload-url).',
+          );
+        }
+      } else if (body.voiceoverMode === ExerciseVoiceoverMode.OFF) {
+        // Flipping back to 'off' clears the recording pointer too so
+        // we don't keep a stale S3 reference + can re-upload cleanly.
+        update.voiceover_s3_bucket = null;
+        update.voiceover_s3_key = null;
+        update.voiceover_mime_type = null;
+      }
+      update.voiceover_mode = body.voiceoverMode;
+    }
+    if (body.voiceoverScript !== undefined) {
+      update.voiceover_script = body.voiceoverScript;
+    }
+
     const exercise = await this.exerciseRepo.updateById(id, update);
 
     // Update equipment links if provided
@@ -415,6 +443,71 @@ export class ExercisesApiService {
     });
 
     return { data: { video: videoUploadUrl } };
+  }
+
+  /**
+   * Issue a presigned PUT URL for the per-exercise voice-over audio
+   * file (spec voice-over v1). Atomically stamps the S3 pointer +
+   * flips voiceover_mode to 'recorded' so the next read of this
+   * exercise surfaces the URL — the client uploads to the URL and
+   * the row is already pointed at the (about-to-exist) object.
+   *
+   * If the client never PUTs, we have a row pointing at a missing
+   * key. Acceptable: the next attempt overwrites the same row and
+   * the player tolerates a 404 on the audio fetch (it just plays no
+   * VO). A future cleanup task could reconcile.
+   */
+  async getVoiceoverUploadUrl(
+    req: AuthedRequest,
+    params: ExerciseIdParam,
+    body: { mimeType: string },
+  ): Promise<{ data: { audio: string } }> {
+    this.requireWriteRole(req);
+    const organisationId = assertActiveOrg(req);
+    const existing = await this.loadEditable(params.id, organisationId);
+
+    // Whitelist a small set of common audio mime types. We don't
+    // process the audio server-side (no transcode pipeline for VO)
+    // so the browser <audio> element has to decode whatever the
+    // client uploads — restricting to widely-supported codecs avoids
+    // "I uploaded an .ogg and Safari can't play it" surprises.
+    const ACCEPTED_MIMES = new Set([
+      'audio/mpeg', // .mp3
+      'audio/mp4', // .m4a, .aac
+      'audio/aac',
+      'audio/webm', // common from MediaRecorder on Chrome
+      'audio/wav',
+    ]);
+    if (!ACCEPTED_MIMES.has(body.mimeType)) {
+      throw new BadRequestException(
+        `Unsupported voice-over mime type. Accepted: ${[...ACCEPTED_MIMES].join(', ')}`,
+      );
+    }
+
+    const ext = this.getExtensionFromMimeType(body.mimeType);
+    const filename = `${uuidv4()}.${ext}`;
+    const s3Key = s3Keys.upload.exerciseVoiceover({
+      visitorId: existing.user_id,
+      exerciseId: existing.id,
+      filename,
+    }).audio;
+
+    // Stamp the pointer + flip mode in one shot. CHECK constraint is
+    // satisfied because bucket + key + mime are all set together.
+    await this.exerciseRepo.updateById(existing.id, {
+      voiceover_s3_bucket: this.s3Service.uploadBucket,
+      voiceover_s3_key: s3Key,
+      voiceover_mime_type: body.mimeType,
+      voiceover_mode: ExerciseVoiceoverMode.RECORDED,
+    });
+
+    const uploadUrl = await this.s3Service.getSignedUrlPUT({
+      bucket: this.s3Service.uploadBucket,
+      key: s3Key,
+      contentType: body.mimeType,
+    });
+
+    return { data: { audio: uploadUrl } };
   }
 
   async markUploadComplete(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
@@ -676,6 +769,23 @@ export class ExercisesApiService {
     const secondaryMusclesDTOs: MuscleGroupDTO[] = secondaryMuscles.map((m) => ({ id: m.id, name: m.name }));
     const images: ExerciseImageDTO[] = await Promise.all(exerciseImages.map((img) => this.mapExerciseImageToDTO(img)));
 
+    // Voice-over URL: only meaningful in 'recorded' mode. We sign the
+    // S3 GET when the pointer trio is present. Generated-from-cues
+    // mode runs entirely client-side via Web Speech API, so no URL
+    // to surface — the client reads the script (or falls back to
+    // cues) directly. Off mode → null.
+    let voiceoverUrl: string | null = null;
+    if (
+      exercise.voiceover_mode === ExerciseVoiceoverMode.RECORDED &&
+      exercise.voiceover_s3_bucket &&
+      exercise.voiceover_s3_key
+    ) {
+      voiceoverUrl = await this.getImageUrl(
+        exercise.voiceover_s3_bucket,
+        exercise.voiceover_s3_key,
+      ).catch(() => null);
+    }
+
     return {
       id: exercise.id,
       name: exercise.name,
@@ -700,6 +810,10 @@ export class ExercisesApiService {
       introStartSeconds: exercise.intro_start_seconds ?? null,
       introEndSeconds: exercise.intro_end_seconds ?? null,
       vimeoVideoId: exercise.vimeo_video_id ?? null,
+      voiceoverMode: exercise.voiceover_mode,
+      voiceoverUrl,
+      voiceoverMimeType: exercise.voiceover_mime_type ?? null,
+      voiceoverScript: exercise.voiceover_script ?? null,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
     };
