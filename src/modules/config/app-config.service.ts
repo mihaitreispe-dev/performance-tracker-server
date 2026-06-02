@@ -189,6 +189,31 @@ export class AppConfigService {
   }
 
   /**
+   * Google Cloud TTS opt-in for the exercise voice-over feature.
+   * Off by default — when off, the `generate` endpoint returns 503
+   * and the player keeps using the Web Speech API fallback for
+   * generated-mode exercises.
+   *
+   * To enable, the deployment must provide standard Google Cloud
+   * credentials (typically GOOGLE_APPLICATION_CREDENTIALS pointing
+   * at a service-account JSON file). The SDK picks them up
+   * automatically; no extra wiring here.
+   */
+  get enableGoogleTts(): boolean {
+    return this.configService.get('ENABLE_GOOGLE_TTS') === 'Y';
+  }
+
+  /**
+   * Default voice for Google Cloud TTS. Picks one of the Wavenet /
+   * Neural2 voices for a natural cadence; coaches can override per-
+   * exercise in a follow-up if there's demand. Format is the GCP
+   * voice name string (e.g. 'en-GB-Neural2-B').
+   */
+  get googleTtsVoice(): string {
+    return this.configService.get('GOOGLE_TTS_VOICE') ?? 'en-US-Neural2-J';
+  }
+
+  /**
    * Local ffmpeg transcode in place of MediaConvert (local-dev stand-in).
    * Off by default.
    */

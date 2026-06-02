@@ -210,6 +210,23 @@ export class RequestExerciseVoiceoverUploadBody {
   mimeType: string;
 }
 
+/**
+ * Server-side voice-over generation request. Empty body is valid —
+ * the server falls back to the exercise's saved `voiceover_script`,
+ * and if that's null too, to the joined `cues`. Pass `script` to
+ * override (e.g. quick regeneration with custom narration without
+ * mutating the saved script).
+ */
+export class GenerateExerciseVoiceoverBody {
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Override script. Falls back to saved voiceover_script or joined cues when omitted.',
+  })
+  @IsString()
+  @IsOptional()
+  script?: string | null;
+}
+
 export class ImportExerciseFromVimeoBody {
   @ApiProperty({
     description: 'A vimeo.com/{id}, player.vimeo.com/video/{id}, or just the numeric Vimeo id.',

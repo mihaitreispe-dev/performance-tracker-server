@@ -24,6 +24,7 @@ import {
   ImportExerciseFromVimeoBody,
   ExerciseIdParam,
   ListExercisesQuery,
+  GenerateExerciseVoiceoverBody,
   RequestExerciseVoiceoverUploadBody,
   UpdateExerciseBody,
   UpdateExerciseChainBody,
@@ -160,6 +161,30 @@ export class ExercisesApiController {
     @Body() body: RequestExerciseVoiceoverUploadBody,
   ): Promise<{ data: { audio: string } }> {
     return this.service.getVoiceoverUploadUrl(req, params, body);
+  }
+
+  /**
+   * Server-side voice-over generation via Google Cloud TTS. Stores
+   * the resulting MP3 in the same per-exercise voice-over slot as a
+   * recorded upload would use, so the player path is identical.
+   * Returns 503 when ENABLE_GOOGLE_TTS is off — the client falls
+   * back to the browser Web Speech API on playback.
+   */
+  @Version('1')
+  @ApiOperation({ summary: 'Generate voice-over via Google Cloud TTS (admin only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: ExerciseResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, type: ErrorResponse, description: 'Forbidden' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse, description: 'Not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, type: ErrorResponse, description: 'No script + no cues to read' })
+  @ApiResponse({ status: HttpStatus.SERVICE_UNAVAILABLE, type: ErrorResponse, description: 'Google TTS not enabled' })
+  @Post(':id/voiceover/generate')
+  async generateVoiceover(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: ExerciseIdParam,
+    @Body() body: GenerateExerciseVoiceoverBody,
+  ): Promise<ExerciseResponse> {
+    return this.service.generateVoiceover(req, params, body);
   }
 
   @Version('1')
