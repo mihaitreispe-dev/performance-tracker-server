@@ -23,6 +23,15 @@ export interface WorkoutExecutionsTable {
   session_rpe: number | null;
   srpe_tss: string | null; // NUMERIC stored as string
   rpe_collected_at: Timestamp | null;
+  /**
+   * True when the user ended early or skipped one or more exercises
+   * (spec B7). Display annotation — not a filter primary. Defaults
+   * to false on insert and is set via the same `finishWorkout` /
+   * `update` round-trip that writes `completed_at`. Once true,
+   * stays true (a partial-then-finished workout doesn't retroactively
+   * become "complete").
+   */
+  partial: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

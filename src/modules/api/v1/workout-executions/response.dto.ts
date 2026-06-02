@@ -70,6 +70,13 @@ export class WorkoutExecutionDTO {
   @IsOptional()
   rpeCollectedAt?: string | null;
 
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'True when the workout ended early or skipped exercise(s) — drives the "Partial workout" chip on the summary + history.',
+  })
+  partial: boolean;
+
   @ApiProperty()
   @IsString()
   createdAt: string;

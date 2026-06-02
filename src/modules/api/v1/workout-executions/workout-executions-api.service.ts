@@ -467,6 +467,13 @@ export class WorkoutExecutionsApiService {
       // anchored, we don't let later writes shift it either.
       updateData.duration_seconds = body.durationSeconds;
     }
+    // `partial` is part of the completion snapshot too (spec B7):
+    // once a workout is finished as partial, a later "completion"
+    // call from another device shouldn't be able to flip it to
+    // non-partial. Bound by the same alreadyFinished gate.
+    if (body.partial !== undefined && !alreadyFinished) {
+      updateData.partial = body.partial;
+    }
     if (body.notes !== undefined) {
       updateData.notes = body.notes;
     }
@@ -993,6 +1000,11 @@ export class WorkoutExecutionsApiService {
       sessionRpe: execution.session_rpe,
       srpeTss: execution.srpe_tss ? Number.parseFloat(execution.srpe_tss) : null,
       rpeCollectedAt,
+      // partial defaults false at the DB layer; coerce to boolean
+      // defensively for older rows where the migration hadn't backfilled
+      // yet (NOT NULL DEFAULT false ensures this never bites at
+      // runtime, but a strict map keeps TypeScript honest).
+      partial: !!execution.partial,
       createdAt,
       updatedAt,
     };

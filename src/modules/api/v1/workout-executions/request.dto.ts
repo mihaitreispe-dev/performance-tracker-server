@@ -84,6 +84,17 @@ export class UpdateWorkoutExecutionBody {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  /**
+   * Set true when the workout completed in a partial state (user
+   * ended early, skipped exercise(s)). Falls under the same first-
+   * finisher snapshot as completedAt — set on the first finishing
+   * call, later calls can't toggle it (B7 + A3 idempotency contract).
+   */
+  @ApiPropertyOptional({ type: Boolean, description: 'Workout completed in a partial state (ended early / skipped exercises)' })
+  @IsBoolean()
+  @IsOptional()
+  partial?: boolean;
 }
 
 /**
