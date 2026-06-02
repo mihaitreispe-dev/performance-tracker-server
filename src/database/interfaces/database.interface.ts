@@ -102,6 +102,7 @@ import { UsersTable } from './users-table.interface';
 import { WearableProviderConnectionsTable } from './wearable-provider-connections-table.interface';
 import { WearableProviderPrioritiesTable } from './wearable-provider-priorities-table.interface';
 import { WeatherForecastsTable } from './weather-forecasts-table.interface';
+import { PlayerQoeEventsTable } from './player-qoe-events-table.interface';
 import { WorkoutExecutionsTable } from './workout-executions-table.interface';
 import { WorkoutFileImportsTable } from './workout-file-imports-table.interface';
 import { WorkoutItemsTable } from './workout-items-table.interface';
@@ -127,6 +128,7 @@ export interface Database {
   workout_items: WorkoutItemsTable;
   workout_schedules: WorkoutSchedulesTable;
   workout_executions: WorkoutExecutionsTable;
+  player_qoe_events: PlayerQoeEventsTable;
   set_completions: SetCompletionsTable;
   cardio_categories: CardioCategoriesTable;
   cardio_metrics: CardioMetricsTable;

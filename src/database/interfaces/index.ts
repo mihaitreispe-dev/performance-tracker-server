@@ -88,3 +88,4 @@ export * from './content-items-table.interface';
 export * from './courses-table.interface';
 export * from './inline-images-table.interface';
 export * from './membership-audit-log-table.interface';
+export * from './player-qoe-events-table.interface';
