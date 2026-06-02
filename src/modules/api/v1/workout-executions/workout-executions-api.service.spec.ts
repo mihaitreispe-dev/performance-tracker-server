@@ -406,6 +406,105 @@ describe('WorkoutExecutionsApiService.update — finish idempotency (A3)', () =>
     expect(prDetectionService.detectAndStorePRs).not.toHaveBeenCalled();
   });
 
+  it('handles bulk last-actuals lookup, mapping repo result to DTOs (B6)', async () => {
+    const setCompletionRepo = (
+      await Test.createTestingModule({
+        providers: [
+          WorkoutExecutionsApiService,
+          { provide: WorkoutExecutionRepository, useValue: {} },
+          {
+            provide: SetCompletionRepository,
+            useValue: {
+              findLastByUserAndExercises: jest.fn().mockResolvedValue(
+                new Map<string, SetCompletion>([
+                  [
+                    'ex-bench',
+                    makeCompletion({
+                      actual_reps: 8,
+                      actual_load: '102.5',
+                      actual_time_seconds: null,
+                      rpe: 8,
+                      completed_at: new Date('2026-05-19T10:30:00Z'),
+                    }),
+                  ],
+                  [
+                    'ex-plank',
+                    makeCompletion({
+                      actual_reps: null,
+                      actual_load: null,
+                      actual_time_seconds: 75,
+                      rpe: null,
+                      completed_at: new Date('2026-05-18T09:00:00Z'),
+                    }),
+                  ],
+                ]),
+              ),
+            },
+          },
+          { provide: CardioMetricsRepository, useValue: {} },
+          { provide: WorkoutRouteRepository, useValue: {} },
+          { provide: WorkoutScheduleRepository, useValue: {} },
+          { provide: WorkoutRepository, useValue: {} },
+          { provide: PersonalRecordsDetectionService, useValue: {} },
+          { provide: WeatherService, useValue: {} },
+          { provide: ExecutionWeatherRepository, useValue: {} },
+          { provide: CoachAthleteRelationshipRepository, useValue: {} },
+          { provide: AthletePrivacySettingsRepository, useValue: {} },
+          { provide: RpeTssTrackingRepository, useValue: {} },
+          { provide: TrainingStressRepository, useValue: {} },
+          { provide: ExerciseInstanceRepository, useValue: {} },
+          { provide: ExerciseRepository, useValue: {} },
+        ],
+      }).compile()
+    ).get(SetCompletionRepository) as jest.Mocked<SetCompletionRepository>;
+
+    const service = (
+      await Test.createTestingModule({
+        providers: [
+          WorkoutExecutionsApiService,
+          { provide: WorkoutExecutionRepository, useValue: {} },
+          { provide: SetCompletionRepository, useValue: setCompletionRepo },
+          { provide: CardioMetricsRepository, useValue: {} },
+          { provide: WorkoutRouteRepository, useValue: {} },
+          { provide: WorkoutScheduleRepository, useValue: {} },
+          { provide: WorkoutRepository, useValue: {} },
+          { provide: PersonalRecordsDetectionService, useValue: {} },
+          { provide: WeatherService, useValue: {} },
+          { provide: ExecutionWeatherRepository, useValue: {} },
+          { provide: CoachAthleteRelationshipRepository, useValue: {} },
+          { provide: AthletePrivacySettingsRepository, useValue: {} },
+          { provide: RpeTssTrackingRepository, useValue: {} },
+          { provide: TrainingStressRepository, useValue: {} },
+          { provide: ExerciseInstanceRepository, useValue: {} },
+          { provide: ExerciseRepository, useValue: {} },
+        ],
+      }).compile()
+    ).get(WorkoutExecutionsApiService);
+
+    const { data } = await service.getLastActuals(reqFor(), {
+      exerciseIds: ['ex-bench', 'ex-plank', 'ex-never-logged'],
+    });
+
+    // Bench bench gets a full strength snapshot with load coerced
+    // from numeric string to Number for JSON serialization.
+    const bench = data.find((d) => d.exerciseId === 'ex-bench')!;
+    expect(bench.actualReps).toBe(8);
+    expect(bench.actualLoad).toBe(102.5);
+    expect(bench.rpe).toBe(8);
+    expect(bench.completedAt).toBe('2026-05-19T10:30:00.000Z');
+
+    // Plank — time-mode, no reps/load.
+    const plank = data.find((d) => d.exerciseId === 'ex-plank')!;
+    expect(plank.actualReps).toBeNull();
+    expect(plank.actualLoad).toBeNull();
+    expect(plank.actualTimeSeconds).toBe(75);
+    expect(plank.rpe).toBeNull();
+
+    // Never-logged exercise is silently absent — caller falls back to
+    // prescription on the client.
+    expect(data.find((d) => d.exerciseId === 'ex-never-logged')).toBeUndefined();
+  });
+
   it('still allows notes edit after finish (notes are not part of the completion snapshot)', async () => {
     const alreadyDone = {
       ...baseExecution,

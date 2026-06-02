@@ -86,6 +86,25 @@ export class UpdateWorkoutExecutionBody {
   notes?: string;
 }
 
+/**
+ * Body for the bulk "last actuals" lookup (B6). The player POSTs an
+ * array of exercise IDs (the exercises about to be worked) and the
+ * server returns the most-recent completed, non-skipped set for each
+ * — feeds the smart-prefill UX so each set row pre-populates with
+ * what the user did last session.
+ *
+ * POST instead of GET because a single workout can pull in ~30+
+ * exercises (long supersets / accessory programs), which would push a
+ * comma-separated querystring uncomfortably close to common URL
+ * limits on intermediate proxies.
+ */
+export class LastActualsLookupBody {
+  @ApiProperty({ type: [String], description: 'Exercise IDs to look up last actuals for' })
+  @IsArray()
+  @IsUUID('all', { each: true })
+  exerciseIds: string[];
+}
+
 export class WorkoutExecutionIdParam {
   @ApiProperty({ description: 'Workout execution ID' })
   @IsUUID()

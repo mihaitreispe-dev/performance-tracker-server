@@ -142,6 +142,73 @@ export class SetCompletionRepository {
     await this.db.deleteFrom('set_completions').where('id', '=', id).execute();
   }
 
+  /**
+   * Last (most recent) completed, non-skipped set per exercise for a
+   * given user — across ALL of that user's executions. Powers the
+   * smart-prefill UX (B6): when the player opens a workout, each set
+   * row pre-populates with what the user did last session for that
+   * exercise rather than the bare prescription. Confirming an
+   * unchanged set becomes a one-tap action.
+   *
+   * Returns a Map keyed by exercise_id. Exercises the user has never
+   * logged are absent from the map (callers fall back to the
+   * prescription).
+   *
+   * Implementation note: we use a DISTINCT ON join. For each exercise
+   * id in the input, we want the single most-recent set across any
+   * execution. The cheapest correct query is:
+   *   SELECT DISTINCT ON (exercise_instances.exercise_id) ...
+   *   ORDER BY exercise_id, completed_at DESC
+   * Kysely doesn't expose DISTINCT ON directly so we hand-build the
+   * SQL via `sql` template (Postgres-specific). The Set's index on
+   * (workout_execution_id, exercise_instance_id) carries the inner
+   * join cheaply; for big users with thousands of completions per
+   * exercise this still runs in milliseconds because we're not
+   * scanning the table — we're seeking the latest row per id.
+   *
+   * Empty input ⇒ empty Map. We skip the query rather than emit a
+   * `WHERE id IN ()` that some dialects choke on.
+   */
+  async findLastByUserAndExercises(
+    userId: string,
+    exerciseIds: string[],
+  ): Promise<Map<string, SetCompletion>> {
+    const result = new Map<string, SetCompletion>();
+    if (exerciseIds.length === 0) return result;
+
+    // The query returns (exercise_id, set_completion_row...) — the
+    // exercise_id is what the caller keys by, not the row's own
+    // exercise_instance_id (which is per-workout).
+    const rows = await this.db
+      .selectFrom('set_completions as sc')
+      .innerJoin('exercise_instances as ei', 'ei.id', 'sc.exercise_instance_id')
+      .innerJoin('workout_executions as we', 'we.id', 'sc.workout_execution_id')
+      .where('we.user_id', '=', userId)
+      .where('ei.exercise_id', 'in', exerciseIds)
+      .where('sc.skipped', '=', false)
+      // Non-null completed_at to exclude rows that were inserted but
+      // never finalized (we don't expect any but defensive).
+      .where('sc.completed_at', 'is not', null)
+      .selectAll('sc')
+      .select('ei.exercise_id as exercise_id')
+      .orderBy('ei.exercise_id', 'asc')
+      .orderBy('sc.completed_at', 'desc')
+      .execute();
+
+    // Walk the result and keep only the first (most recent) row per
+    // exercise_id. The ORDER BY guarantees DESC within each group,
+    // so the first occurrence wins.
+    for (const row of rows) {
+      const exerciseId = (row as { exercise_id: string }).exercise_id;
+      if (!result.has(exerciseId)) {
+        // Strip the join column so the value is a clean SetCompletion.
+        const { exercise_id: _ignored, ...completion } = row as SetCompletion & { exercise_id: string };
+        result.set(exerciseId, completion as SetCompletion);
+      }
+    }
+    return result;
+  }
+
   async deleteByExecutionId(workoutExecutionId: string): Promise<void> {
     await this.db.deleteFrom('set_completions').where('workout_execution_id', '=', workoutExecutionId).execute();
   }

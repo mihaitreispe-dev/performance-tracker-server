@@ -37,6 +37,7 @@ import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
   BatchUploadMetricsBody,
   CompleteSetBody,
+  LastActualsLookupBody,
   ListMetricsQuery,
   ListSetCompletionsQuery,
   ListWorkoutExecutionsQuery,
@@ -49,6 +50,8 @@ import {
   BatchUploadMetricsResponse,
   CardioMetricDTO,
   CardioMetricListResponse,
+  LastActualsDTO,
+  LastActualsResponse,
   RouteMarkerDTO,
   SessionRPEDTO,
   SessionRPEResponse,
@@ -151,6 +154,44 @@ export class WorkoutExecutionsApiService {
       limit: query.limit,
       totalCount,
     };
+  }
+
+  /**
+   * Smart-prefill lookup (B6). One bulk query per workout open: the
+   * player POSTs all exercise IDs in the upcoming session and gets
+   * back the user's most recent completed actuals for each — so
+   * each set row pre-populates with what they did last time instead
+   * of the bare prescription.
+   *
+   * Exercises the user has never logged are absent from the response;
+   * the client falls back to the prescription. No 404 even when the
+   * input contains unknown exercise IDs — the analytics value of the
+   * endpoint is "best-effort union of what we know," not strict
+   * resolution.
+   */
+  async getLastActuals(
+    req: Request & { user: AuthUser },
+    body: LastActualsLookupBody,
+  ): Promise<LastActualsResponse> {
+    const map = await this.setCompletionRepository.findLastByUserAndExercises(
+      req.user.id,
+      body.exerciseIds,
+    );
+    const data: LastActualsDTO[] = [];
+    for (const [exerciseId, completion] of map.entries()) {
+      data.push({
+        exerciseId,
+        actualReps: completion.actual_reps,
+        actualLoad: completion.actual_load == null ? null : Number(completion.actual_load),
+        actualTimeSeconds: completion.actual_time_seconds,
+        rpe: completion.rpe,
+        completedAt:
+          completion.completed_at instanceof Date
+            ? completion.completed_at.toISOString()
+            : String(completion.completed_at),
+      });
+    }
+    return { data };
   }
 
   async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutExecutionResponse> {

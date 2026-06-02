@@ -454,3 +454,39 @@ export class WorkoutExecutionSummaryResponse extends ItemResponse<WorkoutExecuti
   @ValidateNested()
   declare data: WorkoutExecutionSummaryDTO;
 }
+
+/**
+ * Last-session actuals for a single exercise (B6 smart prefill).
+ * Mirrors the most recent completed, non-skipped SetCompletion for
+ * that exercise by the caller across ALL their executions.
+ *
+ * Null fields indicate the user never logged that dimension last
+ * session (e.g. bodyweight sets have null actualLoad). Exercises the
+ * user has never logged are absent from the response array — clients
+ * fall back to the prescription's target values.
+ */
+export class LastActualsDTO {
+  @ApiProperty()
+  exerciseId: string;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  actualReps: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'In kg (server canonical unit).' })
+  actualLoad: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  actualTimeSeconds: number | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
+  rpe: number | null;
+
+  @ApiProperty({ description: 'When the last set was logged.' })
+  completedAt: string;
+}
+
+export class LastActualsResponse {
+  @ApiProperty({ type: [LastActualsDTO] })
+  data: LastActualsDTO[];
+}
+

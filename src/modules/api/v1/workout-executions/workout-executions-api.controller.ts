@@ -21,6 +21,7 @@ import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 import {
   BatchUploadMetricsBody,
   CompleteSetBody,
+  LastActualsLookupBody,
   ListMetricsQuery,
   ListSetCompletionsQuery,
   ListWorkoutExecutionsQuery,
@@ -33,6 +34,7 @@ import {
 import {
   BatchUploadMetricsResponse,
   CardioMetricListResponse,
+  LastActualsResponse,
   SessionRPEResponse,
   SetCompletionListResponse,
   SetCompletionResponse,
@@ -62,6 +64,23 @@ export class WorkoutExecutionsApiController {
     @Query() query: ListWorkoutExecutionsQuery,
   ): Promise<WorkoutExecutionListResponse> {
     return this.service.list(req, query);
+  }
+
+  @Version('1')
+  @ApiOperation({
+    summary: 'Bulk lookup of last-session actuals for a set of exercise IDs (smart-prefill)',
+    description:
+      'Returns the user\'s most recent completed, non-skipped set per exercise. Exercises with no prior log are absent from the response. POST because a workout can contain many exercises and the body is structurally a query, not a mutation.',
+  })
+  @ApiResponse({ status: HttpStatus.OK, type: LastActualsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @HttpCode(HttpStatus.OK)
+  @Post('last-actuals')
+  async getLastActuals(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: LastActualsLookupBody,
+  ): Promise<LastActualsResponse> {
+    return this.service.getLastActuals(req, body);
   }
 
   @Version('1')
