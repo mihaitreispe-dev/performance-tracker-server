@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Param, Query, Req, Version } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Version } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { type Request } from 'express';
 import { ErrorResponse } from 'src/lib/http/dto/error-response.dto';
@@ -7,6 +7,7 @@ import { SkipActiveOrg } from 'src/modules/auth/guards/active-org.guard';
 
 import { PersonalRecordsApiService } from './personal-records-api.service';
 import {
+  BulkStrengthPRsBody,
   ExercisePRsParam,
   ListPersonalRecordsQuery,
   PeriodComparisonQuery,
@@ -15,6 +16,7 @@ import {
   RecentPRsQuery,
 } from './request.dto';
 import {
+  BulkStrengthPRsResponse,
   ExercisePRsResponse,
   PeriodComparisonResponse,
   PersonalRecordListResponse,
@@ -53,6 +55,25 @@ export class PersonalRecordsApiController {
     @Param() params: ExercisePRsParam,
   ): Promise<ExercisePRsResponse> {
     return this.service.getStrengthPRsForExercise(req, params.exerciseId);
+  }
+
+  /**
+   * Bulk strength-PR lookup for the in-player exercise card (spec E1).
+   * POST (not GET) because the exercise-id list can be ~20-64 UUIDs —
+   * past the practical query-string length and harder to cache anyway
+   * (each user has different PRs). The body shape mirrors the bulk
+   * /workout-executions/last-actuals endpoint for consistency.
+   */
+  @Version('1')
+  @ApiOperation({ summary: 'Bulk strength PR lookup for a list of exercises' })
+  @ApiResponse({ status: HttpStatus.OK, type: BulkStrengthPRsResponse })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, type: ErrorResponse, description: 'Unauthorized' })
+  @Post('strength/bulk')
+  async getBulkStrengthPRs(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: BulkStrengthPRsBody,
+  ): Promise<BulkStrengthPRsResponse> {
+    return this.service.getBulkStrengthPRsForExercises(req, body.exerciseIds);
   }
 
   @Version('1')

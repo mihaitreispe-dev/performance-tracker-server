@@ -13,6 +13,7 @@ import {
   RecentPRsQuery,
 } from './request.dto';
 import {
+  BulkStrengthPRsResponse,
   ExercisePRsDTO,
   ExercisePRsResponse,
   PeriodComparisonDTO,
@@ -52,6 +53,65 @@ export class PersonalRecordsApiService {
     const recordDTOs = records.map((r) => this.mapToDTO(r, exerciseNames.get(r.exercise_id ?? '')));
 
     return { data: { records: recordDTOs } };
+  }
+
+  /**
+   * Bulk strength-PR lookup for the in-player exercise card (spec E1).
+   * One query for the user's PRs across every exercise in the active
+   * workout, plus one batch read for the exercise names. Per-exercise
+   * grouping into the same {maxWeight, maxReps, maxVolumeSet} shape as
+   * `getStrengthPRsForExercise` so the chrome can reuse the
+   * single-exercise component verbatim.
+   *
+   * Exercises with no PRs are omitted from the array so first-time
+   * users get a compact `{ records: [] }` rather than an array of
+   * all-null entries.
+   */
+  async getBulkStrengthPRsForExercises(
+    req: Request & { user: AuthUser },
+    exerciseIds: string[],
+  ): Promise<BulkStrengthPRsResponse> {
+    const uniqueIds = [...new Set(exerciseIds)];
+    const records = await this.personalRecordRepository.findStrengthPRsForExercises(
+      req.user.id,
+      uniqueIds,
+    );
+
+    const exerciseNames = await this.getExerciseNames(uniqueIds);
+
+    // Group records by exercise_id then pick the headline record for
+    // each PR type. findStrengthPRsForExercises already orders by
+    // achieved_at desc; since we want the *current* best (not the
+    // most recent occurrence of any value) we still scan all matching
+    // rows per type — historically detected PRs may include older
+    // entries, but the most-recent record-of-its-type IS the current
+    // best by definition (PR detection only writes when a new best
+    // beats the previous).
+    const byExercise = new Map<string, PersonalRecord[]>();
+    for (const r of records) {
+      if (!r.exercise_id) continue;
+      const list = byExercise.get(r.exercise_id) ?? [];
+      list.push(r);
+      byExercise.set(r.exercise_id, list);
+    }
+
+    const data: ExercisePRsDTO[] = [];
+    for (const [exerciseId, rs] of byExercise) {
+      const exerciseName = exerciseNames.get(exerciseId);
+      if (!exerciseName) continue; // exercise deleted since the PR was recorded — skip
+      const maxWeight = rs.find((r) => r.record_type === PersonalRecordType.MAX_WEIGHT);
+      const maxReps = rs.find((r) => r.record_type === PersonalRecordType.MAX_REPS);
+      const maxVolumeSet = rs.find((r) => r.record_type === PersonalRecordType.MAX_VOLUME_SET);
+      data.push({
+        exerciseId,
+        exerciseName,
+        maxWeight: maxWeight ? this.mapToDTO(maxWeight, exerciseName) : null,
+        maxReps: maxReps ? this.mapToDTO(maxReps, exerciseName) : null,
+        maxVolumeSet: maxVolumeSet ? this.mapToDTO(maxVolumeSet, exerciseName) : null,
+      });
+    }
+
+    return { data: { records: data } };
   }
 
   async getStrengthPRsForExercise(req: Request & { user: AuthUser }, exerciseId: string): Promise<ExercisePRsResponse> {

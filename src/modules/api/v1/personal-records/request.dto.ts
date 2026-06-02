@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { PersonalRecordType, WorkoutType } from 'src/database/interfaces';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
@@ -70,6 +70,27 @@ export class ExercisePRsParam {
   @ApiProperty({ description: 'Exercise ID' })
   @IsUUID()
   exerciseId: string;
+}
+
+/**
+ * Bulk strength-PR lookup body (spec E1). The in-player exercise card
+ * sends every exercise_id in the active workout once at session
+ * start; the server returns one entry per exercise that has any PR.
+ *
+ * Capped at 64 to bound the response size — a single workout
+ * realistically has ≤ 20 exercises; 64 is the headroom for circuit
+ * sessions + comfortable above realistic.
+ */
+export class BulkStrengthPRsBody {
+  @ApiProperty({
+    type: [String],
+    description: 'Exercise IDs to look up strength PRs for.',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(64)
+  @IsUUID('all', { each: true })
+  exerciseIds: string[];
 }
 
 export class PREvolutionQuery {

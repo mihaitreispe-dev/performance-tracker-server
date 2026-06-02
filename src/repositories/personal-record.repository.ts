@@ -80,6 +80,30 @@ export class PersonalRecordRepository {
     return this.db.selectFrom('personal_records').selectAll().where('id', '=', id).executeTakeFirst();
   }
 
+  /**
+   * Bulk variant for the in-player exercise card (spec E1). One query
+   * scans the user's strength PRs for every exercise in a given
+   * workout in a single round-trip, instead of fanning out N
+   * findForExercise calls. The caller groups by exercise_id.
+   *
+   * Empty array → empty result (no exercises means no PRs to fetch);
+   * skips the SQL entirely to avoid an `IN ()` validation error.
+   */
+  async findStrengthPRsForExercises(
+    userId: string,
+    exerciseIds: string[],
+  ): Promise<PersonalRecord[]> {
+    if (exerciseIds.length === 0) return [];
+    return this.db
+      .selectFrom('personal_records')
+      .selectAll()
+      .where('user_id', '=', userId)
+      .where('exercise_id', 'in', exerciseIds)
+      .where('record_type', 'in', STRENGTH_TYPES)
+      .orderBy('achieved_at', 'desc')
+      .execute();
+  }
+
   async findMany(filter: FindManyFilter): Promise<PersonalRecord[]> {
     let query = this.db.selectFrom('personal_records').selectAll().where('user_id', '=', filter.userId);
 

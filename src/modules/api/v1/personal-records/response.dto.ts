@@ -111,6 +111,30 @@ export class ExercisePRsResponse extends ItemResponse<ExercisePRsDTO> {
   declare data: ExercisePRsDTO;
 }
 
+/**
+ * Bulk PR lookup for the in-player exercise card (spec E1). The player
+ * sends every exercise_id in the current workout once and renders a
+ * PR chip per slot — avoids N round-trips for an N-exercise session.
+ *
+ * Returned as an array of ExercisePRsDTO; the client groups by
+ * exerciseId. Exercises with no PRs yet are omitted from the array
+ * (not included with all-null fields) so the response stays compact
+ * for first-time users.
+ */
+export class BulkStrengthPRsDTO {
+  @ApiProperty({ type: [ExercisePRsDTO] })
+  @ValidateNested({ each: true })
+  @Type(() => ExercisePRsDTO)
+  records: ExercisePRsDTO[];
+}
+
+export class BulkStrengthPRsResponse extends ItemResponse<BulkStrengthPRsDTO> {
+  @ApiProperty()
+  @IsObject({ always: true })
+  @ValidateNested()
+  declare data: BulkStrengthPRsDTO;
+}
+
 // Evolution point
 export class PREvolutionPointDTO {
   @ApiProperty()
