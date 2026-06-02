@@ -197,6 +197,48 @@ export class MediaConvertService {
   }
 
   /**
+   * Subtitles-only HLS output (WEBVTT). Adds a SUBTITLES group entry
+   * to the master playlist so hls.js and Safari pick the track up
+   * automatically — the player chrome only renders the CC toggle when
+   * the manifest carries one of these.
+   *
+   * Wired conditionally in `createJob` based on `captionInputUrl`. We
+   * default to English; a future multi-language slice extends this to
+   * an array of (languageCode, sourceFile) pairs.
+   *
+   * TODO(captions): we need an authoring workflow that lets an org
+   * upload a .vtt sidecar alongside the master video. The player end
+   * is ready — the missing piece is the upload UI + the
+   * `captionInputUrl` plumb-through from the asset-create endpoint
+   * down to this service. Until that lands, no exercise / class /
+   * snack ships with captions and the CC toggle stays hidden.
+   */
+  private subtitlesHlsOutput(): Output {
+    return {
+      ContainerSettings: {
+        Container: 'M3U8',
+      },
+      CaptionDescriptions: [
+        {
+          CaptionSelectorName: 'Captions Selector 1',
+          DestinationSettings: {
+            DestinationType: 'WEBVTT',
+            WebvttDestinationSettings: {},
+          },
+          LanguageCode: 'ENG',
+          LanguageDescription: 'English',
+        },
+      ],
+      NameModifier: '_captions_en',
+      OutputSettings: {
+        HlsSettings: {
+          AudioGroupId: undefined,
+        },
+      },
+    };
+  }
+
+  /**
    * Both-orientation output plan. The portrait (9:16) set keeps the exact
    * historical layout so existing readers (s3Keys.content.exercise) are
    * unaffected:
@@ -206,12 +248,39 @@ export class MediaConvertService {
    *   {base}/wide/video.m3u8 + rungs, wide/video_poster.*.jpg,
    *   wide/video_thumbnail.*.jpg
    * so the two never collide and the wide URLs are equally derivable.
+   *
+   * When `withCaptions` is true, an English WEBVTT_HLS subtitle track
+   * is appended to the portrait HLS group; the wide group is left
+   * caption-free since the SUBTITLES group on the master playlist is
+   * shared. (HLS supports one SUBTITLES group per master and both
+   * orientations point to the same set of captions.)
    */
-  private buildOutputGroups(outputS3Folder: string, wideCrop?: Rectangle): OutputGroup[] {
+  private buildOutputGroups(
+    outputS3Folder: string,
+    wideCrop?: Rectangle,
+    withCaptions = false,
+  ): OutputGroup[] {
     const wideFolder = `${outputS3Folder}wide/`;
+    const portraitOutputs: Output[] = PORTRAIT_RUNGS.map((rung) => this.hlsVideoOutput(rung));
+    if (withCaptions) {
+      portraitOutputs.push(this.subtitlesHlsOutput());
+    }
+    const portraitGroup: OutputGroup = {
+      CustomName: 'video',
+      Name: 'Apple HLS',
+      Outputs: portraitOutputs,
+      OutputGroupSettings: {
+        Type: 'HLS_GROUP_SETTINGS',
+        HlsGroupSettings: {
+          SegmentLength: 10,
+          Destination: outputS3Folder,
+          MinSegmentLength: 0,
+        },
+      },
+    };
     return [
       // 9:16 primary (unchanged keys, never cropped — it is the source orientation)
-      this.hlsGroup('video', outputS3Folder, PORTRAIT_RUNGS),
+      portraitGroup,
       this.audioGroup(outputS3Folder),
       this.frameCaptureGroup('poster', outputS3Folder, 720, 1280, '_poster'),
       this.frameCaptureGroup('thumbnail', outputS3Folder, 180, 320, '_thumbnail'),
@@ -228,12 +297,22 @@ export class MediaConvertService {
     outputS3Folder,
     watermarkURL,
     wideCrop,
+    captionInputUrl,
   }: {
     inputURL: string;
     outputS3Folder: string;
     watermarkURL?: string;
     /** Crop rect (source px) applied to the 16:9 wide outputs for smart framing. */
     wideCrop?: Rectangle | null;
+    /**
+     * Optional sidecar WEBVTT file URL (S3). When provided, MediaConvert
+     * reads it as caption source and emits an English SUBTITLES group
+     * in the master HLS playlist. The asset's MediaAsset DTO doesn't
+     * need a separate `captionUrl` — the manifest exposes the track
+     * automatically and the player chrome picks it up via hls.js's
+     * SUBTITLE_TRACKS_UPDATED event.
+     */
+    captionInputUrl?: string | null;
   }) {
     if (this.configService.disableMediaConvert) {
       return null;
@@ -256,6 +335,32 @@ export class MediaConvertService {
         }
       : {};
 
+    // When a sidecar VTT is supplied, attach it as a caption selector
+    // on the input. The output side (`buildOutputGroups(..., true)`)
+    // then knows to emit a WEBVTT_HLS subtitle output that references
+    // this selector. No-op when captionInputUrl is null/empty — keeps
+    // the existing caption-free pipeline pristine for the vast
+    // majority of jobs that don't have authored captions yet.
+    const withCaptions = !!captionInputUrl;
+    // SDK enum strings need to be literal-typed for the Input shape's
+    // `Record<string, CaptionSelector>` index signature — `as const`
+    // narrows the strings without us hand-importing each enum union.
+    const captionSelectors = withCaptions
+      ? ({
+          CaptionSelectors: {
+            'Captions Selector 1': {
+              LanguageCode: 'ENG',
+              SourceSettings: {
+                SourceType: 'WEBVTT',
+                FileSourceSettings: {
+                  SourceFile: captionInputUrl!,
+                },
+              },
+            },
+          },
+        } as const)
+      : {};
+
     const params: CreateJobCommandInput = {
       Queue: this.mediaConvertQueue,
       UserMetadata: {},
@@ -264,7 +369,7 @@ export class MediaConvertService {
         TimecodeConfig: {
           Source: 'ZEROBASED',
         },
-        OutputGroups: this.buildOutputGroups(outputS3Folder, wideCrop ?? undefined),
+        OutputGroups: this.buildOutputGroups(outputS3Folder, wideCrop ?? undefined, withCaptions),
         FollowSource: 1,
         Inputs: [
           {
@@ -283,6 +388,7 @@ export class MediaConvertService {
             },
             TimecodeSource: 'ZEROBASED',
             ...imageInserter,
+            ...captionSelectors,
             FileInput: inputURL,
           },
         ],
