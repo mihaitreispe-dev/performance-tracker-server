@@ -32,6 +32,7 @@ import {
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
+import { OutboundSyncApiService } from '../outbound-sync/outbound-sync-api.service';
 import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
 import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
@@ -88,6 +89,10 @@ export class WorkoutExecutionsApiService {
     private readonly trainingStressRepository: TrainingStressRepository,
     private readonly exerciseInstanceRepository: ExerciseInstanceRepository,
     private readonly exerciseRepository: ExerciseRepository,
+    // D3 — workout completions enqueue outbound sync jobs for every
+    // provider this user has connected. Service is @Global() so no
+    // module-level import is needed in the executions module.
+    private readonly outboundSyncService: OutboundSyncApiService,
   ) {}
 
   // Workout Executions
@@ -517,6 +522,29 @@ export class WorkoutExecutionsApiService {
       });
 
       this.triggerWeatherFetch(id, updatedExecution.started_at);
+
+      // D3 outbound sync — enqueue jobs for every provider this user
+      // has connected (Strava, Apple Health, Google Fit, …). Same
+      // first-finish gate as PR detection so multi-device race
+      // doesn't queue duplicates (the DB unique constraint on
+      // (execution, provider) is the safety net regardless).
+      //
+      // Snapshot the data the providers need at enqueue time so the
+      // worker isn't sensitive to mid-flight edits of the underlying
+      // execution / sets. Today the providers' actual push happens
+      // out-of-band via the runWorker() cron entry.
+      this.outboundSyncService
+        .enqueueForExecution(updatedExecution, {
+          startedAt: updatedExecution.started_at,
+          completedAt: updatedExecution.completed_at,
+          durationSeconds: updatedExecution.duration_seconds,
+          partial: updatedExecution.partial,
+          notes: updatedExecution.notes,
+          sessionRpe: updatedExecution.session_rpe,
+        })
+        .catch((error) => {
+          this.logger.error(`Failed to enqueue outbound sync for ${id}:`, error);
+        });
     }
 
     let workout: Workout | undefined;

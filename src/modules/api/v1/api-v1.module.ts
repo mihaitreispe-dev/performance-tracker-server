@@ -38,6 +38,7 @@ import { OrganisationsApiModule } from './organisations/organisations-api.module
 import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
 import { PlayerTelemetryApiModule } from './player-telemetry/player-telemetry-api.module';
+import { OutboundSyncApiModule } from './outbound-sync/outbound-sync-api.module';
 import { PublicApiModule } from './public/public-api.module';
 import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module';
 import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
@@ -74,6 +75,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     WorkoutPlansApiModule.register(),
     PersonalRecordsApiModule.register(),
     PlayerTelemetryApiModule.register(),
+    OutboundSyncApiModule.register(),
     SleepApiModule.register(),
     PainLogsApiModule.register(),
     WearablesApiModule.register(),
