@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
 import { GrantType } from './types';
@@ -204,4 +204,13 @@ export class UpdateUserSettingsBody {
   @Type(() => RPEZonesSettingsInput)
   @IsOptional()
   rpeZones?: RPEZonesSettingsInput | null;
+
+  /**
+   * E5 social opt-in. Defaults FALSE — every social surface stays
+   * hidden until the user explicitly opts in.
+   */
+  @ApiPropertyOptional({ type: Boolean, description: 'Opt in to leaderboards / cohorts / streak compares' })
+  @IsBoolean()
+  @IsOptional()
+  leaderboardOptIn?: boolean;
 }

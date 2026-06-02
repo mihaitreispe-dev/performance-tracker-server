@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 import { Timestamp } from './timestamp';
 
@@ -56,6 +56,14 @@ export interface UserSettingsTable {
   power_zones: PowerZonesSettings | null;
   pace_zones: PaceZonesSettings | null;
   rpe_zones: RPEZonesSettings | null;
+  /**
+   * E5 social opt-in (per-user). Defaults FALSE — every social
+   * surface (leaderboards, cohorts, streak compare) is opt-out so
+   * solo lifters aren't enrolled by default. Read by the
+   * (future) leaderboard surface to scope queries to consenting
+   * users only.
+   */
+  leaderboard_opt_in: ColumnType<boolean, boolean | undefined, boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

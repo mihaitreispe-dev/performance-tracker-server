@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsNumber, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsObject, IsOptional, IsString, IsUrl, IsUUID, ValidateNested } from 'class-validator';
 import { UserRole } from 'src/database/interfaces';
 import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
@@ -221,6 +221,15 @@ class UserSettingsDTO {
   @Type(() => RPEZonesSettingsDTO)
   @IsOptional()
   rpeZones?: RPEZonesSettingsDTO | null;
+
+  /**
+   * E5 social opt-in (per-user). Defaults FALSE — every leaderboard /
+   * cohort / streak surface stays hidden until the user explicitly
+   * opts in from settings.
+   */
+  @ApiProperty({ type: Boolean, default: false })
+  @IsBoolean()
+  leaderboardOptIn: boolean;
 }
 
 export class UserSettingsResponse extends ItemResponse<UserSettingsDTO> {

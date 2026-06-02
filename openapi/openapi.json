@@ -2395,6 +2395,54 @@
         ]
       }
     },
+    "/v1/workout-executions/last-actuals": {
+      "post": {
+        "description": "Returns the user's most recent completed, non-skipped set per exercise. Exercises with no prior log are absent from the response. POST because a workout can contain many exercises and the body is structurally a query, not a mutation.",
+        "operationId": "WorkoutExecutionsApiController_getLastActuals",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LastActualsLookupBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LastActualsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Bulk lookup of last-session actuals for a set of exercise IDs (smart-prefill)",
+        "tags": [
+          "workout-executions"
+        ]
+      }
+    },
     "/v1/workout-executions/{id}": {
       "get": {
         "operationId": "WorkoutExecutionsApiController_getById",
@@ -8513,6 +8561,53 @@
         ]
       }
     },
+    "/v1/personal-records/strength/bulk": {
+      "post": {
+        "operationId": "PersonalRecordsApiController_getBulkStrengthPRs",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkStrengthPRsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkStrengthPRsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Bulk strength PR lookup for a list of exercises",
+        "tags": [
+          "personal-records"
+        ]
+      }
+    },
     "/v1/personal-records/evolution": {
       "get": {
         "operationId": "PersonalRecordsApiController_getEvolution",
@@ -8815,6 +8910,46 @@
         "summary": "Get PR history for a specific record type, sorted by value (best first)",
         "tags": [
           "personal-records"
+        ]
+      }
+    },
+    "/v1/player-telemetry/events": {
+      "post": {
+        "operationId": "PlayerTelemetryApiController_ingest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestPlayerTelemetryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Events accepted"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Bulk-ingest player QoE / funnel / logging events",
+        "tags": [
+          "player-telemetry"
         ]
       }
     },
@@ -25889,8 +26024,15 @@
                 "$ref": "#/components/schemas/RPEZonesSettingsDTO"
               }
             ]
+          },
+          "leaderboardOptIn": {
+            "type": "boolean",
+            "default": false
           }
-        }
+        },
+        "required": [
+          "leaderboardOptIn"
+        ]
       },
       "UserSettingsResponse": {
         "type": "object",
@@ -26070,6 +26212,10 @@
                 "$ref": "#/components/schemas/RPEZonesSettingsInput"
               }
             ]
+          },
+          "leaderboardOptIn": {
+            "type": "boolean",
+            "description": "Opt in to leaderboards / cohorts / streak compares"
           }
         }
       },
@@ -27676,6 +27822,10 @@
             "nullable": true,
             "description": "When session RPE was collected"
           },
+          "partial": {
+            "type": "boolean",
+            "description": "True when the workout ended early or skipped exercise(s) — drives the \"Partial workout\" chip on the summary + history."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -27688,6 +27838,7 @@
           "userId",
           "startedAt",
           "source",
+          "partial",
           "createdAt",
           "updatedAt"
         ]
@@ -27717,6 +27868,68 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/WorkoutExecutionDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "LastActualsLookupBody": {
+        "type": "object",
+        "properties": {
+          "exerciseIds": {
+            "description": "Exercise IDs to look up last actuals for",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "exerciseIds"
+        ]
+      },
+      "LastActualsDTO": {
+        "type": "object",
+        "properties": {
+          "exerciseId": {
+            "type": "string"
+          },
+          "actualReps": {
+            "type": "number",
+            "nullable": true
+          },
+          "actualLoad": {
+            "type": "number",
+            "nullable": true,
+            "description": "In kg (server canonical unit)."
+          },
+          "actualTimeSeconds": {
+            "type": "number",
+            "nullable": true
+          },
+          "rpe": {
+            "type": "number",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "description": "When the last set was logged."
+          }
+        },
+        "required": [
+          "exerciseId",
+          "completedAt"
+        ]
+      },
+      "LastActualsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LastActualsDTO"
             }
           }
         },
@@ -27906,6 +28119,10 @@
           "notes": {
             "type": "string",
             "description": "Notes"
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "Workout completed in a partial state (ended early / skipped exercises)"
           }
         }
       },
@@ -34575,6 +34792,46 @@
           "data"
         ]
       },
+      "BulkStrengthPRsBody": {
+        "type": "object",
+        "properties": {
+          "exerciseIds": {
+            "description": "Exercise IDs to look up strength PRs for.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "exerciseIds"
+        ]
+      },
+      "BulkStrengthPRsDTO": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExercisePRsDTO"
+            }
+          }
+        },
+        "required": [
+          "records"
+        ]
+      },
+      "BulkStrengthPRsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BulkStrengthPRsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "PREvolutionPointDTO": {
         "type": "object",
         "properties": {
@@ -34991,6 +35248,37 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "PlayerTelemetryEventDto": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "metric": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "eventType",
+          "metric"
+        ]
+      },
+      "IngestPlayerTelemetryDto": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerTelemetryEventDto"
+            }
+          }
+        },
+        "required": [
+          "events"
         ]
       },
       "HrSampleDTO": {

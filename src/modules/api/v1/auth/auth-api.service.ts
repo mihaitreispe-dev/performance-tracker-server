@@ -278,6 +278,7 @@ export class AuthApiService {
         powerZones: settings?.power_zones ?? null,
         paceZones: settings?.pace_zones ?? null,
         rpeZones: settings?.rpe_zones ?? null,
+        leaderboardOptIn: settings?.leaderboard_opt_in ?? false,
       },
     };
   }
@@ -300,6 +301,11 @@ export class AuthApiService {
     if (body.rpeZones !== undefined) {
       updateData.rpe_zones = body.rpeZones;
     }
+    // E5 social opt-in. Defaults FALSE server-side; only writes when
+    // the user explicitly flips the toggle from settings.
+    if (body.leaderboardOptIn !== undefined) {
+      updateData.leaderboard_opt_in = body.leaderboardOptIn;
+    }
 
     const settings = await this.userSettingsRepo.upsert(req.user.id, updateData);
     return {
@@ -308,6 +314,7 @@ export class AuthApiService {
         powerZones: settings.power_zones ?? null,
         paceZones: settings.pace_zones ?? null,
         rpeZones: settings.rpe_zones ?? null,
+        leaderboardOptIn: settings.leaderboard_opt_in ?? false,
       },
     };
   }
