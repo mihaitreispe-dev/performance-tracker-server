@@ -22,6 +22,40 @@ export class RegisterDeviceTokenBody {
 }
 
 /**
+ * Body for POST /v1/me/checkout-session — JWT-authed equivalent of
+ * the public-API `/v1/public/clients/:id/checkout-session`. The caller
+ * IS the client; the user id comes from req.user, not the body.
+ */
+export class MeCheckoutSessionBody {
+  @ApiProperty({ description: 'Stripe price id (price_...) for the plan the user is buying.' })
+  @IsString()
+  @MinLength(3)
+  priceId: string;
+
+  @ApiProperty({ description: 'Where to send the user after a successful checkout.' })
+  @IsString()
+  @MaxLength(2000)
+  successUrl: string;
+
+  @ApiProperty({ description: 'Where to send the user if they cancel before paying.' })
+  @IsString()
+  @MaxLength(2000)
+  cancelUrl: string;
+
+  @ApiProperty({ required: false, description: 'Optional Stripe promotion code id.' })
+  @IsOptional()
+  @IsString()
+  promotionCodeId?: string;
+}
+
+export class MeBillingPortalSessionBody {
+  @ApiProperty({ description: 'Where Stripe should return the user after they close the portal.' })
+  @IsString()
+  @MaxLength(2000)
+  returnUrl: string;
+}
+
+/**
  * Query for GET /v1/me/featured-content. Caller passes the resource
  * kinds it cares about — typically `workout,course,snack,plan` for a
  * home-screen carousel. Default: all kinds.

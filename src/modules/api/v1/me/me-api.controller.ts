@@ -12,8 +12,20 @@ import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import type { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import type { ActiveOrgContext } from 'src/modules/auth/guards/active-org.guard';
 
+import {
+  PublicBillingPortalSessionResponse,
+  PublicCheckoutSessionResponse,
+  PublicClientSubscriptionResponse,
+  PublicBillingProductListResponse,
+} from '../public/billing/response.dto';
+
 import { MeApiService } from './me-api.service';
-import { ListFeaturedContentQuery, RegisterDeviceTokenBody } from './request.dto';
+import {
+  ListFeaturedContentQuery,
+  MeBillingPortalSessionBody,
+  MeCheckoutSessionBody,
+  RegisterDeviceTokenBody,
+} from './request.dto';
 import {
   DeviceTokenAckResponse,
   FeaturedContentResponse,
@@ -92,5 +104,54 @@ export class MeApiController {
     @Body() body: RegisterDeviceTokenBody,
   ): Promise<DeviceTokenAckResponse> {
     return this.service.unregisterDeviceToken(req, body);
+  }
+
+  // -------- Billing: products / checkout / portal / current subscription ---
+  //
+  // JWT-authed equivalents of /v1/public/{products,clients/:id/*} —
+  // delegates to PublicBillingService so the Stripe flow stays in one
+  // place. The user id comes from req.user (no path param).
+
+  @Get('products')
+  @ApiOperation({ summary: 'Active products in the active org — subscribe-tab catalog.' })
+  @ApiOkResponse({ type: PublicBillingProductListResponse })
+  async listProducts(@Req() req: AuthedReq): Promise<PublicBillingProductListResponse> {
+    return this.service.listProducts(req);
+  }
+
+  @Post('checkout-session')
+  @ApiOperation({
+    summary:
+      'Start a Stripe Checkout Session for the authed user. Returns the hosted-checkout URL.',
+  })
+  @ApiCreatedResponse({ type: PublicCheckoutSessionResponse })
+  async createCheckoutSession(
+    @Req() req: AuthedReq,
+    @Body() body: MeCheckoutSessionBody,
+  ): Promise<PublicCheckoutSessionResponse> {
+    return this.service.createCheckoutSession(req, body);
+  }
+
+  @Post('billing-portal-session')
+  @ApiOperation({
+    summary:
+      'Open the Stripe Billing Portal for the authed user. Requires a prior checkout.',
+  })
+  @ApiCreatedResponse({ type: PublicBillingPortalSessionResponse })
+  async createBillingPortalSession(
+    @Req() req: AuthedReq,
+    @Body() body: MeBillingPortalSessionBody,
+  ): Promise<PublicBillingPortalSessionResponse> {
+    return this.service.createBillingPortalSession(req, body);
+  }
+
+  @Get('subscription')
+  @ApiOperation({
+    summary:
+      "Current single-row subscription for the user. `data: null` when there's no Stripe customer yet.",
+  })
+  @ApiOkResponse({ type: PublicClientSubscriptionResponse })
+  async getMySubscription(@Req() req: AuthedReq): Promise<PublicClientSubscriptionResponse> {
+    return this.service.getMySubscription(req);
   }
 }

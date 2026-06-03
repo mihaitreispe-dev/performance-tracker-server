@@ -15,6 +15,7 @@ import { S3Service } from 'src/modules/s3/s3.service';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { PublicBillingService } from '../public/billing/public-billing.service';
 import type { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import type { ActiveOrgContext } from 'src/modules/auth/guards/active-org.guard';
 
@@ -47,7 +48,47 @@ export class MeApiService {
     private readonly userRepo: UserRepository,
     private readonly billingRepo: StripeBillingRepository,
     private readonly entitlementsRepo: ResourceEntitlementsRepository,
+    private readonly publicBilling: PublicBillingService,
   ) {}
+
+  // --------------------------------------------------------------------------
+  // Billing flow — delegates to PublicBillingService so /v1/me/* and
+  // /v1/public/clients/:id/* converge on one Stripe call path.
+  // --------------------------------------------------------------------------
+
+  /** Active products in the org's catalogue (subscribe-tab list). */
+  async listProducts(req: AuthedReq) {
+    const orgId = this.requireOrg(req);
+    return this.publicBilling.listProducts(orgId, { includeInactive: false });
+  }
+
+  async createCheckoutSession(
+    req: AuthedReq,
+    body: { priceId: string; successUrl: string; cancelUrl: string; promotionCodeId?: string },
+  ) {
+    const orgId = this.requireOrg(req);
+    return this.publicBilling.createCheckoutSession(orgId, req.user.id, body);
+  }
+
+  async createBillingPortalSession(
+    req: AuthedReq,
+    body: { returnUrl: string },
+  ) {
+    const orgId = this.requireOrg(req);
+    return this.publicBilling.createBillingPortalSession(orgId, req.user.id, body);
+  }
+
+  /** Current subscription (any-of-active product) or null. */
+  async getMySubscription(req: AuthedReq) {
+    const orgId = this.requireOrg(req);
+    return this.publicBilling.getClientSubscription(orgId, req.user.id);
+  }
+
+  private requireOrg(req: AuthedReq): string {
+    const orgId = req.activeOrg?.organisationId;
+    if (!orgId) throw new NotFoundException('Active organisation required');
+    return orgId;
+  }
 
   // --------------------------------------------------------------------------
   // Entitlements roll-up
