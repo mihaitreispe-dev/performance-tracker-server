@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 import { Timestamp } from './timestamp';
 
@@ -17,6 +17,9 @@ export interface CoursesTable {
   cover_s3_bucket: string | null;
   cover_s3_key: string | null;
   status: CourseStatus;
+  /** See workouts-table.interface.ts for the featured-window contract. */
+  featured_from: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
+  featured_until: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

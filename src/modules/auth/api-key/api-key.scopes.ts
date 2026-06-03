@@ -32,6 +32,26 @@ export const API_KEY_SCOPES = [
   // Phase 9 — billing / subscriptions for the org's clients
   'billing:read',
   'billing:write',
+  // Phase 11 — rehabit white-label parity
+  // plans:read     — read workout-plans (the WeekDay × WorkoutItem structures
+  //                  athlete subscribes to). Previously JWT-only.
+  // me:read        — read the currently-authed end-user's profile + org +
+  //                  membership context. Lets a third-party app avoid round-
+  //                  tripping through `/public/clients/:id` for every call.
+  // entitlements:read — aggregate roll-up of "what products does this user own
+  //                     and what resourceIds does that unlock". Avoids the
+  //                     client having to walk the per-resource `lock` field
+  //                     server returns on list endpoints to build an upsell
+  //                     screen.
+  // featured:read  — list resources currently inside their featured window
+  //                  across workouts / snacks / courses / plans.
+  // notifications:write — register / unregister an FCM device token from a
+  //                       third-party client app boot.
+  'plans:read',
+  'me:read',
+  'entitlements:read',
+  'featured:read',
+  'notifications:write',
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

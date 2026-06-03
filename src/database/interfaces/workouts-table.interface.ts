@@ -61,6 +61,15 @@ export interface WorkoutsTable {
    * Phase 3 generator. Null for hand-authored workouts.
    */
   generated_from_response_id: string | null;
+  /**
+   * Featured window. When NOW() falls between `featured_from`
+   * (inclusive, default any time) and `featured_until` (exclusive,
+   * default forever), the workout surfaces in the
+   * /v1/public/featured-content feed and the org-app library's
+   * "Featured" carousel. Both null = not featured.
+   */
+  featured_from: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
+  featured_until: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable } from 'kysely';
+import { ColumnType, Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 import { Timestamp } from './timestamp';
 
@@ -50,6 +50,9 @@ export interface WorkoutPlansTable {
   description: string | null;
   goal: WorkoutPlanGoal | null;
   duration_weeks: number;
+  /** See workouts-table.interface.ts for the featured-window contract. */
+  featured_from: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
+  featured_until: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

@@ -33,6 +33,16 @@ export interface OrganisationsTable {
    * Off by default; toggled from the org's Members tab.
    */
   allows_self_signup: Generated<boolean>;
+  /**
+   * When true, the org has built (or licensed) their own white-label
+   * client app that talks to our public API via OAuth + API key. Push
+   * notifications + checkout deep-links + onboarding redirects target
+   * that app instead of our first-party athlete app.
+   *
+   * When false (default) the org's clients live in our athlete app.
+   * Toggled from the General settings tab.
+   */
+  uses_external_app: Generated<boolean>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

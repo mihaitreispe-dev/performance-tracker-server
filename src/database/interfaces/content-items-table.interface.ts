@@ -50,6 +50,9 @@ export interface ContentItemsTable {
   /** Inline intro markers — used by content-item players (course lessons, snacks) to offer Skip-intro. */
   intro_start_seconds: number | null;
   intro_end_seconds: number | null;
+  /** See workouts-table.interface.ts for the featured-window contract. */
+  featured_from: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
+  featured_until: ColumnType<Timestamp | null, Timestamp | string | null | undefined, Timestamp | string | null>;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
