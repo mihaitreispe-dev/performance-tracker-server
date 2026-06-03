@@ -220,4 +220,38 @@ export class ResourceEntitlementsRepository {
 
     return !!hit;
   }
+
+  /**
+   * Reverse index used by the entitlements roll-up at /v1/me/entitlements.
+   * Given the products a user holds (via active subscriptions, resolved by
+   * StripeBillingRepository.listActiveProductIdsForUser), return the set of
+   * resource ids those products unlock, bucketed by resource type.
+   *
+   * Filtered to a single org so a user with active subs across multiple
+   * orgs only sees the unlocks for the org they're currently scoped to.
+   * Empty product list returns an empty map without a query — common case
+   * for free-tier users.
+   */
+  async listResourcesByProducts(
+    organisationId: string,
+    productIds: string[],
+  ): Promise<Map<EntitlementResourceType, string[]>> {
+    const empty = new Map<EntitlementResourceType, string[]>();
+    if (productIds.length === 0) return empty;
+
+    const rows = await this.db
+      .selectFrom('resource_entitlements')
+      .where('organisation_id', '=', organisationId)
+      .where('stripe_product_id', 'in', productIds)
+      .select(['resource_type', 'resource_id'])
+      .execute();
+
+    const out = new Map<EntitlementResourceType, string[]>();
+    for (const r of rows) {
+      const list = out.get(r.resource_type) ?? [];
+      if (!list.includes(r.resource_id)) list.push(r.resource_id);
+      out.set(r.resource_type, list);
+    }
+    return out;
+  }
 }

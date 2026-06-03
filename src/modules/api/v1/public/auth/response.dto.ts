@@ -72,6 +72,17 @@ export class PublicAuthSessionDTO {
 
   @ApiProperty({ type: PublicAuthUserDTO })
   user: PublicAuthUserDTO;
+
+  /**
+   * The id of the org this session was minted against — derived from the
+   * API key the integrator's OAuth client_id resolves to. Third-party
+   * apps put this in the X-Organisation-Id header on every subsequent
+   * request to /v1/me/* and the rest of the first-party JWT surface;
+   * removes the need for the app to round-trip /v1/organisations/me
+   * just to figure out the active org.
+   */
+  @ApiProperty()
+  organisationId: string;
 }
 
 export class PublicAuthSessionResponse {

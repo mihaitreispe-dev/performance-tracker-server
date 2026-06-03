@@ -27,6 +27,12 @@ export class OrganisationDTO {
   })
   allowsSelfSignup: boolean;
 
+  @ApiProperty({
+    description:
+      "When true, the org has built (or licensed) their own white-label client app. Push notifications, checkout deep-links, and onboarding redirects target the org's own app instead of our first-party athlete app.",
+  })
+  usesExternalApp: boolean;
+
   @ApiProperty()
   createdAt: string;
 }
@@ -54,6 +60,9 @@ export class PublicOrganisationDTO {
 
   @ApiProperty()
   allowsSelfSignup: boolean;
+
+  @ApiProperty()
+  usesExternalApp: boolean;
 }
 
 export class PublicOrganisationResponse {

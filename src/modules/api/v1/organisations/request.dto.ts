@@ -56,6 +56,17 @@ export class UpdateOrganisationDto {
   @IsBoolean()
   @IsOptional()
   allowsSelfSignup?: boolean;
+
+  /**
+   * Set true if the org has built (or licensed) their own white-label client
+   * app and we should route push notifications + checkout deep-links +
+   * onboarding redirects at it instead of our first-party athlete app.
+   * Default: false.
+   */
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  usesExternalApp?: boolean;
 }
 
 export class SlugParam {

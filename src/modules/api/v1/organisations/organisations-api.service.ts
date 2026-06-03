@@ -203,6 +203,7 @@ export class OrganisationsApiService {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.slug !== undefined ? { slug: dto.slug } : {}),
       ...(dto.allowsSelfSignup !== undefined ? { allows_self_signup: dto.allowsSelfSignup } : {}),
+      ...(dto.usesExternalApp !== undefined ? { uses_external_app: dto.usesExternalApp } : {}),
     });
     return { data: await this.mapToDTO(updated) };
   }
@@ -332,6 +333,7 @@ export class OrganisationsApiService {
           : null,
       orgType: org.org_type,
       allowsSelfSignup: org.allows_self_signup,
+      usesExternalApp: org.uses_external_app,
     };
     return { data };
   }
@@ -396,6 +398,7 @@ export class OrganisationsApiService {
           : null,
       orgType: o.org_type,
       allowsSelfSignup: o.allows_self_signup,
+      usesExternalApp: o.uses_external_app,
       createdAt: o.created_at instanceof Date ? o.created_at.toISOString() : String(o.created_at),
     };
   }

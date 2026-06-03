@@ -140,7 +140,15 @@ export class PublicOAuthService {
     });
     await this.userRepo.updateById(user.id, { last_sign_in_at: new Date() });
 
-    return { ...tokens, user: authUserFromUser(user) };
+    // Stamp the API key's org id on the response so the third-party
+    // app knows what to put in X-Organisation-Id on subsequent requests.
+    // For the auth flow, the org is unambiguous — it's the org the
+    // client_id (API key) belongs to.
+    return {
+      ...tokens,
+      user: authUserFromUser(user),
+      organisationId: input.apiKey.organisationId,
+    };
   }
 
   // -------- helpers --------
