@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Kysely } from 'kysely';
+import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 
 import {
@@ -244,5 +244,171 @@ export class NotificationRulesService {
     const rule = await this.ruleRepo.findByIdInOrg(ruleId, organisationId);
     if (!rule) throw new NotFoundException('Rule not found');
     return this.dispatchOne(rule, { dedupeWindowSeconds: 0 });
+  }
+
+  // --------------------------------------------------------------------------
+  // Event-driven entrypoints — called by feature modules (workout-execution
+  // finish, plan-adherence cron) instead of the time-based driver.
+  // --------------------------------------------------------------------------
+
+  /**
+   * An athlete completed a workout. Find every enabled rule with
+   * trigger=on_action_completion across every org the athlete is a
+   * member of, check the event-filter matches, and fire those whose
+   * audience filter would include this user.
+   *
+   * Filter semantics for action-completion rules: the audience filter
+   * is "who is eligible" — the dispatched delivery still goes to ONLY
+   * the user who triggered the event (not the whole audience). This
+   * matches the natural UX ("nice work, you finished a workout!")
+   * vs "everyone gets notified when anyone finishes" which is what a
+   * naive read of audience_filter would give.
+   *
+   * eventFilter shape on the rule: `{ eventType?: 'workout_finished' }`.
+   * Empty filter matches all events of any type.
+   */
+  async fireOnActionCompletion(input: {
+    userId: string;
+    eventType: 'workout_finished';
+  }): Promise<void> {
+    // Find every org the user is an accepted athlete in. Action-
+    // completion rules per-org need to be considered independently.
+    const memberships = await this.db
+      .selectFrom('organisation_memberships')
+      .where('user_id', '=', input.userId)
+      .where('role', '=', OrganisationRole.ATHLETE)
+      .where('accepted_at', 'is not', null)
+      .select(['organisation_id', 'client_type'])
+      .execute();
+    if (memberships.length === 0) return;
+
+    const rules = await this.ruleRepo.listEnabledByTrigger([
+      // Cast widens the engine's trigger enum without introducing a
+      // separate per-method overload — listEnabledByTrigger filters
+      // by trigger_type IN (...) which already handles unknown values
+      // by simply matching nothing.
+      'on_action_completion' as unknown as Parameters<
+        typeof this.ruleRepo.listEnabledByTrigger
+      >[0][number],
+    ]);
+
+    for (const m of memberships) {
+      const orgRules = rules.filter((r) => r.organisation_id === m.organisation_id);
+      for (const rule of orgRules) {
+        // event-filter match
+        const filter = rule.event_filter as { eventType?: string };
+        if (filter.eventType && filter.eventType !== input.eventType) continue;
+
+        // audience eligibility — re-use resolveAudience but check
+        // membership rather than dispatching to the whole list.
+        const audience = rule.audience_filter as NotificationAudienceFilter;
+        if (!this.userMatchesAudience(audience, input.userId, m.client_type)) continue;
+
+        // Fire — but scope dispatch to the single user instead of
+        // resolveAudience-then-multicast. Reuse dispatchOne by
+        // synthesizing a one-off rule with type=specific.
+        const oneOffRule = { ...rule, audience_filter: { type: 'specific', userIds: [input.userId] } as NotificationAudienceFilter };
+        await this.dispatchOne(oneOffRule);
+      }
+    }
+  }
+
+  /**
+   * Engine-side eligibility check: would `userId` (with this client
+   * type) fall inside `audience`? Cheaper than re-running
+   * resolveAudience just to ask "is X in the resulting set?" — we
+   * already know the user and just need to test the predicate.
+   */
+  private userMatchesAudience(
+    audience: NotificationAudienceFilter,
+    userId: string,
+    clientType: string | null,
+  ): boolean {
+    switch (audience.type) {
+      case 'all_athletes':
+        return true;
+      case 'general_pop':
+        return clientType === ClientType.GENERAL;
+      case 'one_to_one':
+        return clientType === ClientType.ATHLETE;
+      case 'specific':
+        return audience.userIds.includes(userId);
+      case 'coach':
+        // Would need a relationship lookup; keep simple — defer the
+        // coach-audience eligibility check until the plan-adherence
+        // path exercises it. For action-completion rules, audience
+        // 'coach' is unusual (you'd typically pick by client_type).
+        return false;
+    }
+  }
+
+  /**
+   * Plan-adherence sweep. Called once per day by the cron. For each
+   * enabled rule with trigger=on_plan_adherence, walks the rule's
+   * audience and finds members who have scheduled workouts in the
+   * lookback window with no completion. Fires the rule for each such
+   * athlete individually (same per-user dispatch as
+   * fireOnActionCompletion).
+   *
+   * Lookback window comes from rule.condition_params:
+   *   { windowDays: 7, minMissed: 2 }  // missed ≥2 in the last 7 days
+   * Defaults: windowDays=7, minMissed=1.
+   *
+   * Dedupe: the engine's per-user delivery log naturally keeps the
+   * rule from re-firing inside the standard window. For plan-adherence
+   * we pass a bigger dedupe window (24h) so an athlete isn't pinged
+   * twice the same day if the cron runs at the wrong time.
+   */
+  async runPlanAdherenceSweep(): Promise<{ fired: number }> {
+    const rules = await this.ruleRepo.listEnabledByTrigger([
+      'on_plan_adherence' as unknown as Parameters<
+        typeof this.ruleRepo.listEnabledByTrigger
+      >[0][number],
+    ]);
+    if (rules.length === 0) return { fired: 0 };
+
+    let fired = 0;
+    for (const rule of rules) {
+      const params = rule.condition_params as { windowDays?: number; minMissed?: number };
+      const windowDays = Math.max(1, params.windowDays ?? 7);
+      const minMissed = Math.max(1, params.minMissed ?? 1);
+
+      const audience = await this.resolveAudience(rule.organisation_id, rule.audience_filter as NotificationAudienceFilter);
+      if (audience.length === 0) continue;
+
+      // For each candidate, count missed scheduled workouts inside the
+      // lookback window. Missed = scheduled_date in window AND no
+      // workout_execution linked (workout_schedule_id) with completed_at.
+      const after = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+      const afterIso = after.toISOString();
+
+      for (const userId of audience) {
+        const missedRow = await this.db
+          .selectFrom('workout_schedules as s')
+          .leftJoin('workout_executions as e', (j) =>
+            j.onRef('e.workout_schedule_id', '=', 's.id').on('e.completed_at', 'is not', null),
+          )
+          .where('s.user_id', '=', userId)
+          .where(sql<boolean>`s.scheduled_date >= ${afterIso}::date`)
+          .where(sql<boolean>`s.scheduled_date < NOW()::date`)
+          .where('e.id', 'is', null)
+          .select(sql<number>`count(s.id)::int`.as('missed'))
+          .executeTakeFirst();
+
+        const missed = missedRow?.missed ?? 0;
+        if (missed < minMissed) continue;
+
+        // Synthesize a one-off rule scoped to this user (same trick
+        // as fireOnActionCompletion). 24h dedupe so this rule
+        // doesn't double-fire if the sweep ticks twice a day.
+        const oneOff = {
+          ...rule,
+          audience_filter: { type: 'specific', userIds: [userId] } as NotificationAudienceFilter,
+        };
+        const result = await this.dispatchOne(oneOff, { dedupeWindowSeconds: 24 * 60 * 60 });
+        if (result.delivered > 0) fired += 1;
+      }
+    }
+    return { fired };
   }
 }

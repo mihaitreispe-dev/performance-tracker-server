@@ -33,6 +33,8 @@ import { WorkoutRouteRepository } from 'src/repositories/workout-route.repositor
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { OutboundSyncApiService } from '../outbound-sync/outbound-sync-api.service';
+import { NotificationRulesService } from 'src/modules/notification-rules/notification-rules.service';
+
 import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
 import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
@@ -93,6 +95,11 @@ export class WorkoutExecutionsApiService {
     // provider this user has connected. Service is @Global() so no
     // module-level import is needed in the executions module.
     private readonly outboundSyncService: OutboundSyncApiService,
+    // F1b — workout completions also fire any enabled
+    // on_action_completion notification rules across every org the
+    // athlete is a member of. Best-effort: failures inside the
+    // engine never block the completion response.
+    private readonly notificationRulesService: NotificationRulesService,
   ) {}
 
   // Workout Executions
@@ -544,6 +551,19 @@ export class WorkoutExecutionsApiService {
         })
         .catch((error) => {
           this.logger.error(`Failed to enqueue outbound sync for ${id}:`, error);
+        });
+
+      // F1b — fire any enabled on_action_completion notification
+      // rules across every org the athlete is a member of.
+      // Fire-and-forget: a misconfigured rule, an FCM outage, etc.
+      // must never block the user's finish response.
+      this.notificationRulesService
+        .fireOnActionCompletion({
+          userId: req.user.id,
+          eventType: 'workout_finished',
+        })
+        .catch((error) => {
+          this.logger.error(`Failed to fire on_action_completion for ${id}:`, error);
         });
     }
 

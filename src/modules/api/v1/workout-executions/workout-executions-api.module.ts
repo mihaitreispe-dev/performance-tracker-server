@@ -1,4 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { NotificationRulesModule } from 'src/modules/notification-rules/notification-rules.module';
 import { WeatherService } from 'src/modules/weather/weather.service';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
@@ -27,6 +28,7 @@ export class WorkoutExecutionsApiModule {
     if (!this.instance) {
       this.instance = {
         module: WorkoutExecutionsApiModule,
+        imports: [NotificationRulesModule.register()],
         providers: [
           WorkoutExecutionsApiService,
           WorkoutExecutionRepository,

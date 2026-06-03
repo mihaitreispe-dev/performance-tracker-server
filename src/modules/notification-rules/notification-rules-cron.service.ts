@@ -74,4 +74,22 @@ export class NotificationRulesCronService {
       this.logger.log(`Notification cron tick fired ${fired}/${rules.length} rules`);
     }
   }
+
+  /**
+   * Daily plan-adherence sweep. Runs once a day at 09:00 server-time.
+   * For every enabled on_plan_adherence rule, finds athletes in the
+   * rule's audience with ≥ minMissed scheduled workouts in the last
+   * windowDays (defaults 7d / 1 missed) and fires the rule for each.
+   *
+   * Engine handles the per-user dedupe with a 24h window so a sweep
+   * re-run (admin retry, deploy-time double-tick) doesn't ping the
+   * same athlete twice the same day.
+   */
+  @Cron('0 9 * * *')
+  async planAdherenceSweep(): Promise<void> {
+    const { fired } = await this.engine.runPlanAdherenceSweep();
+    if (fired > 0) {
+      this.logger.log(`Plan-adherence sweep fired ${fired} notifications`);
+    }
+  }
 }
