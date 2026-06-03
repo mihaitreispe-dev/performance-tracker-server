@@ -33,6 +33,7 @@ import { IndexApiModule } from './index/index-api.module';
 import { IntegrationsApiModule } from './integrations/integrations-api.module';
 import { MeApiModule } from './me/me-api.module';
 import { ModulesApiModule } from './modules/modules-api.module';
+import { NotificationRulesApiModule } from './notification-rules/notification-rules-api.module';
 import { NotificationsApiModule } from './notifications/notifications-api.module';
 import { NutritionApiModule } from './nutrition/nutrition-api.module';
 import { OrganisationsApiModule } from './organisations/organisations-api.module';
@@ -93,6 +94,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     OrganisationsApiModule.register(),
     MeApiModule.register(),
     ModulesApiModule.register(),
+    NotificationRulesApiModule.register(),
     ContentItemsApiModule.register(),
     CoursesApiModule.register(),
     PublicApiModule.register(),

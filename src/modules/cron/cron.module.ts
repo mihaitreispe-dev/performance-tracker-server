@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AdvancedMetricsApiModule } from 'src/modules/api/v1/advanced-metrics/advanced-metrics-api.module';
 import { ScheduledPromptsModule } from 'src/modules/api/v1/coaching/scheduled-prompts/scheduled-prompts.module';
 import { NotificationsApiModule } from 'src/modules/api/v1/notifications/notifications-api.module';
+import { NotificationRulesModule } from 'src/modules/notification-rules/notification-rules.module';
 import { RacePredictionApiModule } from 'src/modules/api/v1/race-prediction/race-prediction-api.module';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { LocalTranscodeModule } from 'src/modules/local-transcode/local-transcode.module';
@@ -43,6 +44,7 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     OpenWearablesModule.register(),
     ScheduledPromptsModule.register(),
     NotificationsApiModule.register(),
+    NotificationRulesModule.register(),
     AdvancedMetricsApiModule.register(),
     RacePredictionApiModule.register(),
   ],
