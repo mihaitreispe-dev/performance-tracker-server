@@ -300,6 +300,16 @@ export class WorkoutDTO {
   @ValidateNested({ each: true })
   items: WorkoutItemDTO[];
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  featuredFrom: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  featuredUntil: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;

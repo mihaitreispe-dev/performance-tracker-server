@@ -246,6 +246,8 @@ export class WorkoutPlansApiService {
     if (body.durationWeeks !== undefined) {
       updateData.duration_weeks = body.durationWeeks;
     }
+    if (body.featuredFrom !== undefined) updateData.featured_from = body.featuredFrom;
+    if (body.featuredUntil !== undefined) updateData.featured_until = body.featuredUntil;
 
     const updatedPlan = await this.workoutPlanRepo.updateById(id, updateData as any);
 
@@ -448,6 +450,16 @@ export class WorkoutPlansApiService {
       goal: plan.goal,
       durationWeeks: plan.duration_weeks,
       userId: plan.user_id,
+      featuredFrom: plan.featured_from
+        ? plan.featured_from instanceof Date
+          ? plan.featured_from.toISOString()
+          : String(plan.featured_from)
+        : null,
+      featuredUntil: plan.featured_until
+        ? plan.featured_until instanceof Date
+          ? plan.featured_until.toISOString()
+          : String(plan.featured_until)
+        : null,
       createdAt,
       updatedAt,
     };

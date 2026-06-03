@@ -536,6 +536,8 @@ export class WorkoutsApiService {
     if (body.visibility !== undefined) {
       update.visibility = this.resolveVisibilityForWrite(req as AuthedRequest, body.visibility);
     }
+    if (body.featuredFrom !== undefined) update.featured_from = body.featuredFrom;
+    if (body.featuredUntil !== undefined) update.featured_until = body.featuredUntil;
 
     let workout = existing;
     if (Object.keys(update).length > 0) {
@@ -839,6 +841,12 @@ export class WorkoutsApiService {
       cardioCategoryId: workout.cardio_category_id,
       cardioCategory,
       items,
+      featuredFrom: workout.featured_from
+        ? new Date(workout.featured_from as unknown as string).toISOString()
+        : null,
+      featuredUntil: workout.featured_until
+        ? new Date(workout.featured_until as unknown as string).toISOString()
+        : null,
       createdAt: new Date(workout.created_at as unknown as string).toISOString(),
       updatedAt: new Date(workout.updated_at as unknown as string).toISOString(),
     };

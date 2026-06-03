@@ -529,6 +529,15 @@ export class UpdateWorkoutBody {
   @Type(() => WorkoutItemBody)
   @IsOptional()
   items?: WorkoutItemBody[];
+
+  /** Featured window. ISO timestamps; null = open-ended on that side. */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredUntil?: string | null;
 }
 
 export class WorkoutIdParam {

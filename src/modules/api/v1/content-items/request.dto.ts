@@ -83,6 +83,15 @@ export class UpdateContentItemDto {
   @Min(1)
   @IsOptional()
   durationSeconds?: number;
+
+  /** Featured window. ISO timestamps; null = open-ended. */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredUntil?: string | null;
 }
 
 export class ListContentItemsQuery {

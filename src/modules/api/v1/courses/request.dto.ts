@@ -3,6 +3,7 @@ import { Transform } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -11,6 +12,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { CourseStatus } from 'src/database/interfaces';
 
@@ -44,6 +46,24 @@ export class UpdateCourseDto {
   @IsEnum(CourseStatus)
   @IsOptional()
   status?: CourseStatus;
+
+  /**
+   * Featured window. ISO 8601 timestamps. Either or both nullable —
+   * null means "open-ended on that side". Both undefined means leave
+   * the existing window untouched; pass null explicitly to clear.
+   * Validation: when both are non-null, from < until.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsDateString()
+  featuredFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsDateString()
+  featuredUntil?: string | null;
 }
 
 export class ListCoursesQuery {

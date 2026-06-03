@@ -44,6 +44,12 @@ export class ContentItemDTO {
   @ApiProperty({ type: [String] })
   tags: string[];
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  featuredFrom: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  featuredUntil: string | null;
+
   @ApiProperty()
   createdAt: string;
 

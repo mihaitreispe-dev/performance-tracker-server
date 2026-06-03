@@ -111,6 +111,11 @@ export class CoursesApiService {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.description !== undefined ? { description: dto.description } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
+      // ISO strings round-trip cleanly through the TIMESTAMPTZ column;
+      // Kysely's ColumnType on the new featured_* fields accepts
+      // `string | null` directly on the INSERT/UPDATE side.
+      ...(dto.featuredFrom !== undefined ? { featured_from: dto.featuredFrom } : {}),
+      ...(dto.featuredUntil !== undefined ? { featured_until: dto.featuredUntil } : {}),
     });
     const lessonCount = (await this.courseRepo.listLessons(id)).length;
     return { data: await this.mapToDTO(updated, lessonCount) };
@@ -250,6 +255,8 @@ export class CoursesApiService {
         : null,
       status: course.status,
       lessonCount,
+      featuredFrom: course.featured_from ? this.toISO(course.featured_from) : null,
+      featuredUntil: course.featured_until ? this.toISO(course.featured_until) : null,
       createdAt: this.toISO(course.created_at),
       updatedAt: this.toISO(course.updated_at),
     };

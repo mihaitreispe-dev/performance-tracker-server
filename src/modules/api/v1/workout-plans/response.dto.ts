@@ -82,6 +82,16 @@ export class WorkoutPlanDTO {
   @IsUUID()
   userId: string;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  featuredFrom: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  featuredUntil: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;

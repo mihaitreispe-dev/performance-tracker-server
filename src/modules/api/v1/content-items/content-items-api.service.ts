@@ -138,6 +138,9 @@ export class ContentItemsApiService {
       ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
       ...(dto.status !== undefined ? { status: dto.status } : {}),
       ...(dto.durationSeconds !== undefined ? { duration_seconds: dto.durationSeconds } : {}),
+      // ISO strings via the ColumnType's `string | null` INSERT side.
+      ...(dto.featuredFrom !== undefined ? { featured_from: dto.featuredFrom } : {}),
+      ...(dto.featuredUntil !== undefined ? { featured_until: dto.featuredUntil } : {}),
     });
     return { data: await this.mapToDTO(updated) };
   }
@@ -258,6 +261,8 @@ export class ContentItemsApiService {
       durationSeconds: item.duration_seconds,
       status: item.status,
       tags: item.tags,
+      featuredFrom: item.featured_from ? this.toISO(item.featured_from) : null,
+      featuredUntil: item.featured_until ? this.toISO(item.featured_until) : null,
       createdAt: this.toISO(item.created_at),
       updatedAt: this.toISO(item.updated_at),
     };

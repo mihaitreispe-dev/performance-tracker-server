@@ -76,6 +76,15 @@ export class UpdateWorkoutPlanBody {
   @Type(() => Number)
   @IsOptional()
   durationWeeks?: number;
+
+  /** Featured window. ISO timestamps; null = open-ended. */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredFrom?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  featuredUntil?: string | null;
 }
 
 export class WorkoutPlanIdParam {

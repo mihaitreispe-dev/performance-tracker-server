@@ -28,6 +28,12 @@ export class CourseDTO {
   @ApiProperty()
   lessonCount: number;
 
+  @ApiPropertyOptional({ nullable: true, type: String })
+  featuredFrom: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  featuredUntil: string | null;
+
   @ApiProperty()
   createdAt: string;
 
