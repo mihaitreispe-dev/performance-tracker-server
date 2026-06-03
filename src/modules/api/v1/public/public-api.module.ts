@@ -16,6 +16,7 @@ import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.r
 import { ModuleRepository } from 'src/repositories/module.repository';
 import { OAuthAuthorizationCodeRepository } from 'src/repositories/oauth-authorization-code.repository';
 import { OnboardingQuestionnaireRepository } from 'src/repositories/onboarding-questionnaire.repository';
+import { NotificationRuleRepository } from 'src/repositories/notification-rule.repository';
 import { OnboardingResponseRepository } from 'src/repositories/onboarding-response.repository';
 import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
@@ -94,6 +95,7 @@ export class PublicApiModule {
           OnboardingResponseRepository,
           OrganisationMembershipRepository,
           OrganisationApiKeyRepository,
+          NotificationRuleRepository,
           OAuthAuthorizationCodeRepository,
           RefreshTokenRepository,
           UserRepository,

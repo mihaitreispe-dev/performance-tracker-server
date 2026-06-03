@@ -161,6 +161,21 @@ export class ListExecutionHistoryQuery {
   completed?: boolean;
 }
 
+/**
+ * Query for GET /v1/public/clients/:id/pending-notifications.
+ * Integrators poll this from their own white-label client app to
+ * pick up notifications queued with route='external_app'.
+ */
+export class ListPendingNotificationsQuery {
+  @ApiPropertyOptional({
+    description:
+      "ISO timestamp. Only return deliveries with sent_at > since. The integrator persists the most-recent sent_at it has seen and passes it on the next poll for a tight watermark.",
+  })
+  @IsOptional()
+  @IsDateString()
+  since?: string;
+}
+
 export class ClientIdParam {
   @IsUUID()
   id: string;

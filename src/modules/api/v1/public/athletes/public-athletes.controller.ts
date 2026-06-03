@@ -27,12 +27,14 @@ import {
   ExecutionIdParam,
   FinishExecutionBody,
   ListExecutionHistoryQuery,
+  ListPendingNotificationsQuery,
   ListScheduledWorkoutsQuery,
   StartExecutionBody,
 } from './request.dto';
 import {
   PublicExecutionHistoryResponse,
   PublicExecutionSummaryResponse,
+  PublicPendingNotificationsResponse,
   PublicPersonalRecordListResponse,
   PublicScheduledWorkoutListResponse,
   PublicSetCompletionResponse,
@@ -148,5 +150,26 @@ export class PublicAthletesController {
     @Param() params: ClientIdParam,
   ): Promise<PublicPersonalRecordListResponse> {
     return this.service.listPersonalRecords(req.apiKey.organisationId, params.id);
+  }
+
+  // -------- Pending notifications (F1c — integrator poll) -----------
+
+  @Get('clients/:id/pending-notifications')
+  @PublicApiRoute('notifications:write')
+  @ApiOperation({
+    summary:
+      "Integrator-poll endpoint. Returns notifications queued for the client with route='external_app'. Pass `since=<last-seen sentAt>` as the watermark on subsequent polls.",
+  })
+  @ApiOkResponse({ type: PublicPendingNotificationsResponse })
+  async listPendingNotifications(
+    @Req() req: PublicRequest,
+    @Param() params: ClientIdParam,
+    @Query() query: ListPendingNotificationsQuery,
+  ): Promise<PublicPendingNotificationsResponse> {
+    return this.service.listPendingNotifications(
+      req.apiKey.organisationId,
+      params.id,
+      query.since ?? null,
+    );
   }
 }

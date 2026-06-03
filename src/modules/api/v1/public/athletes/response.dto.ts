@@ -100,3 +100,26 @@ export class PublicExecutionSummaryDTO {
 export class PublicExecutionSummaryResponse {
   @ApiProperty({ type: PublicExecutionSummaryDTO }) data: PublicExecutionSummaryDTO;
 }
+
+// --- Pending notifications (integrator poll for external-app deliveries) ----
+
+export class PublicPendingNotificationDTO {
+  @ApiProperty() id: string;
+  @ApiProperty() ruleId: string;
+  @ApiProperty({ description: 'Server-rendered title for the push notification.' })
+  title: string;
+  @ApiProperty({ description: 'Server-rendered body.' })
+  body: string;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Optional in-app deep link the integrator should open on tap.',
+  })
+  clickAction: string | null;
+  @ApiProperty({ description: 'ISO timestamp the rule queued this delivery.' })
+  sentAt: string;
+}
+
+export class PublicPendingNotificationsResponse {
+  @ApiProperty({ type: [PublicPendingNotificationDTO] })
+  data: PublicPendingNotificationDTO[];
+}

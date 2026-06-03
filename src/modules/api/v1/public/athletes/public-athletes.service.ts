@@ -16,6 +16,7 @@ import {
 } from 'src/database/interfaces';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
+import { NotificationRuleRepository } from 'src/repositories/notification-rule.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
@@ -66,7 +67,66 @@ export class PublicAthletesService {
     private readonly workoutRepo: WorkoutRepository,
     private readonly exerciseInstanceRepo: ExerciseInstanceRepository,
     private readonly exerciseRepo: ExerciseRepository,
+    private readonly notificationRuleRepo: NotificationRuleRepository,
   ) {}
+
+  // -------- Pending notifications (integrator poll) -----------------
+
+  /**
+   * F1c — list deliveries the notification engine queued for this
+   * user with route='external_app'. Used by integrators whose org
+   * has uses_external_app=true; they poll on app boot + at intervals,
+   * passing `since=<last-seen sentAt>` as the watermark.
+   *
+   * No auth-level constraint on uses_external_app — we always return
+   * whatever's queued; if the org is using our first-party app instead,
+   * the engine never writes external_app rows so the list stays empty.
+   * That keeps the integrator's polling code free to enable / disable
+   * the feature server-side without code churn.
+   */
+  async listPendingNotifications(
+    organisationId: string,
+    userId: string,
+    since: string | null,
+  ): Promise<{
+    data: Array<{
+      id: string;
+      ruleId: string;
+      title: string;
+      body: string;
+      clickAction: string | null;
+      sentAt: string;
+    }>;
+  }> {
+    await this.assertClientMembership(organisationId, userId);
+    const rows = await this.notificationRuleRepo.listExternalDeliveriesForUser(
+      userId,
+      organisationId,
+      since,
+    );
+    if (rows.length === 0) return { data: [] };
+
+    // Join in title/body/clickAction from the rule rows. Done as a
+    // batched lookup so we don't fan out N rule fetches.
+    const ruleIds = [...new Set(rows.map((r) => r.rule_id))];
+    const rules = await Promise.all(ruleIds.map((id) => this.notificationRuleRepo.findById(id)));
+    const ruleById = new Map(rules.filter((r) => r != null).map((r) => [r!.id, r!]));
+
+    return {
+      data: rows.map((r) => {
+        const rule = ruleById.get(r.rule_id);
+        return {
+          id: r.id,
+          ruleId: r.rule_id,
+          title: rule?.title ?? '(deleted rule)',
+          body: rule?.body ?? '',
+          clickAction: rule?.click_action ?? null,
+          sentAt:
+            r.sent_at instanceof Date ? r.sent_at.toISOString() : String(r.sent_at),
+        };
+      }),
+    };
+  }
 
   // -------- Schedules --------
 
