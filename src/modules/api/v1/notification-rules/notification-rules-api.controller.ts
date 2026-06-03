@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -43,6 +44,7 @@ import {
 import {
   NotificationDispatchResultResponse,
   NotificationRuleDTO,
+  NotificationRuleDeliveriesResponse,
   NotificationRuleListResponse,
   NotificationRuleResponse,
 } from './response.dto';
@@ -139,6 +141,41 @@ export class NotificationRulesApiController {
     const existing = await this.repo.findByIdInOrg(params.id, orgId);
     if (!existing) throw new NotFoundException('Rule not found');
     await this.repo.delete(params.id);
+  }
+
+  @Get(':id/deliveries')
+  @ApiOperation({
+    summary:
+      'List recent deliveries for a rule — append-only audit log. Newest first, capped at 200.',
+  })
+  @ApiOkResponse({ type: NotificationRuleDeliveriesResponse })
+  async listDeliveries(
+    @Req() req: AuthedReq,
+    @Param() params: NotificationRuleIdParam,
+    @Query('limit') limitRaw?: string,
+  ): Promise<NotificationRuleDeliveriesResponse> {
+    const orgId = this.requireAdminOrg(req);
+    // Verify the rule is in this org before reading its delivery log —
+    // the deliveries table is also organisation-scoped, but checking
+    // the parent row gives us a 404 instead of an empty list when the
+    // id was guessed.
+    const existing = await this.repo.findByIdInOrg(params.id, orgId);
+    if (!existing) throw new NotFoundException('Rule not found');
+    const limit = limitRaw ? Math.max(1, Math.min(parseInt(limitRaw, 10) || 50, 200)) : 50;
+    const rows = await this.repo.listDeliveriesForRule(params.id, orgId, limit);
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        ruleId: r.rule_id,
+        userId: r.user_id,
+        userDisplayName: r.userDisplayName,
+        userEmail: r.userEmail,
+        sentAt: r.sent_at instanceof Date ? r.sent_at.toISOString() : String(r.sent_at),
+        route: r.route,
+        ok: r.ok,
+        error: r.error,
+      })),
+    };
   }
 
   @Post(':id/test')

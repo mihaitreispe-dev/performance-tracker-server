@@ -71,3 +71,43 @@ export class NotificationDispatchResultResponse {
   @ApiProperty({ type: NotificationDispatchResultDTO })
   data: NotificationDispatchResultDTO;
 }
+
+/**
+ * One row of the per-rule delivery audit log. The UI surfaces these
+ * in a drawer so admins can verify a rule actually fired, see who it
+ * reached, and inspect any per-recipient errors (FCM token expired,
+ * external-app webhook 5xx, etc.).
+ */
+export class NotificationRuleDeliveryDTO {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  ruleId: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  userDisplayName: string;
+
+  @ApiProperty()
+  userEmail: string;
+
+  @ApiProperty()
+  sentAt: string;
+
+  @ApiProperty({ enum: ['fcm', 'external_app'] })
+  route: 'fcm' | 'external_app';
+
+  @ApiProperty()
+  ok: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  error: string | null;
+}
+
+export class NotificationRuleDeliveriesResponse {
+  @ApiProperty({ type: [NotificationRuleDeliveryDTO] })
+  data: NotificationRuleDeliveryDTO[];
+}

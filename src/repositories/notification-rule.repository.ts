@@ -148,6 +148,47 @@ export class NotificationRuleRepository {
   }
 
   /**
+   * Audit log for a single rule, newest first. Joins users so the UI
+   * doesn't have to make a second hop just to render a recipient name —
+   * the delivery table only knows user ids, but the org admin reading
+   * the log wants "Sarah at 09:02" not "f1a3…b9 at 09:02".
+   *
+   * `limit` is capped at 200 server-side as a courtesy to the DOM;
+   * the engine writes one row per (rule, user) per fire, so a daily
+   * rule against 100 users hits 200 after two days.
+   */
+  async listDeliveriesForRule(
+    ruleId: string,
+    organisationId: string,
+    limit = 50,
+  ): Promise<
+    Array<NotificationRuleDelivery & { userDisplayName: string; userEmail: string }>
+  > {
+    const capped = Math.max(1, Math.min(limit, 200));
+    const rows = await this.db
+      .selectFrom('notification_rule_deliveries as d')
+      .innerJoin('users as u', 'u.id', 'd.user_id')
+      .where('d.rule_id', '=', ruleId)
+      .where('d.organisation_id', '=', organisationId)
+      .orderBy('d.sent_at', 'desc')
+      .limit(capped)
+      .select([
+        'd.id',
+        'd.rule_id',
+        'd.user_id',
+        'd.organisation_id',
+        'd.sent_at',
+        'd.route',
+        'd.ok',
+        'd.error',
+        'u.display_name as userDisplayName',
+        'u.email as userEmail',
+      ])
+      .execute();
+    return rows;
+  }
+
+  /**
    * For the integrator-poll endpoint (Phase 7b): list deliveries with
    * route='external_app' since a watermark, for a single user.
    */
