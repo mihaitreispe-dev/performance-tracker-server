@@ -228,7 +228,18 @@ export class MembershipsApiService {
     this.assertCanTargetRole(inviterRole, membership.role);
     this.assertCanTargetRole(inviterRole, dto.role);
 
-    const updated = await this.membershipRepo.updateById(membershipId, { role: dto.role });
+    // clientType only applies to athletes — DB CHECK enforces. If the
+    // (post-update) role isn't ATHLETE, force null. If it IS ATHLETE
+    // and dto.clientType is unset, leave the existing value alone.
+    const newRole = dto.role;
+    const newClientType: ClientType | null | undefined =
+      newRole === OrganisationRole.ATHLETE
+        ? (dto.clientType ?? undefined)
+        : null;
+    const updated = await this.membershipRepo.updateById(membershipId, {
+      role: dto.role,
+      ...(newClientType !== undefined ? { client_type: newClientType } : {}),
+    });
     const user = await this.userRepo.findById(updated.user_id);
     await this.auditRepo.record({
       organisation_id: orgId,

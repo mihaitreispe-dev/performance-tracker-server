@@ -35,6 +35,17 @@ export class UpdateMembershipRoleDto {
   @ApiProperty({ enum: OrganisationRole })
   @IsEnum(OrganisationRole)
   role: OrganisationRole;
+
+  /**
+   * Optional clientType change. Honoured only when the (post-update)
+   * role is ATHLETE — flipping a coach/admin to general-pop is a no-op
+   * (DB CHECK enforces). Pass to flip a client between 1:1 and general
+   * after invite.
+   */
+  @ApiPropertyOptional({ enum: ClientType })
+  @IsOptional()
+  @IsEnum(ClientType)
+  clientType?: ClientType;
 }
 
 export class MembershipIdParams {
