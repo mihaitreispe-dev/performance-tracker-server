@@ -112,6 +112,10 @@ import { WorkoutPlansTable } from './workout-plans-table.interface';
 import { WorkoutRoutesTable } from './workout-routes-table.interface';
 import { WorkoutSchedulesTable } from './workout-schedules-table.interface';
 import { WorkoutsTable } from './workouts-table.interface';
+import {
+  NotificationRuleDeliveriesTable,
+  NotificationRulesTable,
+} from './notification-rules-table.interface';
 
 export interface Database {
   users: UsersTable;
@@ -249,4 +253,8 @@ export interface Database {
   courses: CoursesTable;
   course_lessons: CourseLessonsTable;
   course_completions: CourseCompletionsTable;
+
+  // Phase 11 — Push notification rules + delivery log
+  notification_rules: NotificationRulesTable;
+  notification_rule_deliveries: NotificationRuleDeliveriesTable;
 }
