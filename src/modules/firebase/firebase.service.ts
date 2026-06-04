@@ -22,6 +22,15 @@ export class FirebaseService implements OnModuleInit {
   constructor(private readonly appConfig: AppConfigService) {}
 
   onModuleInit() {
+    // Reuse the default app if it's already been initialised — happens
+    // whenever a second Nest context boots in the same Node process
+    // (cron worker + main API, HMR reload, jest isolated suites). The
+    // admin SDK throws "app/invalid-app-options" otherwise because it
+    // can't deep-equal Credential objects across calls.
+    if (admin.apps.length > 0) {
+      this.app = admin.app();
+      return;
+    }
     this.app = admin.initializeApp({
       credential: admin.credential.cert({
         projectId: this.appConfig.firebaseProjectId,
