@@ -154,7 +154,15 @@ export class PublicOAuthService {
   // -------- helpers --------
 
   private async resolveActiveApiKey(clientId: string): Promise<OrganisationApiKey> {
-    const row = await this.apiKeyRepo.findActiveByPrefix(clientId);
+    // Callers paste either the public prefix (16 chars, e.g.
+    // "sz_test_gVwNcXmu") or the full key the seed/key-create UI
+    // prints (~52 chars). Both should work — the stored key_prefix
+    // is the first 16 chars, so slice before lookup. Treating the
+    // full key as the client_id is also what most OAuth-style
+    // integrators do because the key cleartext is shown to them
+    // exactly once.
+    const lookup = clientId.slice(0, 16);
+    const row = await this.apiKeyRepo.findActiveByPrefix(lookup);
     if (!row) {
       throw new UnauthorizedException('Unknown or revoked client_id');
     }
