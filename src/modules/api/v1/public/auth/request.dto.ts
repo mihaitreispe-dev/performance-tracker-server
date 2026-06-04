@@ -22,7 +22,12 @@ export class AuthorizeBody {
   })
   @IsString()
   @MaxLength(2000)
-  @IsUrl({ require_protocol: true, require_valid_protocol: true })
+  // require_tld:false lets dev-time callbacks like http://localhost:5180/callback
+  // through — validator.js otherwise rejects them because "localhost" has no
+  // dot/TLD. Production redirect URIs still need a real host since the key's
+  // allow-list is what actually gates dispatch (this validator is just a
+  // shape check).
+  @IsUrl({ require_protocol: true, require_valid_protocol: true, require_tld: false })
   redirectUri: string;
 
   @ApiPropertyOptional({ description: 'Opaque value echoed back to the relying party. CSRF defence.' })
