@@ -24,6 +24,9 @@ export class OAuthAuthorizationCodeRepository {
    * Find a non-expired, non-used code by its opaque value. Returns undefined if the
    * code is expired/used/missing — the caller can't tell which, by design (no
    * information leak to attackers probing codes).
+   *
+   * The returned row carries `code_challenge` + `code_challenge_method` so the
+   * service can verify PKCE without a second roundtrip.
    */
   async findRedeemable(code: string): Promise<OAuthAuthorizationCode | undefined> {
     return this.db

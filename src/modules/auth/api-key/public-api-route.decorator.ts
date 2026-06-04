@@ -2,7 +2,7 @@ import { applyDecorators } from '@nestjs/common';
 
 import { SkipActiveOrg } from '../guards/active-org.guard';
 import { DisableJwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RequireApiKey } from './api-key.guard';
+import { OptionalApiKey, RequireApiKey } from './api-key.guard';
 import { ApiKeyScope } from './api-key.scopes';
 
 /**
@@ -18,3 +18,13 @@ import { ApiKeyScope } from './api-key.scopes';
  */
 export const PublicApiRoute = (...scopes: ApiKeyScope[]) =>
   applyDecorators(DisableJwtAuthGuard(), SkipActiveOrg(), RequireApiKey(...scopes));
+
+/**
+ * Same as PublicApiRoute but the API key is OPTIONAL. The guard validates the
+ * bearer when one is present and attaches `req.apiKey`; the request still
+ * goes through if no bearer is supplied at all. Use for endpoints that
+ * support both private-key callers (integrator backends) and public-client
+ * callers (browser SPAs using PKCE) — currently just /v1/public/auth/token.
+ */
+export const OptionalPublicApiRoute = (...scopes: ApiKeyScope[]) =>
+  applyDecorators(DisableJwtAuthGuard(), SkipActiveOrg(), OptionalApiKey(...scopes));

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
 export class AuthorizeBody {
   @ApiProperty({
@@ -35,6 +35,24 @@ export class AuthorizeBody {
   @IsString()
   @MaxLength(500)
   state?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'PKCE code challenge (RFC 7636) — base64url(SHA256(code_verifier)). Required for public-client keys.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(43)
+  @MaxLength(128)
+  codeChallenge?: string;
+
+  @ApiPropertyOptional({
+    enum: ['S256'],
+    description: 'PKCE challenge method. Only S256 is supported; plain is disallowed by policy.',
+  })
+  @IsOptional()
+  @IsIn(['S256'])
+  codeChallengeMethod?: 'S256';
 }
 
 export class TokenExchangeBody {
@@ -47,4 +65,23 @@ export class TokenExchangeBody {
   @IsString()
   @MaxLength(2000)
   redirectUri: string;
+
+  @ApiPropertyOptional({
+    description:
+      'PKCE code verifier (RFC 7636). Required when the code was minted with a code_challenge; required for all public-client keys.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(43)
+  @MaxLength(128)
+  codeVerifier?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Public-client identifier (the API key prefix or full key). Required for public-client keys, ignored otherwise — the Bearer header is the canonical auth for private keys.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  clientId?: string;
 }

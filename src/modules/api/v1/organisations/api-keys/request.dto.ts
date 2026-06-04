@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsOptional,
@@ -59,6 +60,14 @@ export class CreateApiKeyDto {
   @IsString({ each: true })
   @MaxLength(2000, { each: true })
   redirectUris?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Mark this key as a public client (browser SPA / mobile / native). Public keys skip the bcrypt secret check on /v1/public/auth/token and require PKCE instead. Default false — keeps the private integrator-backend flow.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublicClient?: boolean;
 }
 
 export class ApiKeyIdParams {

@@ -1,6 +1,7 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -71,6 +72,8 @@ export class PublicOAuthService {
     clientId: string;
     redirectUri: string;
     state?: string;
+    codeChallenge?: string;
+    codeChallengeMethod?: 'S256';
   }): Promise<{ code: string; redirectUri: string; state: string | null; expiresAt: string }> {
     const apiKey = await this.resolveActiveApiKey(input.clientId);
     if (!apiKey.redirect_uris || apiKey.redirect_uris.length === 0) {
@@ -79,6 +82,23 @@ export class PublicOAuthService {
     if (!apiKey.redirect_uris.includes(input.redirectUri)) {
       throw new ForbiddenException(
         'redirect_uri is not in the allow-list for this API key. Add it via the API key settings.',
+      );
+    }
+
+    // PKCE policy:
+    //   - Public clients MUST send a challenge (the bearer secret is gone,
+    //     PKCE is what binds the code to the originating browser session).
+    //   - Private clients MAY send one (defence-in-depth) but it's optional.
+    //   - If a challenge is sent, the method must be S256 (we never
+    //     accepted 'plain', which is too weak to be useful).
+    if (apiKey.is_public_client && !input.codeChallenge) {
+      throw new BadRequestException(
+        'Public-client keys require a PKCE code_challenge on /authorize.',
+      );
+    }
+    if (input.codeChallenge && input.codeChallengeMethod !== 'S256') {
+      throw new BadRequestException(
+        "PKCE code_challenge_method must be 'S256'.",
       );
     }
 
@@ -94,6 +114,8 @@ export class PublicOAuthService {
       user_id: user.id,
       redirect_uri: input.redirectUri,
       expires_at: expiresAt,
+      code_challenge: input.codeChallenge ?? null,
+      code_challenge_method: input.codeChallenge ? 'S256' : null,
     });
 
     return {
@@ -104,10 +126,36 @@ export class PublicOAuthService {
     };
   }
 
+  /**
+   * Token-exchange supports two auth modes:
+   *
+   *   PRIVATE (legacy): caller is the integrator's backend. ApiKeyAuthGuard
+   *     ran upstream and attached `req.apiKey`. The code's `api_key_id` must
+   *     match that key's id (caller can only redeem codes minted under their
+   *     own key) — this is the bcrypt-secret-backed contract.
+   *
+   *   PUBLIC (PKCE): caller is a browser SPA / native app. No bearer header;
+   *     a `clientId` in the body identifies the key. We require:
+   *       - the key has is_public_client = true,
+   *       - the code carries a stored PKCE challenge,
+   *       - the body's code_verifier hashes to that challenge,
+   *       - the Origin header (if present) sits under one of the key's
+   *         registered redirect URIs — browser-only defence in depth.
+   *
+   * The two paths share the same code lifecycle (CAS on used_at, redirect
+   * binding, expiry); only the authentication of the caller differs.
+   */
   async exchangeCode(input: {
     code: string;
     redirectUri: string;
-    apiKey: { apiKeyId: string; organisationId: string };
+    /** Set when ApiKeyAuthGuard ran (private-client path). */
+    apiKey?: { apiKeyId: string; organisationId: string };
+    /** PKCE verifier — required for public-client codes. */
+    codeVerifier?: string;
+    /** Public-client identifier from the request body — required when `apiKey` isn't set. */
+    clientId?: string;
+    /** Origin header of the incoming HTTP request. Browser-set, undefined on server-to-server. */
+    origin?: string;
   }): Promise<PublicAuthSessionDTO> {
     const row = await this.codeRepo.findRedeemable(input.code);
     if (!row) {
@@ -115,11 +163,38 @@ export class PublicOAuthService {
       // expired, used, or simply doesn't exist.
       throw new UnauthorizedException('Invalid or expired code');
     }
-    if (row.organisation_id !== input.apiKey.organisationId) {
-      throw new UnauthorizedException('Invalid or expired code');
-    }
     if (row.redirect_uri !== input.redirectUri) {
       throw new UnauthorizedException('redirect_uri does not match the original authorization');
+    }
+
+    // Resolve which API key the code was issued under, regardless of which
+    // auth mode the caller is using. This is the row that decides which
+    // verification path applies.
+    const codeKey = await this.apiKeyRepo.findById(row.api_key_id);
+    if (!codeKey || codeKey.revoked_at !== null) {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+
+    if (codeKey.is_public_client) {
+      this.verifyPublicClientExchange({
+        codeKey,
+        codeRow: row,
+        suppliedClientId: input.clientId,
+        suppliedVerifier: input.codeVerifier,
+        origin: input.origin,
+      });
+    } else {
+      // Private path: ApiKeyAuthGuard must have authenticated the caller
+      // and attached its key context. The code must have been minted by
+      // *that* key (org match is the canonical check; ids tighten it).
+      if (!input.apiKey) {
+        throw new UnauthorizedException(
+          'API key required for this code — pass Authorization: Bearer ...',
+        );
+      }
+      if (row.organisation_id !== input.apiKey.organisationId) {
+        throw new UnauthorizedException('Invalid or expired code');
+      }
     }
 
     const claimed = await this.codeRepo.markUsed(input.code);
@@ -147,8 +222,68 @@ export class PublicOAuthService {
     return {
       ...tokens,
       user: authUserFromUser(user),
-      organisationId: input.apiKey.organisationId,
+      organisationId: codeKey.organisation_id,
     };
+  }
+
+  /**
+   * Validate the public-client (PKCE) exchange path. Throws on any
+   * mismatch; returns normally if everything lines up. Pulled out of the
+   * main exchangeCode body so the two paths read clearly side-by-side.
+   */
+  private verifyPublicClientExchange(args: {
+    codeKey: OrganisationApiKey;
+    codeRow: { code_challenge: string | null; code_challenge_method: string | null };
+    suppliedClientId: string | undefined;
+    suppliedVerifier: string | undefined;
+    origin: string | undefined;
+  }) {
+    // Caller must identify the key in the body — there's no Authorization
+    // header on this path. The clientId must resolve to the same key that
+    // issued the code; anything else means the request is being replayed
+    // against a different key.
+    if (!args.suppliedClientId) {
+      throw new UnauthorizedException(
+        'clientId required in body for public-client exchange.',
+      );
+    }
+    if (args.suppliedClientId.slice(0, 16) !== args.codeKey.key_prefix) {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+
+    if (!args.codeRow.code_challenge || args.codeRow.code_challenge_method !== 'S256') {
+      // Public client minted a code without PKCE somehow (manual API call?).
+      // Refuse — accepting it would mean the code is bearer-equivalent.
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+    if (!args.suppliedVerifier) {
+      throw new BadRequestException('code_verifier required for public-client exchange.');
+    }
+    const computed = createHash('sha256').update(args.suppliedVerifier).digest();
+    const expected = Buffer.from(base64UrlDecode(args.codeRow.code_challenge));
+    if (computed.length !== expected.length || !timingSafeEqual(computed, expected)) {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+
+    // Origin gating: when an Origin header is present (browser), it must
+    // sit under one of the key's registered redirect URIs. Server-to-server
+    // callers have no Origin header — they're already gated by the
+    // is_public_client policy refusing them above (no bearer = no auth on
+    // private keys, no Origin to check on public keys). This blocks
+    // drive-by attempts from a different origin even if a code+verifier
+    // somehow leak.
+    if (args.origin) {
+      const allowedOrigins = new Set(
+        (args.codeKey.redirect_uris ?? [])
+          .map((u) => safeOrigin(u))
+          .filter((o): o is string => o !== null),
+      );
+      if (!allowedOrigins.has(args.origin)) {
+        throw new ForbiddenException(
+          'Origin not in this key\'s redirect URI allow-list.',
+        );
+      }
+    }
   }
 
   // -------- helpers --------
@@ -243,4 +378,27 @@ export class PublicOAuthService {
  */
 function randomCode(): string {
   return randomBytes(32).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Decode a base64url (RFC 4648 §5) string into raw bytes. Node's
+ * Buffer.from(..., 'base64') accepts the URL-safe alphabet but expects
+ * standard '=' padding, which RFC 7636 omits — restore it before decoding.
+ */
+function base64UrlDecode(s: string): Uint8Array {
+  const padded = s + '='.repeat((4 - (s.length % 4)) % 4);
+  return new Uint8Array(Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64'));
+}
+
+/**
+ * Extract just the `scheme://host[:port]` part of a redirect URI for
+ * Origin-header comparison. Returns null for unparseable input so the
+ * caller can drop it from the allow-list rather than match against junk.
+ */
+function safeOrigin(uri: string): string | null {
+  try {
+    return new URL(uri).origin;
+  } catch {
+    return null;
+  }
 }

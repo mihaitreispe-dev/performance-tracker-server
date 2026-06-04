@@ -27,6 +27,13 @@ export interface OrganisationApiKeysTable {
    */
   redirect_uris: ColumnType<string[], string[] | undefined, string[]>;
   /**
+   * Marks the key as a public client (SPA / mobile / kiosk). On /v1/public/auth/token
+   * we skip the bcrypt secret check for these keys and require PKCE instead, plus
+   * gate the request's Origin against `redirect_uris`. Defaults to false — existing
+   * integrator-backend keys keep the secret-only flow.
+   */
+  is_public_client: Generated<boolean>;
+  /**
    * Debounced last-use timestamp. The auth guard only writes this if the previous
    * value is older than ~60s, so a hot key doesn't hammer the row on every hit.
    */

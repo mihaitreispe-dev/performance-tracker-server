@@ -17,6 +17,7 @@ import { ApiKeyScope } from './api-key.scopes';
 import { parseApiKey, verifyApiKey } from './api-key.util';
 
 const REQUIRED_SCOPES_KEY = 'API_KEY_REQUIRED_SCOPES';
+const OPTIONAL_SCOPES_KEY = 'API_KEY_OPTIONAL_SCOPES';
 
 /**
  * Mark a route as requiring an API key. The decorator both gates the guard (so
@@ -25,6 +26,17 @@ const REQUIRED_SCOPES_KEY = 'API_KEY_REQUIRED_SCOPES';
  */
 export const RequireApiKey = (...scopes: ApiKeyScope[]) =>
   SetMetadata(REQUIRED_SCOPES_KEY, scopes);
+
+/**
+ * Mark a route as OPTIONALLY API-key-authenticated. If the request carries a
+ * bearer / X-API-Key the guard validates it (with the same scope set as
+ * RequireApiKey) and attaches `req.apiKey`. If no bearer is supplied at all,
+ * the guard lets the request through with `req.apiKey` undefined — the
+ * handler is then responsible for whatever alternative auth (PKCE, etc.) gates
+ * the operation.
+ */
+export const OptionalApiKey = (...scopes: ApiKeyScope[]) =>
+  SetMetadata(OPTIONAL_SCOPES_KEY, scopes);
 
 export interface ApiKeyContext {
   apiKeyId: string;
@@ -55,7 +67,12 @@ export class ApiKeyAuthGuard implements CanActivate {
       REQUIRED_SCOPES_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (!requiredScopes) {
+    const optionalScopes = this.reflector.getAllAndOverride<ApiKeyScope[] | undefined>(
+      OPTIONAL_SCOPES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    const scopesNeeded = requiredScopes ?? optionalScopes;
+    if (!scopesNeeded) {
       // Route doesn't opt in to API-key auth — let other guards (JWT) handle it.
       return true;
     }
@@ -63,6 +80,9 @@ export class ApiKeyAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const candidate = extractApiKey(request);
     if (!candidate) {
+      // Optional route + no bearer → let the request through, the handler
+      // is responsible for the alternative auth path.
+      if (optionalScopes) return true;
       throw new UnauthorizedException('Missing API key — pass Authorization: Bearer sz_live_... or X-API-Key');
     }
 
@@ -81,7 +101,7 @@ export class ApiKeyAuthGuard implements CanActivate {
     }
 
     const keyScopes = row.scopes as ApiKeyScope[];
-    const missing = requiredScopes.filter((s) => !keyScopes.includes(s));
+    const missing = scopesNeeded.filter((s) => !keyScopes.includes(s));
     if (missing.length > 0) {
       throw new ForbiddenException(`API key is missing required scope(s): ${missing.join(', ')}`);
     }

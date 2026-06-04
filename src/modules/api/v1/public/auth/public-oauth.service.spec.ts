@@ -1,4 +1,6 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import {
@@ -31,6 +33,7 @@ const makeApiKey = (overrides: Partial<OrganisationApiKey> = {}): OrganisationAp
     key_hash: 'hash',
     scopes: ['auth:exchange'],
     redirect_uris: [REDIRECT],
+    is_public_client: false,
     last_used_at: null,
     revoked_at: null,
     expires_at: null,
@@ -68,6 +71,8 @@ const makeCode = (overrides: Partial<OAuthAuthorizationCode> = {}): OAuthAuthori
     redirect_uri: REDIRECT,
     expires_at: new Date(Date.now() + 5 * 60 * 1000),
     used_at: null,
+    code_challenge: null,
+    code_challenge_method: null,
     created_at: new Date(),
     ...overrides,
   }) as unknown as OAuthAuthorizationCode;
@@ -131,7 +136,7 @@ describe('PublicOAuthService', () => {
         },
         {
           provide: OrganisationApiKeyRepository,
-          useValue: { findActiveByPrefix: jest.fn() },
+          useValue: { findActiveByPrefix: jest.fn(), findById: jest.fn() },
         },
         {
           provide: OAuthAuthorizationCodeRepository,
@@ -290,6 +295,13 @@ describe('PublicOAuthService', () => {
   describe('exchangeCode', () => {
     const apiKey = { apiKeyId: 'key-1', organisationId: ORG };
 
+    beforeEach(() => {
+      // Default to the private-client path (existing behaviour) so every
+      // test in this block doesn't need to wire findById individually. PKCE
+      // / public-client tests below override with their own makeApiKey.
+      apiKeyRepo.findById.mockResolvedValue(makeApiKey());
+    });
+
     it('returns a session on the happy path', async () => {
       codeRepo.findRedeemable.mockResolvedValue(makeCode());
       codeRepo.markUsed.mockResolvedValue(true);
@@ -345,6 +357,162 @@ describe('PublicOAuthService', () => {
       userRepo.findById.mockResolvedValue(undefined as never);
       await expect(
         service.exchangeCode({ code: 'COD3', redirectUri: REDIRECT, apiKey }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  // ---- mintAuthorizationCode — PKCE rules ----
+
+  describe('mintAuthorizationCode (PKCE)', () => {
+    it('refuses public-client mint without a code_challenge', async () => {
+      apiKeyRepo.findActiveByPrefix.mockResolvedValue(
+        makeApiKey({ is_public_client: true, redirect_uris: [REDIRECT] }),
+      );
+      await expect(
+        service.mintAuthorizationCode({
+          firebaseIdToken: 'fb',
+          clientId: 'sz_live_abcd1234',
+          redirectUri: REDIRECT,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('refuses any non-S256 challenge method', async () => {
+      apiKeyRepo.findActiveByPrefix.mockResolvedValue(makeApiKey());
+      await expect(
+        service.mintAuthorizationCode({
+          firebaseIdToken: 'fb',
+          clientId: 'sz_live_abcd1234',
+          redirectUri: REDIRECT,
+          codeChallenge: 'a'.repeat(43),
+          // @ts-expect-error — deliberately invalid for the runtime check
+          codeChallengeMethod: 'plain',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ---- exchangeCode — public-client (PKCE) path ----
+
+  describe('exchangeCode (public client / PKCE)', () => {
+    /** Build a verifier/challenge pair the way RFC 7636 + the rehabit client do. */
+    function pkcePair() {
+      const verifier = 'a'.repeat(64);
+      const challenge = createHash('sha256').update(verifier).digest('base64')
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      return { verifier, challenge };
+    }
+
+    it('accepts a matching verifier with the right clientId + origin', async () => {
+      const { verifier, challenge } = pkcePair();
+      const publicKey = makeApiKey({
+        is_public_client: true,
+        redirect_uris: ['http://localhost:5180/callback'],
+      });
+      apiKeyRepo.findById.mockResolvedValue(publicKey);
+      codeRepo.findRedeemable.mockResolvedValue(
+        makeCode({
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          redirect_uri: 'http://localhost:5180/callback',
+        }),
+      );
+      codeRepo.markUsed.mockResolvedValue(true);
+      userRepo.findById.mockResolvedValue(makeUser());
+      userRepo.updateById.mockResolvedValue(makeUser());
+
+      const result = await service.exchangeCode({
+        code: 'COD3',
+        redirectUri: 'http://localhost:5180/callback',
+        clientId: publicKey.key_prefix,
+        codeVerifier: verifier,
+        origin: 'http://localhost:5180',
+      });
+
+      expect(result.accessToken).toBe('access-token');
+    });
+
+    it('rejects a mismatched verifier (PKCE failure looks like any other invalid code)', async () => {
+      const { challenge } = pkcePair();
+      const publicKey = makeApiKey({ is_public_client: true });
+      apiKeyRepo.findById.mockResolvedValue(publicKey);
+      codeRepo.findRedeemable.mockResolvedValue(
+        makeCode({ code_challenge: challenge, code_challenge_method: 'S256' }),
+      );
+
+      await expect(
+        service.exchangeCode({
+          code: 'COD3',
+          redirectUri: REDIRECT,
+          clientId: publicKey.key_prefix,
+          codeVerifier: 'b'.repeat(64),
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(codeRepo.markUsed).not.toHaveBeenCalled();
+    });
+
+    it('refuses public-client exchange with a code that has no stored challenge', async () => {
+      const publicKey = makeApiKey({ is_public_client: true });
+      apiKeyRepo.findById.mockResolvedValue(publicKey);
+      // Code minted without PKCE — could only happen if someone bypassed the
+      // mint guard. Refuse on exchange so the code never becomes
+      // bearer-equivalent.
+      codeRepo.findRedeemable.mockResolvedValue(
+        makeCode({ code_challenge: null, code_challenge_method: null }),
+      );
+
+      await expect(
+        service.exchangeCode({
+          code: 'COD3',
+          redirectUri: REDIRECT,
+          clientId: publicKey.key_prefix,
+          codeVerifier: 'a'.repeat(64),
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects an Origin that is not in the key\'s redirect URI allow-list', async () => {
+      const { verifier, challenge } = pkcePair();
+      const publicKey = makeApiKey({
+        is_public_client: true,
+        redirect_uris: ['http://localhost:5180/callback'],
+      });
+      apiKeyRepo.findById.mockResolvedValue(publicKey);
+      codeRepo.findRedeemable.mockResolvedValue(
+        makeCode({
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          redirect_uri: 'http://localhost:5180/callback',
+        }),
+      );
+
+      await expect(
+        service.exchangeCode({
+          code: 'COD3',
+          redirectUri: 'http://localhost:5180/callback',
+          clientId: publicKey.key_prefix,
+          codeVerifier: verifier,
+          origin: 'http://attacker.example',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects when the supplied clientId points at a different key than the code was minted under', async () => {
+      const { verifier, challenge } = pkcePair();
+      const publicKey = makeApiKey({ is_public_client: true });
+      apiKeyRepo.findById.mockResolvedValue(publicKey);
+      codeRepo.findRedeemable.mockResolvedValue(
+        makeCode({ code_challenge: challenge, code_challenge_method: 'S256' }),
+      );
+
+      await expect(
+        service.exchangeCode({
+          code: 'COD3',
+          redirectUri: REDIRECT,
+          // 16-char prefix that *doesn't* match key_prefix
+          clientId: 'sz_live_wrong000',
+          codeVerifier: verifier,
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
   });

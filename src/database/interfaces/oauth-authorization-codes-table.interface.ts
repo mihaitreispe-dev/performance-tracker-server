@@ -21,6 +21,14 @@ export interface OAuthAuthorizationCodesTable {
   redirect_uri: string;
   expires_at: Timestamp;
   used_at: Timestamp | null;
+  /**
+   * PKCE challenge captured at mint time. NULL when the caller didn't opt in
+   * (legacy integrator-backend flow). For public clients the service refuses
+   * to mint a code without it.
+   */
+  code_challenge: string | null;
+  /** Algorithm used to derive `code_challenge` from `code_verifier`. Currently only 'S256'. */
+  code_challenge_method: string | null;
   created_at: Generated<Timestamp>;
 }
 

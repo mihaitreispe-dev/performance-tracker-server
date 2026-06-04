@@ -157,6 +157,11 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           'executions:write',
         ],
         redirect_uris: ['http://localhost:5180/callback', 'com.example.performancesample://callback'],
+        // Mark this key as public-client — the rehabit sample is a pure-
+        // browser SPA with no backend to hold a bearer secret. The
+        // public-client path requires PKCE on /v1/public/auth/token and
+        // additionally gates the request's Origin against this allow-list.
+        is_public_client: true,
         created_by_user_id: systemUserId,
       } as never)
       .execute();

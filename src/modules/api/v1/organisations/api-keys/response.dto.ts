@@ -19,6 +19,12 @@ export class ApiKeyDTO {
   @ApiProperty({ isArray: true, type: String })
   redirectUris: string[];
 
+  @ApiProperty({
+    description:
+      'True when this key is a public client (PKCE-only on /token, no bcrypt secret check, Origin gated against redirect URIs).',
+  })
+  isPublicClient: boolean;
+
   @ApiPropertyOptional({ nullable: true })
   lastUsedAt: string | null;
 
