@@ -11,10 +11,12 @@ import {
   WorkoutExecutionSource,
   WorkoutRoute,
   WorkoutSchedule,
+  WorkoutVisibility,
 } from 'src/database/interfaces';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { WeatherService } from 'src/modules/weather/weather.service';
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
+import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { CardioMetricsRepository } from 'src/repositories/cardio-metrics.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
@@ -91,6 +93,9 @@ export class WorkoutExecutionsApiService {
     private readonly trainingStressRepository: TrainingStressRepository,
     private readonly exerciseInstanceRepository: ExerciseInstanceRepository,
     private readonly exerciseRepository: ExerciseRepository,
+    // Used by the ad-hoc start path to verify the caller is a member
+    // of the org that owns the org_library workout they're starting.
+    private readonly organisationMembershipRepository: OrganisationMembershipRepository,
     // D3 — workout completions enqueue outbound sync jobs for every
     // provider this user has connected. Service is @Global() so no
     // module-level import is needed in the executions module.
@@ -420,18 +425,47 @@ export class WorkoutExecutionsApiService {
   }
 
   async start(req: Request & { user: AuthUser }, body: StartWorkoutExecutionBody): Promise<WorkoutExecutionResponse> {
-    // Verify schedule exists and belongs to user
-    const schedule = await this.workoutScheduleRepository.findById(body.workoutScheduleId);
-    if (!schedule) {
-      throw new NotFoundException('Workout schedule not found');
+    // Body shape: exactly one of workoutId / workoutScheduleId must be
+    // supplied. Class-validator can't express "one of N" cleanly with
+    // class-validator decorators alone, so we enforce it here. This
+    // ALSO covers the no-op "both unset" case which would otherwise
+    // sail through validation since both fields are @IsOptional.
+    if (!body.workoutScheduleId && !body.workoutId) {
+      throw new BadRequestException(
+        'Either workoutScheduleId (scheduled) or workoutId (ad-hoc) is required.',
+      );
     }
-    if (schedule.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied to this workout schedule');
+    if (body.workoutScheduleId && body.workoutId) {
+      throw new BadRequestException(
+        'Pass only one of workoutScheduleId or workoutId, not both.',
+      );
+    }
+
+    // Resolve the schedule we'll attach the execution to. In the
+    // scheduled mode we just verify the supplied schedule. In the
+    // ad-hoc mode we synthesise a schedule for today against the
+    // workout — this keeps the existing schedule_id foreign key on
+    // executions intact (no schema split needed) while letting
+    // callers like the rehabit app start a library workout without
+    // pre-populating the calendar.
+    let schedule: WorkoutSchedule;
+    if (body.workoutScheduleId) {
+      const found = await this.workoutScheduleRepository.findById(body.workoutScheduleId);
+      if (!found) {
+        throw new NotFoundException('Workout schedule not found');
+      }
+      if (found.user_id !== req.user.id) {
+        throw new ForbiddenException('Access denied to this workout schedule');
+      }
+      schedule = found;
+    } else {
+      // body.workoutId — ad-hoc path.
+      schedule = await this.resolveAdHocSchedule(req.user.id, body.workoutId!);
     }
 
     const execution = await this.workoutExecutionRepository.create({
       user_id: req.user.id,
-      workout_schedule_id: body.workoutScheduleId,
+      workout_schedule_id: schedule.id,
       started_at: body.startedAt ? new Date(body.startedAt) : new Date(),
       source: WorkoutExecutionSource.MANUAL,
       notes: body.notes ?? null,
@@ -440,6 +474,68 @@ export class WorkoutExecutionsApiService {
     const workout = await this.workoutRepository.findById(schedule.workout_id);
 
     return { data: this.mapExecutionToDTO(execution, workout) };
+  }
+
+  /**
+   * Ad-hoc start helper: verify the user can access the workout (owner
+   * OR a member of the org and the workout is `org_library`), then
+   * create a schedule row for today's date pointing at it. The
+   * execution rows in this codebase are always anchored via
+   * workout_schedule_id; rather than introduce a parallel "no
+   * schedule" code path we mint a lightweight schedule on the fly.
+   *
+   * The created schedule is intentionally unattributed to a plan / day
+   * (it's a plain "I did this workout today" marker). The user's
+   * calendar surface treats it the same as any other one-off entry,
+   * which is the right semantic — an ad-hoc start IS a one-off entry.
+   */
+  private async resolveAdHocSchedule(userId: string, workoutId: string): Promise<WorkoutSchedule> {
+    const workout = await this.workoutRepository.findById(workoutId);
+    if (!workout) {
+      throw new NotFoundException('Workout not found');
+    }
+    // Access check mirrors WorkoutsApiService.getById: owner is fine,
+    // org_library inside the same organisation is fine, anything else
+    // is forbidden. We don't have AuthedRequest here (the service
+    // takes a plain Request), so we read organisation membership off
+    // the workout itself — if the user owns it, allow; if it's
+    // org_library and the user shares the org, allow.
+    const isOwner = workout.user_id === userId;
+    if (!isOwner) {
+      if (workout.visibility !== WorkoutVisibility.ORG_LIBRARY) {
+        throw new ForbiddenException('Access denied to this workout');
+      }
+      // Membership check against the workout's organisation. Plain
+      // SQL — no @Global() org-membership service exists in this
+      // module's import surface, so we hit the repo directly via the
+      // schedule repository's underlying db (shared connection).
+      const isMember = await this.userIsMemberOfOrg(userId, workout.organisation_id);
+      if (!isMember) {
+        throw new ForbiddenException('Access denied to this workout');
+      }
+    }
+
+    return this.workoutScheduleRepository.create({
+      organisation_id: workout.organisation_id,
+      user_id: userId,
+      workout_id: workout.id,
+      scheduled_date: new Date(),
+    });
+  }
+
+  /**
+   * Lightweight org-membership check used only by the ad-hoc start
+   * path. The `org_library` visibility makes a workout visible to
+   * every accepted member of the workout's organisation; this is the
+   * exact same check WorkoutsApiService runs implicitly through
+   * `assertActiveOrg` + `organisation_id` filtering on getById.
+   */
+  private async userIsMemberOfOrg(userId: string, organisationId: string): Promise<boolean> {
+    const row = await this.organisationMembershipRepository.findByUserAndOrg(
+      userId,
+      organisationId,
+    );
+    return !!row;
   }
 
   async update(

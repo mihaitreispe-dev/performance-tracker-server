@@ -7,6 +7,7 @@ import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athle
 import { ExecutionWeatherRepository } from 'src/repositories/execution-weather.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
+import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { PersonalRecordRepository } from 'src/repositories/personal-record.repository';
 import { RpeTssTrackingRepository } from 'src/repositories/rpe-tss-tracking.repository';
 import { SetCompletionRepository } from 'src/repositories/set-completion.repository';
@@ -47,6 +48,7 @@ export class WorkoutExecutionsApiModule {
           AthletePrivacySettingsRepository,
           RpeTssTrackingRepository,
           TrainingStressRepository,
+          OrganisationMembershipRepository,
         ],
         controllers: [WorkoutExecutionsApiController],
       };

@@ -52,10 +52,39 @@ export class ListWorkoutExecutionsQuery extends PageQuery {
   sort?: SortOptions<'started_at' | 'completed_at' | 'created_at' | 'updated_at'>;
 }
 
+/**
+ * Body for POST /v1/workout-executions. Two start modes are supported:
+ *
+ *  - **Scheduled** — caller passes `workoutScheduleId`. Used by the
+ *    athlete app's calendar flow where every workout is already on
+ *    the calendar before it's executed.
+ *
+ *  - **Ad-hoc** — caller passes `workoutId` instead. The server
+ *    auto-creates a workout-schedule for today against that workout
+ *    (after a visibility check) and starts the execution against that
+ *    new schedule. Used by the rehabit sample app where users tap a
+ *    library workout and press "Start" without a calendar step.
+ *
+ * Exactly one of `workoutId` / `workoutScheduleId` must be set. The
+ * service layer is responsible for the access checks in each mode;
+ * the DTO only validates the shape.
+ */
 export class StartWorkoutExecutionBody {
-  @ApiProperty({ description: 'Workout schedule ID to start executing' })
+  @ApiPropertyOptional({
+    description:
+      'Workout schedule ID to start executing. Mutually exclusive with workoutId — pass one or the other.',
+  })
   @IsUUID()
-  workoutScheduleId: string;
+  @IsOptional()
+  workoutScheduleId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Workout ID for an ad-hoc execution. Server auto-creates a schedule for today and starts the execution against it. Mutually exclusive with workoutScheduleId.',
+  })
+  @IsUUID()
+  @IsOptional()
+  workoutId?: string;
 
   @ApiPropertyOptional({ type: String, format: 'date-time', description: 'Start time (defaults to now)' })
   @IsDateString()
