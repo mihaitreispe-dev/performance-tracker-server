@@ -50,6 +50,12 @@ export class ContentItemDTO {
   @ApiPropertyOptional({ nullable: true, type: String })
   featuredUntil: string | null;
 
+  @ApiProperty({
+    description:
+      'True when this resource has at least one configured entitlement requirement AND the caller does not hold any product that unlocks it. False when the resource is free (no entitlements configured) OR the caller has already unlocked it. Computed server-side per-caller; do not rely on this field for authoring callers since it reflects the requester\'s own entitlements.',
+  })
+  locked: boolean;
+
   @ApiProperty()
   createdAt: string;
 

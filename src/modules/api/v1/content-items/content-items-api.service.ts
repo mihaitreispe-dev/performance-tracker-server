@@ -1,11 +1,19 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ContentItem, ContentItemKind, ContentItemStatus, OrganisationRole } from 'src/database/interfaces';
+import {
+  ContentItem,
+  ContentItemKind,
+  ContentItemStatus,
+  EntitlementResourceType,
+  OrganisationRole,
+} from 'src/database/interfaces';
 import { assertActiveOrg } from 'src/lib/util/active-org';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
+import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
+import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -43,6 +51,8 @@ export class ContentItemsApiService {
     private readonly contentRepo: ContentItemRepository,
     private readonly s3Service: S3Service,
     private readonly config: AppConfigService,
+    private readonly entitlementsRepo: ResourceEntitlementsRepository,
+    private readonly billingRepo: StripeBillingRepository,
   ) {}
 
   async list(req: AuthedRequest, query: ListContentItemsQuery): Promise<ContentItemsListResponse> {
@@ -56,14 +66,18 @@ export class ContentItemsApiService {
       },
       { limit: query.limit, offset: query.offset },
     );
-    return { data: await Promise.all(items.map((i) => this.mapToDTO(i))) };
+    const locks = await this.computeLockMap(req.user.id, organisationId, items.map((i) => i.id));
+    return {
+      data: await Promise.all(items.map((i) => this.mapToDTO(i, locks.get(i.id) ?? false))),
+    };
   }
 
   async getById(req: AuthedRequest, id: string): Promise<ContentItemResponse> {
     const organisationId = assertActiveOrg(req);
     const item = await this.contentRepo.findByIdInOrg(id, organisationId);
     if (!item) throw new NotFoundException('Content item not found');
-    return { data: await this.mapToDTO(item) };
+    const locks = await this.computeLockMap(req.user.id, organisationId, [item.id]);
+    return { data: await this.mapToDTO(item, locks.get(item.id) ?? false) };
   }
 
   async create(req: AuthedRequest, dto: CreateContentItemDto): Promise<CreateContentItemResponse> {
@@ -243,7 +257,14 @@ export class ContentItemsApiService {
     }
   }
 
-  async mapToDTO(item: ContentItem): Promise<ContentItemDTO> {
+  /**
+   * `locked` defaults to false. Authoring paths (create/update/markUploadComplete)
+   * pass nothing — admins managing content don't care about their own
+   * entitlements against it. Consumption paths (list/getById) pass the
+   * computed lock from computeLockMap so the rehabit / athlete clients
+   * can render correct paywall state without a second round-trip.
+   */
+  async mapToDTO(item: ContentItem, locked = false): Promise<ContentItemDTO> {
     return {
       id: item.id,
       organisationId: item.organisation_id,
@@ -263,9 +284,55 @@ export class ContentItemsApiService {
       tags: item.tags,
       featuredFrom: item.featured_from ? this.toISO(item.featured_from) : null,
       featuredUntil: item.featured_until ? this.toISO(item.featured_until) : null,
+      locked,
       createdAt: this.toISO(item.created_at),
       updatedAt: this.toISO(item.updated_at),
     };
+  }
+
+  /**
+   * Per-user lock-status batch: for every supplied content_item id,
+   * decide whether the caller can play it. The rule mirrors
+   * `MeApiService.stampLockStatus` so the lock state on a list view
+   * matches the lock state on the featured carousel:
+   *
+   *   • resource has zero configured entitlements → locked = false
+   *     (the resource is free; previous client-side logic incorrectly
+   *      flagged this case as locked because the user's unlocked set
+   *      didn't include it)
+   *   • resource has ≥1 entitlement AND user holds an unlocking product
+   *     → locked = false
+   *   • resource has ≥1 entitlement AND user holds nothing
+   *     → locked = true
+   *
+   * Empty input → empty map (skips both Postgres calls).
+   */
+  private async computeLockMap(
+    userId: string,
+    organisationId: string,
+    contentItemIds: string[],
+  ): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>();
+    if (contentItemIds.length === 0) return result;
+
+    const rt: EntitlementResourceType = 'content_item';
+    const reqMap = await this.entitlementsRepo.listForResources(rt, contentItemIds);
+    const productIds = await this.billingRepo.listActiveProductIdsForUser(userId);
+    const unlockedByType = await this.entitlementsRepo.listResourcesByProducts(
+      organisationId,
+      productIds,
+    );
+    const userUnlocks = new Set(unlockedByType.get(rt) ?? []);
+
+    for (const id of contentItemIds) {
+      const required = reqMap.get(id) ?? [];
+      if (required.length === 0) {
+        result.set(id, false); // free
+        continue;
+      }
+      result.set(id, !userUnlocks.has(id));
+    }
+    return result;
   }
 
   private async buildSignedReadUrl(bucket: string | null, key: string | null): Promise<string | null> {
