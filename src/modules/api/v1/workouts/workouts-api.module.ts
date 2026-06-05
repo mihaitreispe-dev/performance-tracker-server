@@ -10,6 +10,8 @@ import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { ExerciseInstanceGroupRepository } from 'src/repositories/exercise-instance-group.repository';
+import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
+import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
@@ -40,6 +42,12 @@ export class WorkoutsApiModule {
           CardioStepRepository,
           CardioStepGroupRepository,
           CardioCategoryRepository,
+          // Per-caller workout lock stamping (workouts list + getById).
+          // Same pattern ContentItemsApiService uses for snacks; mirrors
+          // the featured-content lock stamping in MeApiService so the
+          // three surfaces resolve "is this gated?" identically.
+          ResourceEntitlementsRepository,
+          StripeBillingRepository,
         ],
         controllers: [WorkoutsApiController, WorkoutExportController],
         exports: [WorkoutsApiService],

@@ -310,6 +310,13 @@ export class WorkoutDTO {
   @IsString()
   featuredUntil: string | null;
 
+  @ApiProperty({
+    description:
+      'True when this workout has at least one configured entitlement requirement AND the caller does not hold any product that unlocks it. False when the workout is free (no entitlements configured) OR the caller has already unlocked it. Computed server-side per-caller; authoring callers can ignore — it reflects the requester\'s own entitlements.',
+  })
+  @IsOptional()
+  locked: boolean;
+
   @ApiProperty()
   @IsString()
   createdAt: string;

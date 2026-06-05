@@ -6,6 +6,7 @@ import {
   CardioStepGroup,
   CardioStepGroupItem,
   CardioStepMode,
+  EntitlementResourceType,
   Exercise,
   ExerciseInstance,
   ExerciseInstanceGroup,
@@ -34,6 +35,8 @@ import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
 import { ExerciseInstanceGroupRepository } from 'src/repositories/exercise-instance-group.repository';
+import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
+import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
@@ -71,6 +74,8 @@ export class WorkoutsApiService {
     private readonly privacySettingsRepo: AthletePrivacySettingsRepository,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
+    private readonly entitlementsRepo: ResourceEntitlementsRepository,
+    private readonly billingRepo: StripeBillingRepository,
   ) {}
 
   async list(req: AuthedRequest, query: ListWorkoutsQuery): Promise<WorkoutListResponse> {
@@ -115,7 +120,14 @@ export class WorkoutsApiService {
       this.workoutRepo.countMany(organisationId, filter),
     ]);
 
-    const data = await Promise.all(workouts.map((w) => this.mapWorkoutToDTO(w)));
+    const locks = await this.computeLockMap(
+      req.user.id,
+      organisationId,
+      workouts.map((w) => w.id),
+    );
+    const data = await Promise.all(
+      workouts.map((w) => this.mapWorkoutToDTO(w, locks.get(w.id) ?? false)),
+    );
     const links = buildPageLinks({
       request: req,
       apiUrl: this.configService.apiV1URL,
@@ -134,16 +146,23 @@ export class WorkoutsApiService {
       throw new NotFoundException();
     }
 
+    // Compute lock once, thread through every access-grant branch.
+    // Cheap (two scoped Postgres queries) and idempotent — the same
+    // lock value applies regardless of which permission path let the
+    // caller through.
+    const locks = await this.computeLockMap(req.user.id, organisationId, [workout.id]);
+    const locked = locks.get(workout.id) ?? false;
+
     // Allow access if user owns the workout
     if (workout.user_id === req.user.id) {
-      return { data: await this.mapWorkoutToDTO(workout) };
+      return { data: await this.mapWorkoutToDTO(workout, locked) };
     }
 
     // Org-library rows are visible to every member of the org. The
     // tenancy preflight above (organisation_id match) is the only
     // remaining check for library rows.
     if (workout.visibility === WorkoutVisibility.ORG_LIBRARY) {
-      return { data: await this.mapWorkoutToDTO(workout) };
+      return { data: await this.mapWorkoutToDTO(workout, locked) };
     }
 
     // Admins / owners (and platform admins via ActiveOrgGuard's
@@ -152,7 +171,7 @@ export class WorkoutsApiService {
     // for moderation / audit purposes.
     const role = req.activeOrg?.role;
     if (role === OrganisationRole.OWNER || role === OrganisationRole.ADMIN) {
-      return { data: await this.mapWorkoutToDTO(workout) };
+      return { data: await this.mapWorkoutToDTO(workout, locked) };
     }
 
     // Also allow access if the workout was scheduled for this user by a coach
@@ -161,7 +180,7 @@ export class WorkoutsApiService {
     const coachSchedule = await this.workoutScheduleRepo.findCoachCreatedScheduleForUser(req.user.id, id);
 
     if (coachSchedule) {
-      return { data: await this.mapWorkoutToDTO(workout) };
+      return { data: await this.mapWorkoutToDTO(workout, locked) };
     }
 
     // Allow coach access to athlete's workout if:
@@ -172,7 +191,7 @@ export class WorkoutsApiService {
     if (relationship && relationship.status === CoachAthleteStatus.ACTIVE) {
       const settings = await this.privacySettingsRepo.findByUserId(workout.user_id);
       if (settings?.share_workouts) {
-        return { data: await this.mapWorkoutToDTO(workout) };
+        return { data: await this.mapWorkoutToDTO(workout, locked) };
       }
     }
 
@@ -818,7 +837,15 @@ export class WorkoutsApiService {
     await this.cardioStepRepo.deleteByIds(cardioStepIds);
   }
 
-  private async mapWorkoutToDTO(workout: Workout): Promise<WorkoutDTO> {
+  /**
+   * `locked` defaults to false. Authoring paths (create / update /
+   * internal-by-id / search-or-create) leave it unset — admins
+   * managing content don't care about their own entitlements
+   * against it. Consumption paths (list / getById) compute it via
+   * computeLockMap and pass it in so consumer clients can render
+   * correct paywall state without a second round-trip.
+   */
+  private async mapWorkoutToDTO(workout: Workout, locked = false): Promise<WorkoutDTO> {
     const workoutItems = await this.workoutRepo.findWorkoutItemsByWorkoutId(workout.id);
     const items = await this.mapWorkoutItemsToDTOs(workoutItems);
 
@@ -847,9 +874,56 @@ export class WorkoutsApiService {
       featuredUntil: workout.featured_until
         ? new Date(workout.featured_until as unknown as string).toISOString()
         : null,
+      locked,
       createdAt: new Date(workout.created_at as unknown as string).toISOString(),
       updatedAt: new Date(workout.updated_at as unknown as string).toISOString(),
     };
+  }
+
+  /**
+   * Per-user workout lock-status batch. Mirrors the algorithm that
+   * MeApiService.stampLockStatus uses for featured content and that
+   * ContentItemsApiService.computeLockMap uses for snacks — so a
+   * workout's lock state on the list reads identically to its state
+   * on a featured carousel:
+   *
+   *   • resource has zero configured entitlements → locked = false
+   *     (free; previous derived-from-/me/entitlements client logic
+   *      incorrectly flagged this case as locked because the user's
+   *      unlockedResources set doesn't include free items by design)
+   *   • resource has ≥1 entitlement AND user holds an unlocking product
+   *     → locked = false
+   *   • resource has ≥1 entitlement AND user holds nothing
+   *     → locked = true
+   *
+   * Empty input → empty map (both Postgres calls skipped).
+   */
+  private async computeLockMap(
+    userId: string,
+    organisationId: string,
+    workoutIds: string[],
+  ): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>();
+    if (workoutIds.length === 0) return result;
+
+    const rt: EntitlementResourceType = 'workout';
+    const reqMap = await this.entitlementsRepo.listForResources(rt, workoutIds);
+    const productIds = await this.billingRepo.listActiveProductIdsForUser(userId);
+    const unlockedByType = await this.entitlementsRepo.listResourcesByProducts(
+      organisationId,
+      productIds,
+    );
+    const userUnlocks = new Set(unlockedByType.get(rt) ?? []);
+
+    for (const id of workoutIds) {
+      const required = reqMap.get(id) ?? [];
+      if (required.length === 0) {
+        result.set(id, false); // free
+        continue;
+      }
+      result.set(id, !userUnlocks.has(id));
+    }
+    return result;
   }
 
   private mapCardioCategoryToDTO(category: CardioCategory): CardioCategoryDTO {
