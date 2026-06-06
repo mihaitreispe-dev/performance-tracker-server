@@ -1156,7 +1156,11 @@ export class WorkoutsApiService {
       if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
         return await this.s3Service.getCloudFrontSignedUrlGET({ key: paths.thumbnail });
       }
-      return `${this.configService.cdnUrl}/${paths.thumbnail}`;
+      // Goes through publicContentUrl so the local MinIO path-style
+      // `{host}/{bucket}/{key}` is composed correctly. Inline
+      // `${cdnUrl}/${key}` was dropping the bucket prefix in dev and
+      // serving 404 thumbnails despite the file being present.
+      return this.configService.publicContentUrl(paths.thumbnail);
     }
 
     // 2. Direct uploaded-picture fallback was retired with migration

@@ -134,6 +134,34 @@ export class AppConfigService {
     return this.configService.get('DISABLE_CDN') === 'Y';
   }
 
+  /**
+   * Build a public-readable URL for a content-bucket key.
+   *
+   * Two deployment shapes:
+   *
+   *  - **Production CloudFront** — `cdnUrl` is the CloudFront
+   *    distribution that maps directly to the content bucket as its
+   *    origin, so the URL is `{cdnUrl}/{key}` (no bucket name in the
+   *    path; CloudFront resolves it origin-side).
+   *
+   *  - **Local MinIO** (`DISABLE_CDN=Y`) — `cdnUrl` is the MinIO
+   *    endpoint root (e.g. `http://localhost:9002`), and MinIO serves
+   *    objects with path-style URLs `{host}/{bucket}/{key}`. We need
+   *    to prepend the content bucket name explicitly so the URL
+   *    resolves.
+   *
+   * Centralising the choice here means every caller that wants a
+   * public asset URL gets the right shape automatically — historically
+   * the inline `${cdnUrl}/${key}` interpolation was correct for prod
+   * but 404'd in dev because the bucket prefix was missing.
+   */
+  publicContentUrl(key: string): string {
+    if (this.disableCdn) {
+      return `${this.cdnUrl}/${this.s3ContentBucket}/${key}`;
+    }
+    return `${this.cdnUrl}/${key}`;
+  }
+
   // CloudFront
 
   get cloudFrontKeyPairId(): string | undefined {

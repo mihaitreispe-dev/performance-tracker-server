@@ -988,14 +988,13 @@ export class ExercisesApiService {
    *   3. Plain CDN: public CDN, no signing — concatenate cdnUrl + key.
    */
   private async resolveContentUrl(key: string): Promise<string> {
-    if (this.configService.disableCdn) {
-      const endpoint = this.configService.s3Endpoint ?? this.configService.cdnUrl;
-      return `${endpoint}/${this.configService.s3ContentBucket}/${key}`;
-    }
-    if (this.configService.isCloudFrontSigningEnabled) {
+    if (!this.configService.disableCdn && this.configService.isCloudFrontSigningEnabled) {
       return await this.s3Service.getCloudFrontSignedUrlGET({ key });
     }
-    return `${this.configService.cdnUrl}/${key}`;
+    // disableCdn: path-style MinIO. CDN without signing: trust the
+    // CloudFront origin to route bucket→key. publicContentUrl picks
+    // the right shape for each.
+    return this.configService.publicContentUrl(key);
   }
 
   /**
@@ -1012,19 +1011,16 @@ export class ExercisesApiService {
 
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
 
-    // Same three-mode pick as buildMediaAssets — local dev relies on the
-    // content bucket being public-read (see minio-init service) so we
-    // emit a plain endpoint URL. That way thumbnails and HLS segments
-    // share the same URL scheme; signing is reserved for the upload
-    // bucket which stays private.
-    if (this.configService.disableCdn) {
-      const endpoint = this.configService.s3Endpoint ?? this.configService.cdnUrl;
-      return `${endpoint}/${this.configService.s3ContentBucket}/${s3Paths.thumbnail}`;
-    }
-    if (this.configService.isCloudFrontSigningEnabled) {
+    // Same three-mode pick as buildMediaAssets — local dev relies on
+    // the content bucket being public-read (see minio-init service)
+    // so we emit a plain endpoint URL via publicContentUrl. CDN signing
+    // applies in prod with CloudFront. Goes through publicContentUrl
+    // so the local MinIO path-style `{host}/{bucket}/{key}` is
+    // composed correctly.
+    if (!this.configService.disableCdn && this.configService.isCloudFrontSigningEnabled) {
       return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
     }
-    return `${this.configService.cdnUrl}/${s3Paths.thumbnail}`;
+    return this.configService.publicContentUrl(s3Paths.thumbnail);
   }
 
   private getExtensionFromMimeType(mimeType: string): string {
