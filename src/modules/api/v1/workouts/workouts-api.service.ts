@@ -875,6 +875,7 @@ export class WorkoutsApiService {
         ? new Date(workout.featured_until as unknown as string).toISOString()
         : null,
       locked,
+      previewPicture: pickPreviewPicture(items),
       createdAt: new Date(workout.created_at as unknown as string).toISOString(),
       updatedAt: new Date(workout.updated_at as unknown as string).toISOString(),
     };
@@ -1178,4 +1179,31 @@ export class WorkoutsApiService {
 
     return null;
   }
+}
+
+/**
+ * Walk the mapped item list in position order and pull the first
+ * exercise picture we can find. Looks INSIDE groups too — for a
+ * superset, the first child exercise's picture wins. Returns null
+ * when no exercise in the workout has a transcoded picture yet
+ * (callers render their own placeholder).
+ *
+ * Stays a free function (not a private method on the service) since
+ * it only inspects the DTO surface, not anything that needs the
+ * Postgres connection / repos. Keeps it pure and testable.
+ */
+function pickPreviewPicture(items: WorkoutItemDTO[]): string | null {
+  for (const item of items) {
+    const direct = item.exerciseInstance?.exercise?.picture;
+    if (direct) return direct;
+    const groupChildren = item.group?.items ?? [];
+    for (const child of groupChildren) {
+      const pic = child.exercise?.picture;
+      if (pic) return pic;
+    }
+    // cardio_step / cardio_step_group ignored — their content shape
+    // doesn't carry a `picture` field today. If we add one later,
+    // extend this walk.
+  }
+  return null;
 }

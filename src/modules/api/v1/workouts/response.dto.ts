@@ -317,6 +317,16 @@ export class WorkoutDTO {
   @IsOptional()
   locked: boolean;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    description:
+      "Best-effort representative picture for the workout — picked from the first exercise instance with a picture (walking groups too). Null when no exercise in the workout has a transcoded picture yet. Used by listing surfaces (Library / Featured / search) to give every workout card a visual without requiring authors to upload a separate cover.",
+  })
+  @IsOptional()
+  @IsString()
+  previewPicture: string | null;
+
   @ApiProperty()
   @IsString()
   createdAt: string;
