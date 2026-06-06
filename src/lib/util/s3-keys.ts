@@ -70,6 +70,7 @@ export const s3Keys = {
     exercise: ({ userId, exerciseId }: { userId: string; exerciseId: string }) => {
       const base = `exercises/${userId}/${exerciseId}`;
       const wide = `${base}/wide`;
+      const square = `${base}/square`;
       return {
         base,
         // 9:16 portrait (primary) — historical layout, unchanged.
@@ -81,6 +82,14 @@ export const s3Keys = {
         videoWide: `${wide}/video.m3u8`,
         posterWide: `${wide}/video_poster.0000000.jpg`,
         thumbnailWide: `${wide}/video_thumbnail.0000000.jpg`,
+        // 1:1 square companion extracted from the MIDDLE of the clip
+        // (not frame 0), so listing surfaces that render square tiles
+        // (workout-detail rows, the prep "What you'll do" list, the
+        // player preview segment list, NextPreviewTile) show a
+        // recognisable frame instead of the first letterbox of black
+        // before motion starts. Lives under square/ to mirror the
+        // wide/ rendition layout.
+        thumbnailSquare: `${square}/video_thumbnail.0000000.jpg`,
       };
     },
   },

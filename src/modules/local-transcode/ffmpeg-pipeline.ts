@@ -38,6 +38,34 @@ export function runFfmpeg(args: string[]): Promise<void> {
   });
 }
 
+/**
+ * Read the source's duration in seconds via ffprobe. Used by the
+ * middle-frame thumbnail extractor so we can seek to half-way without
+ * baking in a hard-coded offset. Returns 0 (caller falls back to a
+ * frame-0 extract) when ffprobe can't determine duration — either
+ * because the binary is missing, the source has no `format.duration`
+ * tag, or stdout is unparseable.
+ */
+function probeDurationSeconds(sourcePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    const proc = spawn(
+      'ffprobe',
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', sourcePath],
+      { stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    let stdout = '';
+    proc.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.on('error', () => resolve(0));
+    proc.on('close', (code) => {
+      if (code !== 0) return resolve(0);
+      const parsed = parseFloat(stdout.trim());
+      resolve(Number.isFinite(parsed) && parsed > 0 ? parsed : 0);
+    });
+  });
+}
+
 /** Fit the source into WxH, then either letterbox (pad) or centre-crop (crop). */
 function fitFilter(width: number, height: number, mode: WideMode): string {
   if (mode === 'crop') {
@@ -97,6 +125,61 @@ async function extractStill(sourcePath: string, outPath: string, width: number, 
 }
 
 /**
+ * Extract a single still from the midpoint of the source clip. Uses
+ * `-ss <half_duration>` BEFORE `-i` for a fast keyframe seek (vs the
+ * frame-accurate but slow form that puts -ss after -i). For a tile
+ * thumbnail, keyframe-accurate is plenty — we just want "something
+ * recognisable from the middle of the rep", not a specific frame.
+ *
+ * The crop is centre-crop (mode='crop') instead of letterbox-pad so
+ * square tiles show a tightly framed subject instead of a black
+ * letterbox. Falls back to a frame-0 extract via `extractStill` when
+ * ffprobe can't read the duration (binary missing, unparseable
+ * output, zero-length source) — never throws on its own; the caller
+ * always gets a file at outPath.
+ */
+async function extractMiddleSquareStill(
+  sourcePath: string,
+  outPath: string,
+  size: number,
+): Promise<void> {
+  const duration = await probeDurationSeconds(sourcePath);
+  if (duration <= 0) {
+    // No duration — extract from frame 0 with centre-crop so the tile
+    // still has the right aspect, even if it's not "from the middle".
+    await runFfmpeg([
+      '-y',
+      '-i',
+      sourcePath,
+      '-frames:v',
+      '1',
+      '-vf',
+      fitFilter(size, size, 'crop'),
+      '-q:v',
+      '2',
+      outPath,
+    ]);
+    return;
+  }
+  const seekSeconds = duration / 2;
+  await runFfmpeg([
+    '-y',
+    // -ss BEFORE -i = fast keyframe seek (acceptable for a thumbnail).
+    '-ss',
+    seekSeconds.toFixed(3),
+    '-i',
+    sourcePath,
+    '-frames:v',
+    '1',
+    '-vf',
+    fitFilter(size, size, 'crop'),
+    '-q:v',
+    '2',
+    outPath,
+  ]);
+}
+
+/**
  * Transcode a source clip into both orientations + posters + thumbnails +
  * audio. Returns the artifacts to upload (relative keys). Audio is
  * best-effort — silent demo clips simply omit it.
@@ -118,7 +201,8 @@ export async function transcodeExerciseSource(opts: {
   await pushHls(artifacts, portraitDir, '');
   await pushHls(artifacts, wideDir, 'wide/');
 
-  // Posters + thumbnails for both orientations.
+  // Posters + thumbnails for both orientations, both extracted from
+  // frame 0 so they line up with what MediaConvert produces in prod.
   const stills: Array<{ rel: string; file: string; w: number; h: number }> = [
     { rel: 'video_poster.0000000.jpg', file: 'poster.jpg', w: 720, h: 1280 },
     { rel: 'video_thumbnail.0000000.jpg', file: 'thumb.jpg', w: 180, h: 320 },
@@ -130,6 +214,22 @@ export async function transcodeExerciseSource(opts: {
     await extractStill(sourcePath, localPath, still.w, still.h);
     artifacts.push({ relKey: still.rel, localPath, contentType: 'image/jpeg' });
   }
+
+  // Square thumbnail from the MIDDLE of the clip — used by every
+  // square-tile surface (workout-detail rows, prep "What you'll do"
+  // list, preview segment rows, NextPreviewTile). Frame 0 is often
+  // a black letterbox or a setup pose; midpoint usually catches the
+  // athlete mid-rep so the tile reads as the exercise itself, not
+  // an empty stage. Centre-crop (not pad) keeps the subject in
+  // frame instead of letterboxing a portrait/landscape source into
+  // a square with black bars.
+  const squareThumbPath = join(workDir, 'thumb_square.jpg');
+  await extractMiddleSquareStill(sourcePath, squareThumbPath, 480);
+  artifacts.push({
+    relKey: 'square/video_thumbnail.0000000.jpg',
+    localPath: squareThumbPath,
+    contentType: 'image/jpeg',
+  });
 
   // Separate audio track (best-effort).
   try {

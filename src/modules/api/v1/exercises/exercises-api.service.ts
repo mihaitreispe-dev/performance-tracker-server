@@ -1011,16 +1011,20 @@ export class ExercisesApiService {
 
     const s3Paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
 
-    // Same three-mode pick as buildMediaAssets — local dev relies on
-    // the content bucket being public-read (see minio-init service)
-    // so we emit a plain endpoint URL via publicContentUrl. CDN signing
-    // applies in prod with CloudFront. Goes through publicContentUrl
-    // so the local MinIO path-style `{host}/{bucket}/{key}` is
-    // composed correctly.
+    // Prefer the 1:1 square middle-frame thumbnail — same shape the
+    // tile surfaces (workout-detail rows, prep list, NextPreviewTile)
+    // expect. Falls back to the 9:16 first-frame variant if the
+    // square hasn't been produced yet (exercises transcoded before
+    // the square pipeline shipped). Same three-mode URL pick as
+    // buildMediaAssets — local dev relies on the content bucket being
+    // public-read (see minio-init service) so we emit a plain endpoint
+    // URL via publicContentUrl. CDN signing applies in prod with
+    // CloudFront.
+    const key = s3Paths.thumbnailSquare;
     if (!this.configService.disableCdn && this.configService.isCloudFrontSigningEnabled) {
-      return await this.s3Service.getCloudFrontSignedUrlGET({ key: s3Paths.thumbnail });
+      return await this.s3Service.getCloudFrontSignedUrlGET({ key });
     }
-    return this.configService.publicContentUrl(s3Paths.thumbnail);
+    return this.configService.publicContentUrl(key);
   }
 
   private getExtensionFromMimeType(mimeType: string): string {

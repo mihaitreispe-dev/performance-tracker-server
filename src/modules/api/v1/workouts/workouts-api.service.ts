@@ -1150,17 +1150,26 @@ export class WorkoutsApiService {
   }
 
   private async getExercisePictureUrl(exercise: Exercise): Promise<string | null> {
-    // 1. Check for processed video thumbnail
+    // 1. Check for processed video thumbnail. Prefer the 1:1 square
+    // middle-frame extract for listing-tile contexts (the consumers
+    // of this field render square cards on the workout-detail page,
+    // the player preview, the prep list). Falls back to the 9:16
+    // portrait thumbnail when the square hasn't been produced yet —
+    // exercises transcoded before the square pipeline shipped don't
+    // have the file at the new key, and listing the orientation-
+    // specific cut is better than a sage placeholder while a backfill
+    // catches up.
     if (exercise.status === ExerciseStatus.ASSETS_DONE) {
       const paths = s3Keys.content.exercise({ userId: exercise.user_id, exerciseId: exercise.id });
+      const key = paths.thumbnailSquare;
       if (this.configService.isCloudFrontSigningEnabled && !this.configService.disableCdn) {
-        return await this.s3Service.getCloudFrontSignedUrlGET({ key: paths.thumbnail });
+        return await this.s3Service.getCloudFrontSignedUrlGET({ key });
       }
       // Goes through publicContentUrl so the local MinIO path-style
       // `{host}/{bucket}/{key}` is composed correctly. Inline
       // `${cdnUrl}/${key}` was dropping the bucket prefix in dev and
       // serving 404 thumbnails despite the file being present.
-      return this.configService.publicContentUrl(paths.thumbnail);
+      return this.configService.publicContentUrl(key);
     }
 
     // 2. Direct uploaded-picture fallback was retired with migration
