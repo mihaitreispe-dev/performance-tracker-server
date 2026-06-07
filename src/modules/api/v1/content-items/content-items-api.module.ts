@@ -4,6 +4,7 @@ import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
+import { SnackCompletionRepository } from 'src/repositories/snack-completion.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 
 import { ContentItemsApiController } from './content-items-api.controller';
@@ -26,6 +27,9 @@ export class ContentItemsApiModule {
           // as the featured-content lock stamping in MeApiService.
           ResourceEntitlementsRepository,
           StripeBillingRepository,
+          // One-row-per-play log for the rehabit history view.
+          // See migration 1774404000000.
+          SnackCompletionRepository,
         ],
         controllers: [ContentItemsApiController],
         exports: [ContentItemsApiService, ContentItemRepository],

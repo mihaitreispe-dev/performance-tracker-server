@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/auth/guards/jwt-auth.guard';
 import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
@@ -8,12 +21,14 @@ import {
   ContentItemIdParam,
   CreateContentItemDto,
   ListContentItemsQuery,
+  LogSnackCompletionBody,
   UpdateContentItemDto,
 } from './request.dto';
 import {
   ContentItemResponse,
   ContentItemsListResponse,
   CreateContentItemResponse,
+  SnackCompletionListResponse,
 } from './response.dto';
 
 @ApiTags('Content Items')
@@ -83,5 +98,30 @@ export class ContentItemsApiController {
   @ApiNoContentResponse()
   async delete(@Req() req: AuthedRequest, @Param() params: ContentItemIdParam): Promise<void> {
     return this.contentItemsService.delete(req, params.id);
+  }
+
+  @Post(':id/completions')
+  @ApiOperation({
+    summary:
+      'Log a completed snack play. Idempotent on duplicate completions — re-watching counts as a separate play.',
+  })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  async logCompletion(
+    @Req() req: AuthedRequest,
+    @Param() params: ContentItemIdParam,
+    @Body() body: LogSnackCompletionBody,
+  ): Promise<void> {
+    await this.contentItemsService.logSnackCompletion(req, params.id, body.durationSeconds);
+  }
+
+  @Get('me/completions')
+  @ApiOperation({
+    summary:
+      "Reverse-chronological list of the caller's completed snack plays, enriched with title + thumbnail.",
+  })
+  @ApiOkResponse({ type: SnackCompletionListResponse })
+  async listMyCompletions(@Req() req: AuthedRequest): Promise<SnackCompletionListResponse> {
+    return this.contentItemsService.listMySnackCompletions(req);
   }
 }

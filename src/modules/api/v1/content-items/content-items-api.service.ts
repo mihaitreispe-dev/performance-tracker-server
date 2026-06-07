@@ -13,6 +13,7 @@ import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
+import { SnackCompletionRepository } from 'src/repositories/snack-completion.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -53,6 +54,7 @@ export class ContentItemsApiService {
     private readonly config: AppConfigService,
     private readonly entitlementsRepo: ResourceEntitlementsRepository,
     private readonly billingRepo: StripeBillingRepository,
+    private readonly snackCompletionRepo: SnackCompletionRepository,
   ) {}
 
   async list(req: AuthedRequest, query: ListContentItemsQuery): Promise<ContentItemsListResponse> {
@@ -248,6 +250,94 @@ export class ContentItemsApiService {
         // Best-effort cleanup; row deletion is the source of truth.
       }
     }
+  }
+
+  /**
+   * Log a completed snack play. Called by the rehabit player when its
+   * autoAdvanceOnEnd path fires on a snack track. Verifies the snack
+   * lives in the caller's active organisation (we don't want a user
+   * logging plays for a snack they couldn't otherwise see) but does
+   * NOT enforce a paywall — completion logging is observational, the
+   * paywall gates the playback path upstream.
+   *
+   * Duplicate completions are allowed (re-watching counts). The
+   * caller can pass a client-measured `durationSeconds` so the
+   * history view can show "you spent 1m 45s in this snack" without
+   * defaulting to the snack's intrinsic length.
+   */
+  async logSnackCompletion(
+    req: AuthedRequest,
+    id: string,
+    durationSeconds?: number,
+  ): Promise<void> {
+    const organisationId = assertActiveOrg(req);
+    const item = await this.contentRepo.findByIdInOrg(id, organisationId);
+    if (!item) throw new NotFoundException('Content item not found');
+    if (item.kind !== ContentItemKind.SNACK) {
+      throw new BadRequestException('Only snack items can have completions logged');
+    }
+    await this.snackCompletionRepo.create({
+      user_id: req.user.id,
+      content_item_id: item.id,
+      organisation_id: organisationId,
+      duration_seconds:
+        typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds >= 0
+          ? Math.round(durationSeconds)
+          : null,
+    });
+  }
+
+  /**
+   * Reverse-chronological list of the caller's completed snack plays,
+   * each enriched with the snack's title + thumbnail so the history
+   * view can render rows without a second batch lookup. Scoped to the
+   * caller via repo; cross-org plays surface naturally (the user IS
+   * scoped per-row even though the underlying snacks belong to
+   * different orgs over their account lifetime).
+   */
+  async listMySnackCompletions(
+    req: AuthedRequest,
+    opts?: { limit?: number },
+  ): Promise<{
+    data: Array<{
+      id: string;
+      contentItemId: string;
+      title: string;
+      thumbnailUrl: string | null;
+      completedAt: string;
+      durationSeconds: number | null;
+    }>;
+  }> {
+    const completions = await this.snackCompletionRepo.listForUser(req.user.id, opts);
+    if (completions.length === 0) return { data: [] };
+
+    // Batch-fetch the referenced snacks via the existing list path so
+    // we get the same thumbnail-resolution behaviour as the snacks
+    // page. Scoped to the union of orgs that produced these
+    // completions — typically just one, but the user may have moved
+    // between orgs.
+    const uniqueItemIds = Array.from(new Set(completions.map((c) => c.content_item_id)));
+    const items = await this.contentRepo.findByIds(uniqueItemIds);
+    const itemsById = new Map(items.map((it) => [it.id, it]));
+
+    const data = await Promise.all(
+      completions.map(async (c) => {
+        const item = itemsById.get(c.content_item_id);
+        const title = item?.title ?? 'Snack';
+        const thumbnailUrl = item
+          ? await this.buildSignedReadUrl(item.thumbnail_s3_bucket, item.thumbnail_s3_key)
+          : null;
+        return {
+          id: c.id,
+          contentItemId: c.content_item_id,
+          title,
+          thumbnailUrl,
+          completedAt: new Date(c.completed_at as unknown as string).toISOString(),
+          durationSeconds: c.duration_seconds,
+        };
+      }),
+    );
+    return { data };
   }
 
   private requireWriteRole(req: AuthedRequest): void {

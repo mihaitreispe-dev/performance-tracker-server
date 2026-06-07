@@ -15,6 +15,7 @@ export * from './workout-items-table.interface';
 export * from './workout-schedules-table.interface';
 export * from './workout-executions-table.interface';
 export * from './set-completions-table.interface';
+export * from './snack-completions-table.interface';
 export * from './cardio-categories-table.interface';
 export * from './cardio-metrics-table.interface';
 export * from './cardio-steps-table.interface';

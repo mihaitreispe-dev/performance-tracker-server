@@ -130,3 +130,20 @@ export class ContentItemIdParam {
   @IsUUID()
   id: string;
 }
+
+/**
+ * Body for POST /v1/content-items/:id/completions. Both fields are
+ * optional. `durationSeconds` lets the client report how long the
+ * user actually spent in the player (vs the snack's intrinsic
+ * length); we round + clamp it server-side before storing.
+ */
+export class LogSnackCompletionBody {
+  @ApiPropertyOptional({
+    type: Number,
+    description: 'Seconds the user spent in the player before completion fired.',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  durationSeconds?: number;
+}

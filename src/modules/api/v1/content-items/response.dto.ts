@@ -95,3 +95,35 @@ export class CreateContentItemResponse {
   @ApiProperty({ type: ContentItemWithUploadDTO })
   data: ContentItemWithUploadDTO;
 }
+
+/**
+ * One entry in the caller's snack history. Returned by
+ * GET /content-items/me/completions. Each row carries enough context
+ * to render a history-page card without an extra detail fetch — the
+ * service joins to `content_items` for `title` and presigns
+ * `thumbnailUrl` inline.
+ */
+export class SnackCompletionDTO {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  contentItemId: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  thumbnailUrl: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  completedAt: string;
+
+  @ApiPropertyOptional({ nullable: true, type: Number })
+  durationSeconds: number | null;
+}
+
+export class SnackCompletionListResponse {
+  @ApiProperty({ type: [SnackCompletionDTO] })
+  data: SnackCompletionDTO[];
+}

@@ -91,6 +91,7 @@ import { ResourceEntitlementsTable } from './resource-entitlements-table.interfa
 import { RouteMarkersTable } from './route-markers-table.interface';
 import { RpeTssTrackingTable } from './rpe-tss-tracking-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
+import { SnackCompletionsTable } from './snack-completions-table.interface';
 import { SleepBaselinesTable } from './sleep-baselines-table.interface';
 import { SleepLogsTable } from './sleep-logs-table.interface';
 import { TrainingStressScoresTable } from './training-stress-scores-table.interface';
@@ -253,6 +254,10 @@ export interface Database {
   courses: CoursesTable;
   course_lessons: CourseLessonsTable;
   course_completions: CourseCompletionsTable;
+  // Snack play log — one row per autoAdvanceOnEnd-fired completion
+  // from the rehabit player. Feeds the "things you've done lately"
+  // history list. See migration 1774404000000.
+  snack_completions: SnackCompletionsTable;
 
   // Phase 11 — Push notification rules + delivery log
   notification_rules: NotificationRulesTable;
