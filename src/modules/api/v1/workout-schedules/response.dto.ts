@@ -33,6 +33,13 @@ export class ExecutionSummaryDTO {
   @IsUUID()
   id: string;
 
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'True when this execution ended early or skipped exercise(s). Lets calendar / history surfaces show a "Partial" marker without a second fetch against the execution row.',
+  })
+  partial: boolean;
+
   @ApiPropertyOptional({ type: Number, description: 'Duration in seconds' })
   @IsOptional()
   durationSeconds?: number | null;

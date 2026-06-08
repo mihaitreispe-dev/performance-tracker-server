@@ -147,6 +147,7 @@ export class WorkoutSchedulesApiService {
 
       result.set(execution.workout_schedule_id, {
         id: execution.id,
+        partial: execution.partial ?? false,
         durationSeconds,
         distanceMeters,
         paceSecondsPerKm,
