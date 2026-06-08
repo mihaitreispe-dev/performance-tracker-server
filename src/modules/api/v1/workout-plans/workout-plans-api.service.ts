@@ -402,9 +402,13 @@ export class WorkoutPlansApiService {
     if (!plan || plan.organisation_id !== organisationId) {
       throw new NotFoundException('Workout plan not found');
     }
-    if (plan.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied');
-    }
+    // No owner check here (unlike getById / update / delete): any
+    // member of the plan's org can activate it onto their OWN
+    // calendar. rehabit library plans are authored by the org admin,
+    // not the athlete scheduling them — the org-tenancy check above
+    // is the access grant. Generated schedules are owned by
+    // req.user.id below, so activation only ever fills the caller's
+    // calendar regardless of who wrote the plan.
 
     const items = await this.workoutPlanItemRepo.findMany({
       filter: { workoutPlanId: planId },

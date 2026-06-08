@@ -1,10 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { type Request } from 'express';
-import { Workout, WorkoutExecution, WorkoutSchedule } from 'src/database/interfaces';
+import { Workout, WorkoutExecution, WorkoutSchedule, WorkoutVisibility } from 'src/database/interfaces';
 import { formatDateToYMD } from 'src/lib/util';
 import { assertActiveOrg } from 'src/lib/util/active-org';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
+import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
@@ -30,6 +31,9 @@ export class WorkoutSchedulesApiService {
     private readonly workoutRepository: WorkoutRepository,
     private readonly workoutExecutionRepository: WorkoutExecutionRepository,
     private readonly workoutRouteRepository: WorkoutRouteRepository,
+    // Lets athletes schedule org_library workouts they don't own —
+    // membership in the workout's org is the access grant.
+    private readonly organisationMembershipRepository: OrganisationMembershipRepository,
   ) {}
 
   async list(
@@ -184,18 +188,36 @@ export class WorkoutSchedulesApiService {
   }
 
   async create(req: AuthedRequest, body: CreateWorkoutScheduleBody): Promise<WorkoutScheduleResponse> {
-    const organisationId = assertActiveOrg(req);
-    // Verify workout exists and belongs to user
+    // Guard: require an active org context even though the schedule
+    // anchors to the workout's org below.
+    assertActiveOrg(req);
     const workout = await this.workoutRepository.findById(body.workoutId);
     if (!workout) {
       throw new NotFoundException('Workout not found');
     }
+    // Access: owner can always schedule. Otherwise the workout must be
+    // an org_library row in an org the caller belongs to — same grant
+    // model as WorkoutExecutionsApiService.resolveAdHocSchedule, so a
+    // rehabit athlete can put a library workout on their own calendar
+    // even though the org admin owns the row.
     if (workout.user_id !== req.user.id) {
-      throw new ForbiddenException('Access denied to this workout');
+      const allowed =
+        workout.visibility === WorkoutVisibility.ORG_LIBRARY &&
+        !!(await this.organisationMembershipRepository.findByUserAndOrg(
+          req.user.id,
+          workout.organisation_id,
+        ));
+      if (!allowed) {
+        throw new ForbiddenException('Access denied to this workout');
+      }
     }
 
     const schedule = await this.workoutScheduleRepository.create({
-      organisation_id: organisationId,
+      // Schedule lands in the WORKOUT's org, not necessarily the
+      // caller's active org — they match for rehabit's single-org
+      // sessions, but anchoring to the workout's org keeps the
+      // schedule tenanted with the resource it points at.
+      organisation_id: workout.organisation_id,
       user_id: req.user.id,
       workout_id: body.workoutId,
       scheduled_date: new Date(body.scheduledDate),

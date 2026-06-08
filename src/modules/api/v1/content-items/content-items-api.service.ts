@@ -14,6 +14,7 @@ import { S3Service } from 'src/modules/s3/s3.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { SnackCompletionRepository } from 'src/repositories/snack-completion.repository';
+import { SnackScheduleRepository } from 'src/repositories/snack-schedule.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,12 +23,23 @@ import {
   ListContentItemsQuery,
   UpdateContentItemDto,
 } from './request.dto';
+import { formatDateToYMD } from 'src/lib/util';
 import {
   ContentItemDTO,
   ContentItemResponse,
   ContentItemsListResponse,
   CreateContentItemResponse,
+  SnackScheduleDTO,
 } from './response.dto';
+
+/**
+ * Format a DATE column value (Date or pg date string) to YYYY-MM-DD.
+ * Mirrors the workout-schedule path (formatDateToYMD) so snack
+ * schedules and workout schedules bucket onto the same calendar day.
+ */
+function ymd(value: unknown): string {
+  return formatDateToYMD(value instanceof Date ? value : new Date(String(value)));
+}
 
 const WRITE_ROLES: OrganisationRole[] = [
   OrganisationRole.OWNER,
@@ -55,6 +67,7 @@ export class ContentItemsApiService {
     private readonly entitlementsRepo: ResourceEntitlementsRepository,
     private readonly billingRepo: StripeBillingRepository,
     private readonly snackCompletionRepo: SnackCompletionRepository,
+    private readonly snackScheduleRepo: SnackScheduleRepository,
   ) {}
 
   async list(req: AuthedRequest, query: ListContentItemsQuery): Promise<ContentItemsListResponse> {
@@ -334,6 +347,91 @@ export class ContentItemsApiService {
           thumbnailUrl,
           completedAt: new Date(c.completed_at as unknown as string).toISOString(),
           durationSeconds: c.duration_seconds,
+        };
+      }),
+    );
+    return { data };
+  }
+
+  /**
+   * Put a snack on the caller's calendar for a date. Verifies the
+   * snack is visible in the caller's active org (same NotFound-on-
+   * miss path as getById) and is actually a snack. No paywall check
+   * — scheduling is intent, the paywall gates playback when the day
+   * arrives. Returns the enriched DTO so the client can drop the new
+   * row straight into the calendar cache.
+   */
+  async scheduleSnack(
+    req: AuthedRequest,
+    id: string,
+    scheduledDate: string,
+  ): Promise<{ data: SnackScheduleDTO }> {
+    const organisationId = assertActiveOrg(req);
+    const item = await this.contentRepo.findByIdInOrg(id, organisationId);
+    if (!item) throw new NotFoundException('Content item not found');
+    if (item.kind !== ContentItemKind.SNACK) {
+      throw new BadRequestException('Only snack items can be scheduled');
+    }
+    const row = await this.snackScheduleRepo.create({
+      user_id: req.user.id,
+      content_item_id: item.id,
+      organisation_id: organisationId,
+      // new Date('YYYY-MM-DD') = UTC midnight — same convention the
+      // workout-schedule create path uses, so both land on the same
+      // calendar day after formatDateToYMD on the way out.
+      scheduled_date: new Date(scheduledDate),
+    });
+    const thumbnailUrl = await this.buildSignedReadUrl(
+      item.thumbnail_s3_bucket,
+      item.thumbnail_s3_key,
+    );
+    return {
+      data: {
+        id: row.id,
+        contentItemId: item.id,
+        title: item.title,
+        thumbnailUrl,
+        scheduledDate: ymd(row.scheduled_date),
+        completedAt: row.completed_at
+          ? new Date(row.completed_at as unknown as string).toISOString()
+          : null,
+      },
+    };
+  }
+
+  /**
+   * The caller's scheduled snacks, optionally date-windowed for the
+   * calendar. Enriched with title + thumbnail per row.
+   */
+  async listMySnackSchedules(
+    req: AuthedRequest,
+    opts?: { dateFrom?: string; dateTo?: string },
+  ): Promise<{ data: SnackScheduleDTO[] }> {
+    const rows = await this.snackScheduleRepo.listForUser(req.user.id, {
+      dateFrom: opts?.dateFrom ? new Date(opts.dateFrom + 'T00:00:00') : undefined,
+      dateTo: opts?.dateTo ? new Date(opts.dateTo + 'T00:00:00') : undefined,
+    });
+    if (rows.length === 0) return { data: [] };
+
+    const uniqueItemIds = Array.from(new Set(rows.map((r) => r.content_item_id)));
+    const items = await this.contentRepo.findByIds(uniqueItemIds);
+    const itemsById = new Map(items.map((it) => [it.id, it]));
+
+    const data = await Promise.all(
+      rows.map(async (r) => {
+        const item = itemsById.get(r.content_item_id);
+        const thumbnailUrl = item
+          ? await this.buildSignedReadUrl(item.thumbnail_s3_bucket, item.thumbnail_s3_key)
+          : null;
+        return {
+          id: r.id,
+          contentItemId: r.content_item_id,
+          title: item?.title ?? 'Snack',
+          thumbnailUrl,
+          scheduledDate: ymd(r.scheduled_date),
+          completedAt: r.completed_at
+            ? new Date(r.completed_at as unknown as string).toISOString()
+            : null,
         };
       }),
     );

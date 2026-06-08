@@ -1,4 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
 import { WorkoutExecutionRepository } from 'src/repositories/workout-execution.repository';
 import { WorkoutRouteRepository } from 'src/repositories/workout-route.repository';
@@ -21,6 +22,7 @@ export class WorkoutSchedulesApiModule {
           WorkoutRepository,
           WorkoutExecutionRepository,
           WorkoutRouteRepository,
+          OrganisationMembershipRepository,
         ],
         controllers: [WorkoutSchedulesApiController],
       };

@@ -92,6 +92,7 @@ import { RouteMarkersTable } from './route-markers-table.interface';
 import { RpeTssTrackingTable } from './rpe-tss-tracking-table.interface';
 import { SetCompletionsTable } from './set-completions-table.interface';
 import { SnackCompletionsTable } from './snack-completions-table.interface';
+import { SnackSchedulesTable } from './snack-schedules-table.interface';
 import { SleepBaselinesTable } from './sleep-baselines-table.interface';
 import { SleepLogsTable } from './sleep-logs-table.interface';
 import { TrainingStressScoresTable } from './training-stress-scores-table.interface';
@@ -258,6 +259,10 @@ export interface Database {
   // from the rehabit player. Feeds the "things you've done lately"
   // history list. See migration 1774404000000.
   snack_completions: SnackCompletionsTable;
+  // Scheduled snacks — user intent to do a snack on a date, the
+  // snack-side parallel of workout_schedules. See migration
+  // 1774404100000.
+  snack_schedules: SnackSchedulesTable;
 
   // Phase 11 — Push notification rules + delivery log
   notification_rules: NotificationRulesTable;

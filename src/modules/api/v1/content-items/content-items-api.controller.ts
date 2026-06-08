@@ -21,7 +21,9 @@ import {
   ContentItemIdParam,
   CreateContentItemDto,
   ListContentItemsQuery,
+  ListSnackSchedulesQuery,
   LogSnackCompletionBody,
+  ScheduleSnackBody,
   UpdateContentItemDto,
 } from './request.dto';
 import {
@@ -29,6 +31,8 @@ import {
   ContentItemsListResponse,
   CreateContentItemResponse,
   SnackCompletionListResponse,
+  SnackScheduleListResponse,
+  SnackScheduleResponse,
 } from './response.dto';
 
 @ApiTags('Content Items')
@@ -123,5 +127,32 @@ export class ContentItemsApiController {
   @ApiOkResponse({ type: SnackCompletionListResponse })
   async listMyCompletions(@Req() req: AuthedRequest): Promise<SnackCompletionListResponse> {
     return this.contentItemsService.listMySnackCompletions(req);
+  }
+
+  @Post(':id/schedules')
+  @ApiOperation({ summary: 'Schedule a snack onto the caller’s calendar for a given date.' })
+  @ApiOkResponse({ type: SnackScheduleResponse })
+  async scheduleSnack(
+    @Req() req: AuthedRequest,
+    @Param() params: ContentItemIdParam,
+    @Body() body: ScheduleSnackBody,
+  ): Promise<SnackScheduleResponse> {
+    return this.contentItemsService.scheduleSnack(req, params.id, body.scheduledDate);
+  }
+
+  @Get('me/schedules')
+  @ApiOperation({
+    summary:
+      "The caller's scheduled snacks, optionally date-windowed (dateFrom / dateTo) for the calendar.",
+  })
+  @ApiOkResponse({ type: SnackScheduleListResponse })
+  async listMySchedules(
+    @Req() req: AuthedRequest,
+    @Query() query: ListSnackSchedulesQuery,
+  ): Promise<SnackScheduleListResponse> {
+    return this.contentItemsService.listMySnackSchedules(req, {
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    });
   }
 }

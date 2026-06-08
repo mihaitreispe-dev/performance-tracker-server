@@ -127,3 +127,38 @@ export class SnackCompletionListResponse {
   @ApiProperty({ type: [SnackCompletionDTO] })
   data: SnackCompletionDTO[];
 }
+
+/**
+ * One scheduled snack — returned by GET /content-items/me/schedules
+ * and the create endpoint. Enriched with the snack's title +
+ * thumbnail so the calendar renders without a second lookup.
+ */
+export class SnackScheduleDTO {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  contentItemId: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  thumbnailUrl: string | null;
+
+  @ApiProperty({ type: String, format: 'date', description: 'YYYY-MM-DD' })
+  scheduledDate: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time' })
+  completedAt: string | null;
+}
+
+export class SnackScheduleResponse {
+  @ApiProperty({ type: SnackScheduleDTO })
+  data: SnackScheduleDTO;
+}
+
+export class SnackScheduleListResponse {
+  @ApiProperty({ type: [SnackScheduleDTO] })
+  data: SnackScheduleDTO[];
+}
