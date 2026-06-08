@@ -79,7 +79,19 @@ export async function bootstrap(opts?: { port: number }) {
         origin: corsOrigins,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        // X-Organisation-Id is sent by the shared apiClient on every
+        // request (active-org scoping); X-API-Key / X-Client-Version are
+        // used by the Rehabit OAuth client. Omitting any of these makes
+        // the browser preflight reject the request with no body — a
+        // notoriously hard-to-debug CORS failure.
+        allowedHeaders: [
+          'Content-Type',
+          'Authorization',
+          'X-Requested-With',
+          'X-Organisation-Id',
+          'X-API-Key',
+          'X-Client-Version',
+        ],
       }),
     );
   } else if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
