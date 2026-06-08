@@ -70,13 +70,17 @@ export class Env extends BoostrapEnv {
   @Matches('^Y|N$', 'i')
   DB_SSL: string;
 
-  // AWS
+  // AWS — optional. When set (local MinIO / explicit-key deploys) the
+  // SDK clients use them; on ECS/Fargate they're unset and the SDK
+  // falls back to the task role (see s3 / mediaconvert services).
 
   @IsString()
-  AWS_ACCESS_KEY: string;
+  @IsOptional()
+  AWS_ACCESS_KEY?: string;
 
   @IsString()
-  AWS_SECRET_KEY: string;
+  @IsOptional()
+  AWS_SECRET_KEY?: string;
 
   // S3
 
@@ -117,13 +121,16 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   CLIENT_URL?: string;
 
-  // Swagger
+  // Swagger — optional. Basic-auth docs only mount when BOTH are set
+  // (see api-v1.app.module); unset = docs route disabled.
 
   @IsString()
-  SWAGGER_USERNAME: string;
+  @IsOptional()
+  SWAGGER_USERNAME?: string;
 
   @IsString()
-  SWAGGER_PASSWORD: string;
+  @IsOptional()
+  SWAGGER_PASSWORD?: string;
 
   // CDN
 
@@ -134,13 +141,17 @@ export class Env extends BoostrapEnv {
   @Matches('^Y|N$', 'i')
   DISABLE_CDN: string;
 
-  // CloudFront
+  // CloudFront — optional. Only used for CloudFront signed-URL GETs
+  // (getCloudFrontSignedUrlGET), which short-circuit to '' when unset.
+  // Our CDN uses public/OAC access, so these stay empty.
 
   @IsString()
-  CLOUDFRONT_KEY_PAIR_ID: string;
+  @IsOptional()
+  CLOUDFRONT_KEY_PAIR_ID?: string;
 
   @IsString()
-  CLOUDFRONT_PRIVATE_KEY: string;
+  @IsOptional()
+  CLOUDFRONT_PRIVATE_KEY?: string;
 
   // Firebase — optional so a deploy without push configured still
   // boots (FirebaseService is graceful; see its onModuleInit). When
