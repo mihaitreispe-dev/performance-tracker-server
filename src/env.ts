@@ -142,16 +142,21 @@ export class Env extends BoostrapEnv {
   @IsString()
   CLOUDFRONT_PRIVATE_KEY: string;
 
-  // Firebase
+  // Firebase — optional so a deploy without push configured still
+  // boots (FirebaseService is graceful; see its onModuleInit). When
+  // all three are set, push + Firebase auth activate.
 
   @IsString()
-  FIREBASE_PROJECT_ID: string;
+  @IsOptional()
+  FIREBASE_PROJECT_ID?: string;
 
   @IsString()
-  FIREBASE_CLIENT_EMAIL: string;
+  @IsOptional()
+  FIREBASE_CLIENT_EMAIL?: string;
 
   @IsString()
-  FIREBASE_PRIVATE_KEY: string;
+  @IsOptional()
+  FIREBASE_PRIVATE_KEY?: string;
 
   // MediaConvert
 
