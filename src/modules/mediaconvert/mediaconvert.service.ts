@@ -51,11 +51,19 @@ export class MediaConvertService {
 
   constructor(private readonly configService: AppConfigService) {
     this.region = this.configService.mediaConvertRegion;
+    // Same credential strategy as S3Service: explicit key when set,
+    // otherwise fall through to the default chain (the Fargate task
+    // role) so no long-lived keys ship with the container.
+    const explicitKey = this.configService.awsAccessKey;
     const mediaConvertOpts: MediaConvertClientConfig = {
-      credentials: {
-        accessKeyId: this.configService.awsAccessKey,
-        secretAccessKey: this.configService.awsSecretKey,
-      },
+      ...(explicitKey
+        ? {
+            credentials: {
+              accessKeyId: explicitKey,
+              secretAccessKey: this.configService.awsSecretKey,
+            },
+          }
+        : {}),
       region: this.region,
     };
     this.mediaConvertClient = new MediaConvert(mediaConvertOpts);

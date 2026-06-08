@@ -34,11 +34,22 @@ export class S3Service {
   constructor(private readonly configService: AppConfigService) {
     this.region = this.configService.s3Region;
     const endpoint = stringToS3Endpoint(this.configService.s3Endpoint);
+    // Credential resolution:
+    //   - When AWS_ACCESS_KEY is set (local MinIO, or any explicit-key
+    //     deploy) use it directly.
+    //   - When it's empty (the ECS/Fargate path) OMIT credentials so
+    //     the SDK falls through to its default chain — on Fargate that
+    //     resolves the TASK ROLE, so we ship no long-lived keys.
+    const explicitKey = this.configService.awsAccessKey;
     const s3Opts: S3ClientConfig = {
-      credentials: {
-        accessKeyId: this.configService.awsAccessKey,
-        secretAccessKey: this.configService.awsSecretKey,
-      },
+      ...(explicitKey
+        ? {
+            credentials: {
+              accessKeyId: explicitKey,
+              secretAccessKey: this.configService.awsSecretKey,
+            },
+          }
+        : {}),
       region: this.region,
       endpoint: endpoint,
       useAccelerateEndpoint: !endpoint,

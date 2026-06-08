@@ -40,6 +40,14 @@ export async function bootstrap(opts?: { port: number }) {
 
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: ['1'] });
 
+  // Liveness probe for the ALB target group (and any uptime monitor).
+  // Unauthenticated, unversioned, no body parsing — just a fast 200 so
+  // the load balancer knows the task is up. Registered before the
+  // versioned routers + CORS so it can't be gated by either.
+  app.use('/health', (_req: Request, res: Response) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   const rawBodyBuffer = (req: any, _: any, buffer: any, encoding: any) => {
     if (!req.headers['stripe-signature']) {
       return;
