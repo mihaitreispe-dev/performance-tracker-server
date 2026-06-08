@@ -1,0 +1,122 @@
+# Build the API image, run DB migrations, and roll the ECS service.
+#
+# Branch -> environment:
+#   dev   -> staging  (perftracker-staging)
+#   main  -> prod     (perftracker-prod)
+#
+# Auth is GitHub OIDC -> the perftracker-gha-server IAM role. No AWS
+# keys are stored in GitHub. The role's trust policy is pinned to this
+# repo + these two branches (see infra: shared/cicd.tf).
+#
+# Runner is native ARM64 so the image matches the Graviton/Fargate
+# task platform without QEMU emulation. If ARM runners aren't available
+# on your plan, switch `runs-on` to ubuntu-latest and add a buildx +
+# QEMU setup step (docker/setup-qemu-action) before the build.
+name: deploy
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPO: 195076803133.dkr.ecr.eu-central-1.amazonaws.com/perftracker-api
+  ROLE_ARN: arn:aws:iam::195076803133:role/perftracker-gha-server
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve environment from branch
+        id: env
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "name=perftracker-prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=perftracker-staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image
+        id: build
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_SHA::7}"
+          docker build -t "${ECR_REPO}:${TAG}" -t "${ECR_REPO}:${GITHUB_REF_NAME}" .
+          docker push "${ECR_REPO}:${TAG}"
+          docker push "${ECR_REPO}:${GITHUB_REF_NAME}"
+          echo "image=${ECR_REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Register new task definition revision
+        id: taskdef
+        env:
+          NAME: ${{ steps.env.outputs.name }}
+          IMAGE: ${{ steps.build.outputs.image }}
+        run: |
+          set -euo pipefail
+          # Take the current active task def, swap in the new image, and
+          # register a new revision (immutable, rollback-friendly).
+          aws ecs describe-task-definition --task-definition "${NAME}-api" \
+            --query 'taskDefinition' --output json > taskdef.json
+          jq --arg IMG "$IMAGE" '
+            .containerDefinitions[0].image = $IMG
+            | del(.taskDefinitionArn,.revision,.status,.requiresAttributes,
+                  .compatibilities,.registeredAt,.registeredBy)
+          ' taskdef.json > newdef.json
+          NEW_ARN=$(aws ecs register-task-definition --cli-input-json file://newdef.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
+          echo "Registered $NEW_ARN"
+
+      - name: Run database migrations
+        env:
+          NAME: ${{ steps.env.outputs.name }}
+          TASKDEF: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          set -euo pipefail
+          # Reuse the service's own network config for the one-off task.
+          NET=$(aws ecs describe-services --cluster "$NAME" --services "${NAME}-api" \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration' --output json)
+          SUBNETS=$(echo "$NET" | jq -r '.subnets | join(",")')
+          SGS=$(echo "$NET" | jq -r '.securityGroups | join(",")')
+          TASK_ARN=$(aws ecs run-task --cluster "$NAME" --task-definition "$TASKDEF" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SGS],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"api","command":["pnpm","migrate:latest"]}]}' \
+            --query 'tasks[0].taskArn' --output text)
+          echo "migration task: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$NAME" --tasks "$TASK_ARN"
+          EXIT=$(aws ecs describe-tasks --cluster "$NAME" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          echo "migration exit code: $EXIT"
+          if [ "$EXIT" != "0" ]; then
+            echo "::error::Migrations failed (exit $EXIT) — service NOT updated."
+            exit 1
+          fi
+
+      - name: Deploy service
+        env:
+          NAME: ${{ steps.env.outputs.name }}
+          TASKDEF: ${{ steps.taskdef.outputs.arn }}
+        run: |
+          set -euo pipefail
+          aws ecs update-service --cluster "$NAME" --service "${NAME}-api" \
+            --task-definition "$TASKDEF" >/dev/null
+          echo "Waiting for service to stabilise..."
+          aws ecs wait services-stable --cluster "$NAME" --services "${NAME}-api"
+          echo "Deployed $TASKDEF to $NAME."
