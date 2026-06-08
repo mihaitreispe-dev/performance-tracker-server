@@ -17,7 +17,11 @@ import { AppConfigService } from 'src/modules/config/app-config.service';
 @Injectable()
 export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
-  private app!: admin.app.App;
+  // Undefined when Firebase isn't configured on this deployment —
+  // see the boot guard below. Methods check `requireApp()` so an
+  // unconfigured push/auth call fails loudly at request time instead
+  // of crashing the whole API at boot.
+  private app?: admin.app.App;
 
   constructor(private readonly appConfig: AppConfigService) {}
 
@@ -31,13 +35,40 @@ export class FirebaseService implements OnModuleInit {
       this.app = admin.app();
       return;
     }
-    this.app = admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: this.appConfig.firebaseProjectId,
-        clientEmail: this.appConfig.firebaseClientEmail,
-        privateKey: this.appConfig.firebasePrivateKey.replace(/\\n/g, '\n'),
-      }),
-    });
+    // Graceful when unconfigured (same posture as StripeService): a
+    // deploy without FIREBASE_* creds boots fine, with push + Firebase
+    // auth dormant until the secret is populated. Previously a missing
+    // key crashed onModuleInit (cert() on an empty/undefined key),
+    // which would have hard-failed the first Fargate deploy before
+    // the Firebase secret was set.
+    const projectId = this.appConfig.firebaseProjectId as string | undefined;
+    const clientEmail = this.appConfig.firebaseClientEmail as string | undefined;
+    const privateKey = this.appConfig.firebasePrivateKey as string | undefined;
+    if (!projectId || !clientEmail || !privateKey) {
+      this.logger.warn(
+        'Firebase not configured (FIREBASE_* unset) — push notifications + Firebase auth disabled until set.',
+      );
+      return;
+    }
+    try {
+      this.app = admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+        }),
+      });
+    } catch (err) {
+      this.logger.error(`Firebase init failed; push + Firebase auth disabled: ${err}`);
+    }
+  }
+
+  /** Throw a clear error if a Firebase-backed method is hit on an unconfigured deploy. */
+  private requireApp(): admin.app.App {
+    if (!this.app) {
+      throw new Error('Firebase is not configured on this deployment (set FIREBASE_* secrets).');
+    }
+    return this.app;
   }
 
   // --------------------------------------------------------------------------
@@ -45,7 +76,7 @@ export class FirebaseService implements OnModuleInit {
   // --------------------------------------------------------------------------
 
   async verifyIdToken(idToken: string): Promise<admin.auth.DecodedIdToken> {
-    return this.app.auth().verifyIdToken(idToken);
+    return this.requireApp().auth().verifyIdToken(idToken);
   }
 
   // --------------------------------------------------------------------------
@@ -65,7 +96,7 @@ export class FirebaseService implements OnModuleInit {
     clickAction?: string;
   }): Promise<{ messageId: string } | { error: string; invalidToken: boolean }> {
     try {
-      const messageId = await this.app.messaging().send({
+      const messageId = await this.requireApp().messaging().send({
         token: input.token,
         notification: { title: input.title, body: input.body },
         data: {
@@ -96,7 +127,7 @@ export class FirebaseService implements OnModuleInit {
   }): Promise<Array<{ token: string; ok: boolean; error?: string; invalidToken?: boolean }>> {
     if (input.tokens.length === 0) return [];
     try {
-      const response = await this.app.messaging().sendEachForMulticast({
+      const response = await this.requireApp().messaging().sendEachForMulticast({
         tokens: input.tokens,
         notification: { title: input.title, body: input.body },
         data: {
