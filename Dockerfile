@@ -35,5 +35,9 @@ COPY --from=build /usr/app/tsconfig.build.json /usr/app/tsconfig.build.json
 COPY --from=build /usr/app/src/database/interfaces /usr/app/src/database/interfaces
 COPY --from=build /usr/app/src/database/migrations /usr/app/src/database/migrations
 COPY --from=build /usr/app/src/database/seeds /usr/app/src/database/seeds
+# kysely-ctl's config (DB connection + migrationFolder) — required by
+# `pnpm migrate:latest`, which the ECS one-off migrate task runs.
+# Without it the CLI can't find its config and migrations never apply.
+COPY --from=build /usr/app/.config /usr/app/.config
 EXPOSE 5100
 CMD ["pnpm", "start:build"]
