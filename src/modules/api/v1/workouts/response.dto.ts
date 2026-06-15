@@ -15,6 +15,16 @@ import { ItemResponse } from 'src/lib/http/dto/item-response.dto';
 import { PageResponse } from 'src/lib/http/dto/page-response.dto';
 import { IsEnumString } from 'src/lib/validators/is-enum-string';
 
+export class EquipmentInfoDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+}
+
 export class ExerciseInfoDTO {
   @ApiProperty()
   @IsUUID()
@@ -28,6 +38,14 @@ export class ExerciseInfoDTO {
   @IsString()
   @IsOptional()
   picture?: string | null;
+
+  // Equipment the exercise needs. Populated on the workout-detail
+  // surface so the client can list "equipment needed" for the whole
+  // workout without an extra round-trip per exercise.
+  @ApiPropertyOptional({ type: [EquipmentInfoDTO] })
+  @IsArray()
+  @IsOptional()
+  equipment?: EquipmentInfoDTO[];
 }
 
 export class ExerciseInstanceDTO {

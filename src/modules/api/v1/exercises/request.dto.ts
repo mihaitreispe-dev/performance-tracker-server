@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsArray, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { ExerciseLevel, ExerciseVisibility, ExerciseVoiceoverMode } from 'src/database/interfaces';
 import { type SortOptions, SortParam } from 'src/lib/http/decorators/sort-param';
@@ -22,6 +23,18 @@ export class ListExercisesQuery extends SearchableQuery {
   @IsEnumString(ExerciseLevel)
   @IsOptional()
   level?: ExerciseLevel;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Comma-separated equipment ids; matches exercises linked to ANY of them.',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.split(',').map((s) => s.trim()).filter(Boolean) : value,
+  )
+  @IsArray()
+  @IsUUID('4', { each: true })
+  equipmentIds?: string[];
 
   @SortParam(ExerciseSortField)
   sort?: SortOptions<'name' | 'created_at' | 'updated_at'>;

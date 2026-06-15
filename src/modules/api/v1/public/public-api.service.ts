@@ -192,6 +192,24 @@ export class PublicApiService {
       ])
       .execute();
 
+    // Equipment per exercise, fetched once for all of the workout's
+    // exercises so the rehabit app can show "equipment needed" up front.
+    const exerciseIds = [...new Set([...standalone.map((s) => s.ex_id), ...grouped.map((g) => g.ex_id)])];
+    const equipByExercise = new Map<string, { id: string; name: string }[]>();
+    if (exerciseIds.length > 0) {
+      const eqRows = await this.db
+        .selectFrom('exercise_equipment as ee')
+        .innerJoin('equipment as eq', 'eq.id', 'ee.equipment_id')
+        .where('ee.exercise_id', 'in', exerciseIds)
+        .select(['ee.exercise_id as exercise_id', 'eq.id as id', 'eq.name as name'])
+        .execute();
+      for (const r of eqRows) {
+        const list = equipByExercise.get(r.exercise_id) ?? [];
+        list.push({ id: r.id, name: r.name });
+        equipByExercise.set(r.exercise_id, list);
+      }
+    }
+
     const steps: PublicWorkoutStepDTO[] = [
       ...standalone.map((s) => ({
         exerciseInstanceId: s.ei_id,
@@ -199,6 +217,7 @@ export class PublicApiService {
         exerciseName: s.ex_name,
         exerciseDescription: s.ex_description,
         cues: (s.ex_cues as string[] | null) ?? [],
+        equipment: equipByExercise.get(s.ex_id) ?? [],
         position: s.wi_position,
         groupId: null,
         mode: s.mode,
@@ -216,6 +235,7 @@ export class PublicApiService {
         exerciseName: g.ex_name,
         exerciseDescription: g.ex_description,
         cues: (g.ex_cues as string[] | null) ?? [],
+        equipment: equipByExercise.get(g.ex_id) ?? [],
         // Synthesise a fractional position so grouped items sort *between*
         // their parent workout_item and the next one without us pulling sort
         // logic into JS-side comparator gymnastics.

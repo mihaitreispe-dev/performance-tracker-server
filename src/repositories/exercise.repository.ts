@@ -15,6 +15,8 @@ export interface ExerciseFilter {
   visibility?: ExerciseVisibility;
   userId?: string;
   search?: string;
+  /** Match exercises linked to ANY of these equipment ids. */
+  equipmentIds?: string[];
 }
 
 export interface ExerciseSort {
@@ -80,6 +82,18 @@ export class ExerciseRepository {
     if (filter?.search) {
       query = query.where('name', 'ilike', `%${filter.search}%`);
     }
+    if (filter?.equipmentIds && filter.equipmentIds.length > 0) {
+      const equipmentIds = filter.equipmentIds;
+      query = query.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('exercise_equipment as ee')
+            .select('ee.exercise_id')
+            .whereRef('ee.exercise_id', '=', 'exercises.id')
+            .where('ee.equipment_id', 'in', equipmentIds),
+        ),
+      );
+    }
 
     if (sort && sort.length > 0) {
       for (const s of sort) {
@@ -119,6 +133,18 @@ export class ExerciseRepository {
     }
     if (filter?.search) {
       query = query.where('name', 'ilike', `%${filter.search}%`);
+    }
+    if (filter?.equipmentIds && filter.equipmentIds.length > 0) {
+      const equipmentIds = filter.equipmentIds;
+      query = query.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('exercise_equipment as ee')
+            .select('ee.exercise_id')
+            .whereRef('ee.exercise_id', '=', 'exercises.id')
+            .where('ee.equipment_id', 'in', equipmentIds),
+        ),
+      );
     }
 
     const result = await query.executeTakeFirstOrThrow();

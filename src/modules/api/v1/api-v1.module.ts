@@ -24,6 +24,7 @@ import { ContentItemsApiModule } from './content-items/content-items-api.module'
 import { CoursesApiModule } from './courses/courses-api.module';
 import { DataExportApiModule } from './data-export/data-export.module';
 import { DataImportApiModule } from './data-import/data-import.module';
+import { EquipmentApiModule } from './equipment/equipment-api.module';
 import { ExercisesApiModule } from './exercises/exercises-api.module';
 import { ExploreApiModule } from './explore/explore-api.module';
 import { HealthApiModule } from './health/health-api.module';
@@ -64,6 +65,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     AuthModule.register(),
     AuthApiModule.register(),
     ExercisesApiModule.register(),
+    EquipmentApiModule.register(),
     WorkoutsApiModule.register(),
     WorkoutSchedulesApiModule.register(),
     WorkoutExecutionsApiModule.register(),

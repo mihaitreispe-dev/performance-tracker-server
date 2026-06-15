@@ -64,12 +64,19 @@ export class PublicLockStatusDTO {
  * sibling steps with the same `groupId` set; consumers that don't care about
  * supersets can ignore it.
  */
+export class PublicWorkoutStepEquipmentDTO {
+  @ApiProperty() id: string;
+  @ApiProperty() name: string;
+}
+
 export class PublicWorkoutStepDTO {
   @ApiProperty() exerciseInstanceId: string;
   @ApiProperty() exerciseId: string;
   @ApiProperty() exerciseName: string;
   @ApiPropertyOptional({ nullable: true }) exerciseDescription: string | null;
   @ApiProperty({ type: [String] }) cues: string[];
+  @ApiProperty({ type: [PublicWorkoutStepEquipmentDTO], description: 'Equipment this step needs.' })
+  equipment: PublicWorkoutStepEquipmentDTO[];
   @ApiProperty({ description: 'Position in the workout. Stable across reads.' }) position: number;
   @ApiPropertyOptional({
     nullable: true,

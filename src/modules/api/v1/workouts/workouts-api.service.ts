@@ -31,6 +31,7 @@ import { CardioCategoryRepository } from 'src/repositories/cardio-category.repos
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { CardioStepGroupRepository } from 'src/repositories/cardio-step-group.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
+import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
@@ -65,6 +66,7 @@ export class WorkoutsApiService {
     private readonly exerciseInstanceRepo: ExerciseInstanceRepository,
     private readonly exerciseInstanceGroupRepo: ExerciseInstanceGroupRepository,
     private readonly exerciseRepo: ExerciseRepository,
+    private readonly equipmentRepo: EquipmentRepository,
     private readonly exerciseImageRepo: ExerciseImageRepository,
     private readonly cardioStepRepo: CardioStepRepository,
     private readonly cardioStepGroupRepo: CardioStepGroupRepository,
@@ -1134,14 +1136,20 @@ export class WorkoutsApiService {
     // Bulk fetch all exercises instead of N individual queries
     const exercises = await this.exerciseRepo.findByIds(exerciseIds);
 
-    // Resolve pictures in parallel for better performance
+    // Resolve pictures + equipment in parallel for better performance.
+    // Equipment rides along so the workout-detail surface can list the
+    // gear needed for the whole workout without an extra round-trip.
     await Promise.all(
       exercises.map(async (exercise) => {
-        const picture = await this.getExercisePictureUrl(exercise);
+        const [picture, equipment] = await Promise.all([
+          this.getExercisePictureUrl(exercise),
+          this.equipmentRepo.findByExerciseId(exercise.id),
+        ]);
         result.set(exercise.id, {
           id: exercise.id,
           name: exercise.name,
           picture,
+          equipment: equipment.map((e) => ({ id: e.id, name: e.name })),
         });
       }),
     );

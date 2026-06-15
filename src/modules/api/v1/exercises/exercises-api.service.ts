@@ -85,11 +85,12 @@ export class ExercisesApiService {
 
   async list(req: AuthedRequest, query: ListExercisesQuery): Promise<ExerciseListResponse> {
     const organisationId = assertActiveOrg(req);
-    const { q, offset = 0, limit = 20, visibility, sort } = query;
+    const { q, offset = 0, limit = 20, visibility, sort, equipmentIds } = query;
 
     const filter = {
       visibility,
       search: q,
+      equipmentIds,
     };
 
     const [exercises, totalCount] = await Promise.all([

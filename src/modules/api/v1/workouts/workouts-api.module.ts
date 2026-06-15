@@ -6,6 +6,7 @@ import { CardioCategoryRepository } from 'src/repositories/cardio-category.repos
 import { CardioStepRepository } from 'src/repositories/cardio-step.repository';
 import { CardioStepGroupRepository } from 'src/repositories/cardio-step-group.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
+import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { ExerciseInstanceRepository } from 'src/repositories/exercise-instance.repository';
@@ -38,6 +39,7 @@ export class WorkoutsApiModule {
           ExerciseInstanceRepository,
           ExerciseInstanceGroupRepository,
           ExerciseRepository,
+          EquipmentRepository,
           ExerciseImageRepository,
           CardioStepRepository,
           CardioStepGroupRepository,
