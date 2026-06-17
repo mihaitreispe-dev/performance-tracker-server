@@ -5,6 +5,7 @@ import { LocalTranscodeModule } from 'src/modules/local-transcode/local-transcod
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { S3Module } from 'src/modules/s3/s3.module';
 import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
+import { TranslationsModule } from 'src/modules/translations/translations.module';
 import { VimeoModule } from 'src/modules/vimeo/vimeo.module';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
@@ -31,6 +32,7 @@ export class ExercisesApiModule {
           VimeoModule.register(),
           SmartCropModule.register(),
           LocalTranscodeModule.register(),
+          TranslationsModule.register(),
         ],
         providers: [
           ExercisesApiService,

@@ -29,6 +29,7 @@ import { GoogleTtsService } from 'src/modules/google-tts/google-tts.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
+import { TranslationsService } from 'src/modules/translations/translations.service';
 import { VimeoService, type VimeoProgressiveRendition } from 'src/modules/vimeo/vimeo.service';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
@@ -54,6 +55,7 @@ import {
   ExerciseImageDTO,
   ExerciseListResponse,
   ExerciseResponse,
+  ExerciseTranslationDTO,
   ExerciseUploadUrlResponse,
   MediaAssetDTO,
   MuscleGroupDTO,
@@ -79,6 +81,10 @@ export class ExercisesApiService {
     // the SDK on first call; throws 503 when ENABLE_GOOGLE_TTS is
     // off. @Global in GoogleTtsModule so no per-module import.
     private readonly googleTts: GoogleTtsService,
+    // Content-translation reads — published voice-over / intro
+    // translations are embedded in the single-exercise GET so the
+    // player can pick captions / translated narration by locale.
+    private readonly translationsService: TranslationsService,
   ) {}
 
   private readonly importLogger = new Logger('VimeoImporter');
@@ -116,7 +122,7 @@ export class ExercisesApiService {
     // loadReadable enforces the org-or-public tenancy boundary.
     const organisationId = assertActiveOrg(req);
     const exercise = await this.loadReadable(id, organisationId);
-    return { data: await this.mapExerciseToDTO(exercise) };
+    return { data: await this.mapExerciseToDTO(exercise, { includeTranslations: true }) };
   }
 
   /** Load an exercise the caller can read: own org rows or any PUBLIC row. */
@@ -832,7 +838,10 @@ export class ExercisesApiService {
     }
   }
 
-  private async mapExerciseToDTO(exercise: Exercise): Promise<ExerciseDTO> {
+  private async mapExerciseToDTO(
+    exercise: Exercise,
+    opts: { includeTranslations?: boolean } = {},
+  ): Promise<ExerciseDTO> {
     const [assets, picture, equipmentList, primaryMuscles, secondaryMuscles, exerciseImages] = await Promise.all([
       this.buildMediaAssets(exercise),
       this.getThumbnailUrl(exercise),
@@ -864,6 +873,10 @@ export class ExercisesApiService {
       ).catch(() => null);
     }
 
+    const translations = opts.includeTranslations
+      ? await this.buildPublishedTranslations(exercise.id)
+      : undefined;
+
     return {
       id: exercise.id,
       name: exercise.name,
@@ -892,9 +905,37 @@ export class ExercisesApiService {
       voiceoverUrl,
       voiceoverMimeType: exercise.voiceover_mime_type ?? null,
       voiceoverScript: exercise.voiceover_script ?? null,
+      translations,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
     };
+  }
+
+  /**
+   * Published voice-over + intro translations for an exercise, mapped to
+   * DTOs with signed caption / dubbed-audio URLs. Only 'published' rows
+   * — drafts and in-review translations never reach an athlete.
+   */
+  private async buildPublishedTranslations(exerciseId: string): Promise<ExerciseTranslationDTO[]> {
+    const rows = [
+      ...(await this.translationsService.listForTarget('exercise_voiceover', exerciseId)),
+      ...(await this.translationsService.listForTarget('exercise_intro', exerciseId)),
+    ].filter((r) => r.review_status === 'published');
+    return Promise.all(
+      rows.map(async (r) => ({
+        targetType: r.target_type,
+        locale: r.locale,
+        translatedText: r.translated_text,
+        captionVttUrl:
+          r.caption_vtt_s3_bucket && r.caption_vtt_s3_key
+            ? await this.getImageUrl(r.caption_vtt_s3_bucket, r.caption_vtt_s3_key).catch(() => null)
+            : null,
+        dubbedAudioUrl:
+          r.dubbed_audio_s3_bucket && r.dubbed_audio_s3_key
+            ? await this.getImageUrl(r.dubbed_audio_s3_bucket, r.dubbed_audio_s3_key).catch(() => null)
+            : null,
+      })),
+    );
   }
 
   private async mapExerciseImageToDTO(image: ExerciseImage): Promise<ExerciseImageDTO> {

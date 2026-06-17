@@ -89,6 +89,21 @@ export class ExerciseImageDTO {
   position: number;
 }
 
+/**
+ * A published translation of this exercise's voice-over or intro, in one
+ * language. Surfaced to the player so it can show captions / speak the
+ * translated script in the athlete's language. Only published rows reach
+ * here.
+ */
+export class ExerciseTranslationDTO {
+  @ApiProperty({ type: String, description: "'exercise_voiceover' | 'exercise_intro'" })
+  targetType: string;
+  @ApiProperty({ type: String }) locale: string;
+  @ApiProperty({ type: String, nullable: true }) translatedText: string | null;
+  @ApiProperty({ type: String, nullable: true }) captionVttUrl: string | null;
+  @ApiProperty({ type: String, nullable: true }) dubbedAudioUrl: string | null;
+}
+
 export class ExerciseDTO {
   @ApiProperty()
   @IsUUID()
@@ -229,6 +244,16 @@ export class ExerciseDTO {
   @IsString()
   @IsOptional()
   voiceoverScript?: string | null;
+
+  /**
+   * Published translations of this exercise's voice-over + intro. Only
+   * populated on single-exercise GET (the player path) — absent on list
+   * responses to avoid an N+1. The player picks the entry matching the
+   * athlete's language for captions / translated narration.
+   */
+  @ApiPropertyOptional({ type: () => [ExerciseTranslationDTO] })
+  @IsOptional()
+  translations?: ExerciseTranslationDTO[];
 
   @ApiProperty()
   @IsString()
