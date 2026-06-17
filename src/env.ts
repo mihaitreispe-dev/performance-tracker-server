@@ -206,30 +206,17 @@ export class Env extends BoostrapEnv {
   LOCAL_TRANSCODE_WIDE_MODE?: string;
 
   // Content translation pipeline (voice-over + intro translation).
-  // AWS Translate (machine translation) + Transcribe (speech-to-text)
-  // are opt-in; off by default so the feature ships dark until an org
-  // turns it on. ElevenLabs key is for the later cloned-voice dub.
+  // AWS Translate (machine translation) is opt-in; off by default so the
+  // feature ships dark until an org turns it on. Speech-to-text + the
+  // cloned-voice dub run on ElevenLabs (enabled by ELEVENLABS_API_KEY).
   @IsString()
   @Matches('^Y|N$', 'i')
   @IsOptional()
   ENABLE_AWS_TRANSLATE?: string;
 
   @IsString()
-  @Matches('^Y|N$', 'i')
-  @IsOptional()
-  ENABLE_AWS_TRANSCRIBE?: string;
-
-  @IsString()
   @IsOptional()
   ELEVENLABS_API_KEY?: string;
-
-  // Which speech-to-text backend to use for the translation pipeline.
-  // Optional override; when unset the provider is inferred (ElevenLabs
-  // when ELEVENLABS_API_KEY is present, else AWS when ENABLE_AWS_TRANSCRIBE=Y).
-  @IsString()
-  @Matches('^aws|elevenlabs$', 'i')
-  @IsOptional()
-  TRANSCRIBE_PROVIDER?: string;
 
   // ElevenLabs Scribe STT model id. Defaults to 'scribe_v1'.
   @IsString()

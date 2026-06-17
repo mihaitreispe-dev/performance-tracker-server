@@ -18,7 +18,6 @@ import { Database } from 'src/database/interfaces/database.interface';
 import { ExerciseVoiceoverMode } from 'src/database/interfaces/exercises-table.interface';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
-import { AwsTranscribeService } from 'src/modules/aws-transcribe/aws-transcribe.service';
 import { AwsTranslateService } from 'src/modules/aws-translate/aws-translate.service';
 import { ElevenLabsSttService } from 'src/modules/elevenlabs/elevenlabs-stt.service';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -34,20 +33,6 @@ interface ResolvedSource {
   durationSeconds?: number | null;
 }
 
-/**
- * Map a base locale to the regioned language code AWS Transcribe wants
- * (it has no bare 'en'). Falls back to the locale unchanged.
- */
-const TRANSCRIBE_LOCALE: Record<string, string> = {
-  en: 'en-US',
-  es: 'es-ES',
-  fr: 'fr-FR',
-  de: 'de-DE',
-  it: 'it-IT',
-  pt: 'pt-PT',
-  nl: 'nl-NL',
-};
-
 @Injectable()
 export class TranslationsService {
   private readonly logger = new Logger(TranslationsService.name);
@@ -55,7 +40,6 @@ export class TranslationsService {
   constructor(
     @InjectKysely() private readonly db: Kysely<Database>,
     private readonly translate: AwsTranslateService,
-    private readonly transcribe: AwsTranscribeService,
     private readonly elevenLabsStt: ElevenLabsSttService,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
@@ -121,7 +105,7 @@ export class TranslationsService {
     if (source.text !== undefined) {
       await this.translateKnownText({ targetType, targetId, locales, sourceLocale, text: source.text });
     } else if (source.media) {
-      await this.startTranscription({ targetType, targetId, locales, sourceLocale, media: source.media });
+      await this.startTranscription({ targetType, targetId, locales });
     }
 
     return this.listForTarget(targetType, targetId);
@@ -174,46 +158,19 @@ export class TranslationsService {
   }
 
   /**
-   * Cron entrypoint: advance every row whose Transcribe job is still in
-   * flight. On completion we store the transcript as the source text and
-   * machine-translate each waiting locale. Grouped by job name so a
-   * shared transcript is fetched once.
+   * Cron entrypoint: transcribe + translate every row queued for STT.
+   * ElevenLabs Scribe is synchronous, so we run it here (a background
+   * worker) — claim a target, transcribe its media once, then
+   * machine-translate each waiting locale. No-ops when ElevenLabs isn't
+   * configured.
    */
   async advanceTranscriptionJobs(): Promise<void> {
-    // AWS path — rows carry a real job handle; poll each to completion.
-    if (this.transcribe.enabled) {
-      const pending = await this.db
-        .selectFrom('content_translations')
-        .select(['transcribe_job_name'])
-        .where('transcribe_status', 'in', ['queued', 'running'])
-        .where('transcribe_job_name', 'is not', null)
-        .groupBy('transcribe_job_name')
-        .execute();
+    if (!this.elevenLabsStt.enabled) return;
 
-      for (const { transcribe_job_name: jobName } of pending) {
-        if (!jobName) continue;
-        try {
-          await this.completeTranscriptionJob(jobName);
-        } catch (e) {
-          this.logger.error(`Transcribe poll failed for ${jobName}: ${String(e)}`);
-        }
-      }
-    }
-
-    // ElevenLabs path — rows queued without a job handle. Run Scribe
-    // synchronously here (background worker), one target at a time.
-    if (this.elevenLabsStt.enabled) {
-      await this.advanceElevenLabsTranscriptions();
-    }
-  }
-
-  /** ElevenLabs-backed transcription for rows queued without a job handle. */
-  private async advanceElevenLabsTranscriptions(): Promise<void> {
     const targets = await this.db
       .selectFrom('content_translations')
       .select(['target_type', 'target_id'])
       .where('transcribe_status', '=', 'queued')
-      .where('transcribe_job_name', 'is', null)
       .groupBy(['target_type', 'target_id'])
       .execute();
 
@@ -237,7 +194,6 @@ export class TranslationsService {
       .where('target_type', '=', targetType)
       .where('target_id', '=', targetId)
       .where('transcribe_status', '=', 'queued')
-      .where('transcribe_job_name', 'is', null)
       .returningAll()
       .execute();
     if (claimed.length === 0) return; // another worker took it
@@ -280,50 +236,12 @@ export class TranslationsService {
         .where('target_type', '=', targetType)
         .where('target_id', '=', targetId)
         .where('transcribe_status', '=', 'running')
-        .where('transcribe_job_name', 'is', null)
         .execute();
       throw e;
     }
   }
 
   // ---- internals ------------------------------------------------------
-
-  private async completeTranscriptionJob(jobName: string): Promise<void> {
-    const result = await this.transcribe.getResult(jobName);
-    if (result.state === 'queued' || result.state === 'running') return;
-
-    const rows = await this.db
-      .selectFrom('content_translations')
-      .selectAll()
-      .where('transcribe_job_name', '=', jobName)
-      .execute();
-
-    if (result.state === 'failed') {
-      this.logger.warn(`Transcribe job ${jobName} failed: ${result.failureReason}`);
-      await this.db
-        .updateTable('content_translations')
-        .set({ transcribe_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
-        .where('transcribe_job_name', '=', jobName)
-        .execute();
-      return;
-    }
-
-    const text = (result.transcriptText ?? '').trim();
-    for (const row of rows) {
-      const translated = text ? await this.safeTranslate(text, row.locale, row.source_locale) : '';
-      await this.db
-        .updateTable('content_translations')
-        .set({
-          source_text: text,
-          translated_text: translated,
-          transcribe_status: 'done',
-          review_status: 'machine_translated',
-          updated_at: sql`now()`,
-        })
-        .where('id', '=', row.id)
-        .execute();
-    }
-  }
 
   private async translateKnownText(opts: {
     targetType: TranslationTargetType;
@@ -356,56 +274,23 @@ export class TranslationsService {
     targetType: TranslationTargetType;
     targetId: string;
     locales: string[];
-    sourceLocale: string;
-    media: { bucket: string; key: string; mime: string | null };
   }): Promise<void> {
-    const { targetType, targetId, sourceLocale, media } = opts;
-    const provider = this.configService.transcribeProvider;
-    if (provider === 'off') {
+    if (!this.elevenLabsStt.enabled) {
       throw new ServiceUnavailableException(
-        'No speech-to-text provider is configured (set ELEVENLABS_API_KEY or ENABLE_AWS_TRANSCRIBE=Y).',
+        'Speech-to-text is not configured on this server (set ELEVENLABS_API_KEY).',
       );
     }
-
-    if (provider === 'aws') {
-      // AWS Transcribe is a real async job — start it now and store the
-      // handle; the cron polls it to completion.
-      const jobName = `tr-${targetId}-${Math.random().toString(36).slice(2, 8)}`;
-      const mediaLocale = TRANSCRIBE_LOCALE[sourceLocale] ?? sourceLocale;
-      await this.transcribe.startTranscription({
-        jobName,
-        mediaS3Uri: `s3://${media.bucket}/${media.key}`,
-        mediaLocale,
-        mediaFormat: AwsTranscribeService.mediaFormatForMime(media.mime),
-      });
-      await this.db
-        .updateTable('content_translations')
-        .set({
-          transcribe_job_name: jobName,
-          transcribe_status: 'running',
-          review_status: 'transcribing',
-          updated_at: sql`now()`,
-        })
-        .where('target_type', '=', targetType)
-        .where('target_id', '=', targetId)
-        .where('locale', 'in', opts.locales)
-        .execute();
-      return;
-    }
-
-    // ElevenLabs Scribe is a synchronous call — defer it to the cron so
-    // the request returns fast. Mark the rows queued (no job handle); the
-    // cron re-resolves the media, transcribes, and translates.
+    // ElevenLabs Scribe is a synchronous call — queue the rows and let the
+    // per-minute cron transcribe + translate so the request returns fast.
     await this.db
       .updateTable('content_translations')
       .set({
-        transcribe_job_name: null,
         transcribe_status: 'queued',
         review_status: 'transcribing',
         updated_at: sql`now()`,
       })
-      .where('target_type', '=', targetType)
-      .where('target_id', '=', targetId)
+      .where('target_type', '=', opts.targetType)
+      .where('target_id', '=', opts.targetId)
       .where('locale', 'in', opts.locales)
       .execute();
   }
