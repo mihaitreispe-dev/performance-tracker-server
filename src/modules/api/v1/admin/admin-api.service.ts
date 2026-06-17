@@ -11,7 +11,13 @@ import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-
 import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
+import { ModuleRepository } from 'src/repositories/module.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { BadRequestException } from '@nestjs/common';
+import { OrganisationType } from 'src/database/interfaces';
+import { OnboardOrganisationBody } from './request.dto';
+import { AdminOnboardResponse } from './response.dto';
 
 import { authUserFromUser } from '../auth/auth-user.mapper';
 import { AuthSessionResponse } from '../auth/response.dto';
@@ -58,9 +64,77 @@ export class AdminApiService {
     private readonly membershipRepo: OrganisationMembershipRepository,
     private readonly apiKeyRepo: OrganisationApiKeyRepository,
     private readonly apiUsageRepo: OrganisationApiUsageRepository,
+    private readonly moduleRepo: ModuleRepository,
+    private readonly themeRepo: OrganisationThemeRepository,
     private readonly authService: AuthService,
     private readonly s3Service: S3Service,
   ) {}
+
+  // ---- Onboarding ----------------------------------------------------------
+
+  /**
+   * Create an org with preconfigured settings in one flow: enabled modules,
+   * theme/branding, flags, an optional OWNER (existing user, resolved up
+   * front so we never half-create), and an optional first API key
+   * (cleartext returned once). Reuses the org/module/theme/membership repos
+   * + the same key issuance as the standalone endpoint.
+   */
+  async onboardOrganisation(actorUserId: string, body: OnboardOrganisationBody): Promise<AdminOnboardResponse> {
+    if (await this.orgRepo.findBySlug(body.slug)) {
+      throw new BadRequestException('Slug already in use.');
+    }
+    let owner: User | undefined;
+    if (body.ownerEmail) {
+      owner = await this.userRepo.findByEmail(body.ownerEmail);
+      if (!owner) {
+        throw new BadRequestException('No user with that email — they must create an account first.');
+      }
+    }
+
+    const org = await this.orgRepo.create({
+      name: body.name,
+      slug: body.slug,
+      created_by_user_id: actorUserId,
+      ...(body.orgType ? { org_type: body.orgType as OrganisationType } : {}),
+      ...(body.allowsSelfSignup != null ? { allows_self_signup: body.allowsSelfSignup } : {}),
+      ...(body.usesExternalApp != null ? { uses_external_app: body.usesExternalApp } : {}),
+    });
+
+    for (const m of body.modules ?? []) {
+      await this.moduleRepo.upsertOrgSetting({ organisation_id: org.id, module_key: m.key, enabled: m.enabled });
+    }
+
+    if (body.theme) {
+      await this.themeRepo.upsert({
+        organisation_id: org.id,
+        ...(body.theme.themeTokens ? { theme_tokens: body.theme.themeTokens } : {}),
+        ...(body.theme.themeTokensDark ? { theme_tokens_dark: body.theme.themeTokensDark } : {}),
+        ...(body.theme.copyOverrides ? { copy_overrides: body.theme.copyOverrides } : {}),
+        font_family: body.theme.fontFamily ?? null,
+      });
+    }
+
+    if (owner) {
+      await this.membershipRepo.create({
+        organisation_id: org.id,
+        user_id: owner.id,
+        role: OrganisationRole.OWNER,
+        client_type: null,
+        invited_by_user_id: actorUserId,
+        invitation_message: null,
+        accepted_at: new Date(),
+      });
+    }
+
+    let cleartext: string | null = null;
+    if (body.apiKey) {
+      const issued = await this.issueApiKey(org.id, actorUserId, body.apiKey);
+      cleartext = issued.data.key;
+    }
+
+    const detail = await this.getOrganisationDetail(org.id);
+    return { data: { organisation: detail.data, apiKey: cleartext } };
+  }
 
   /**
    * Every org in the platform, annotated with the caller's own membership

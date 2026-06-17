@@ -17,6 +17,7 @@ import {
   AdminUserSearchQuery,
   ImpersonateDto,
   IssueApiKeyBody,
+  OnboardOrganisationBody,
 } from './request.dto';
 import {
   AdminActivityResponse,
@@ -24,6 +25,7 @@ import {
   AdminApiKeyListResponse,
   AdminApiUsageResponse,
   AdminIssuedApiKeyResponse,
+  AdminOnboardResponse,
   AdminOrganisationDetailResponse,
   AdminOrganisationListResponse,
   AdminOverviewResponse,
@@ -73,6 +75,16 @@ export class AdminApiController {
     @Query() query: AdminActivityQuery,
   ): Promise<AdminActivityResponse> {
     return this.service.getActivity(params.id, query.from, query.to);
+  }
+
+  @Post('organisations')
+  @ApiOperation({ summary: 'Onboard a new org with preconfigured settings (modules, theme, flags, optional owner + first API key).' })
+  @ApiOkResponse({ type: AdminOnboardResponse })
+  async onboardOrganisation(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: OnboardOrganisationBody,
+  ): Promise<AdminOnboardResponse> {
+    return this.service.onboardOrganisation(req.user.id, body);
   }
 
   @Get('organisations/:id/api-keys')

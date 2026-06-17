@@ -185,3 +185,15 @@ export class AdminApiUsageDTO {
 export class AdminApiUsageResponse {
   @ApiProperty({ type: AdminApiUsageDTO }) data: AdminApiUsageDTO;
 }
+
+// ---- Onboarding result ------------------------------------------------------
+
+export class AdminOnboardResultDTO {
+  @ApiProperty({ type: AdminOrganisationDetailDTO }) organisation: AdminOrganisationDetailDTO;
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Cleartext of the issued API key — shown ONCE.' })
+  apiKey: string | null;
+}
+
+export class AdminOnboardResponse {
+  @ApiProperty({ type: AdminOnboardResultDTO }) data: AdminOnboardResultDTO;
+}

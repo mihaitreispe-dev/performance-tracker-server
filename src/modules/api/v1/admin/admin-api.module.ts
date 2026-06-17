@@ -5,6 +5,8 @@ import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-
 import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
+import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
+import { ModuleRepository } from 'src/repositories/module.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 
 import { AdminApiController } from './admin-api.controller';
@@ -25,6 +27,8 @@ export class AdminApiModule {
           OrganisationMembershipRepository,
           OrganisationApiKeyRepository,
           OrganisationApiUsageRepository,
+          ModuleRepository,
+          OrganisationThemeRepository,
         ],
         controllers: [AdminApiController],
       };

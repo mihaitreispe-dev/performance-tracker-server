@@ -1,5 +1,18 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 
 export class ImpersonateDto {
   @ApiProperty({ description: 'User id to impersonate.' })
@@ -70,4 +83,91 @@ export class IssueApiKeyBody {
   @IsBoolean()
   @IsOptional()
   isPublicClient?: boolean;
+}
+
+// ---- Onboarding -------------------------------------------------------------
+
+export class OnboardModuleDTO {
+  @ApiProperty({ description: 'Module key (e.g. workouts, courses).' })
+  @IsString()
+  key: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+}
+
+export class OnboardThemeDTO {
+  @ApiPropertyOptional({ type: Object, description: 'Light-mode theme tokens (token → value).' })
+  @IsObject()
+  @IsOptional()
+  themeTokens?: Record<string, string>;
+
+  @ApiPropertyOptional({ type: Object, description: 'Dark-mode theme tokens.' })
+  @IsObject()
+  @IsOptional()
+  themeTokensDark?: Record<string, string>;
+
+  @ApiPropertyOptional({ type: Object, description: 'Copy overrides (key → text).' })
+  @IsObject()
+  @IsOptional()
+  copyOverrides?: Record<string, string>;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  fontFamily?: string;
+}
+
+export class OnboardApiKeyDTO extends IssueApiKeyBody {}
+
+export class OnboardOrganisationBody {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(160)
+  name: string;
+
+  @ApiProperty({ description: 'URL-safe identifier; must be unique.' })
+  @IsString()
+  @MaxLength(80)
+  slug: string;
+
+  @ApiPropertyOptional({ enum: ['organisation', 'individual'] })
+  @IsIn(['organisation', 'individual'])
+  @IsOptional()
+  orgType?: 'organisation' | 'individual';
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  allowsSelfSignup?: boolean;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  usesExternalApp?: boolean;
+
+  @ApiPropertyOptional({ type: [OnboardModuleDTO] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OnboardModuleDTO)
+  @IsOptional()
+  modules?: OnboardModuleDTO[];
+
+  @ApiPropertyOptional({ type: OnboardThemeDTO })
+  @ValidateNested()
+  @Type(() => OnboardThemeDTO)
+  @IsOptional()
+  theme?: OnboardThemeDTO;
+
+  @ApiPropertyOptional({ description: 'Email of an existing user to set as OWNER.' })
+  @IsEmail()
+  @IsOptional()
+  ownerEmail?: string;
+
+  @ApiPropertyOptional({ type: OnboardApiKeyDTO, description: 'Issue a first API key during onboarding.' })
+  @ValidateNested()
+  @Type(() => OnboardApiKeyDTO)
+  @IsOptional()
+  apiKey?: OnboardApiKeyDTO;
 }
