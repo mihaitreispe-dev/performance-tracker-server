@@ -223,6 +223,19 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   ELEVENLABS_STT_MODEL?: string;
 
+  // ElevenLabs text-to-speech model for the dub. Defaults to
+  // 'eleven_multilingual_v2' (speaks the translated target languages).
+  @IsString()
+  @IsOptional()
+  ELEVENLABS_TTS_MODEL?: string;
+
+  // Fallback ElevenLabs voice id used to dub when a coach hasn't enrolled
+  // (and consented to) their own cloned voice. Absent → dub only runs for
+  // coaches who have a cloned voice on file.
+  @IsString()
+  @IsOptional()
+  ELEVENLABS_DEFAULT_VOICE_ID?: string;
+
   // Garmin Integration
 
   @IsString()

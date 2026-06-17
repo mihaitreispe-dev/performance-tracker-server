@@ -20,6 +20,7 @@ import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { AwsTranslateService } from 'src/modules/aws-translate/aws-translate.service';
 import { ElevenLabsSttService } from 'src/modules/elevenlabs/elevenlabs-stt.service';
+import { ElevenLabsTtsService } from 'src/modules/elevenlabs/elevenlabs-tts.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 
 import { buildVttFromText } from './vtt';
@@ -41,6 +42,7 @@ export class TranslationsService {
     @InjectKysely() private readonly db: Kysely<Database>,
     private readonly translate: AwsTranslateService,
     private readonly elevenLabsStt: ElevenLabsSttService,
+    private readonly elevenLabsTts: ElevenLabsTtsService,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
   ) {}
@@ -137,19 +139,26 @@ export class TranslationsService {
     reviewerUserId: string;
   }): Promise<ContentTranslation> {
     const row = await this.requireRow(opts.id);
-    if (opts.status === 'published') {
+    const publishing = opts.status === 'published';
+    if (publishing) {
       if (!row.translated_text?.trim()) {
         throw new BadRequestException('Cannot publish a translation with no text.');
       }
       await this.publishCaption(row);
     }
+    // Queue a cloned-voice dub on publish (regenerated on each re-publish
+    // so an edited translation gets fresh audio). The cron synthesises it
+    // — TTS of a paragraph is too slow to do inline. No-op when ElevenLabs
+    // TTS isn't configured.
+    const queueDub = publishing && this.elevenLabsTts.enabled;
     return this.db
       .updateTable('content_translations')
       .set({
         review_status: opts.status,
         reviewed_by: opts.reviewerUserId,
         reviewed_at: sql`now()`,
-        ...(opts.status === 'published' ? { published_at: sql`now()` } : {}),
+        ...(publishing ? { published_at: sql`now()` } : {}),
+        ...(queueDub ? { dub_provider: 'elevenlabs', dub_status: 'queued' as const } : {}),
         updated_at: sql`now()`,
       })
       .where('id', '=', row.id)
@@ -181,6 +190,135 @@ export class TranslationsService {
         this.logger.error(`ElevenLabs STT failed for ${t.target_type}/${t.target_id}: ${String(e)}`);
       }
     }
+  }
+
+  /**
+   * Cron entrypoint: render the cloned-voice dub for every published
+   * translation queued for it. Synthesises the approved text with the
+   * coach's voice (or the default), uploads the MP3, and stamps
+   * `dubbed_audio_s3_*` so the player can play translated narration.
+   */
+  async advanceDubJobs(): Promise<void> {
+    if (!this.elevenLabsTts.enabled) return;
+
+    const queued = await this.db
+      .selectFrom('content_translations')
+      .selectAll()
+      .where('dub_status', '=', 'queued')
+      .execute();
+
+    for (const row of queued) {
+      try {
+        await this.runDubForRow(row);
+      } catch (e) {
+        this.logger.error(`Dub failed for translation ${row.id}: ${String(e)}`);
+      }
+    }
+  }
+
+  private async runDubForRow(row: ContentTranslation): Promise<void> {
+    // Claim so a concurrent tick skips it.
+    const claimed = await this.db
+      .updateTable('content_translations')
+      .set({ dub_status: 'running', updated_at: sql`now()` })
+      .where('id', '=', row.id)
+      .where('dub_status', '=', 'queued')
+      .returningAll()
+      .executeTakeFirst();
+    if (!claimed) return;
+
+    const text = claimed.translated_text?.trim();
+    if (!text) {
+      await this.db
+        .updateTable('content_translations')
+        .set({ dub_status: 'failed', updated_at: sql`now()` })
+        .where('id', '=', row.id)
+        .execute();
+      return;
+    }
+
+    try {
+      const voiceId = await this.resolveDubVoiceId(claimed.target_type, claimed.target_id);
+      if (!voiceId) {
+        // No coach voice + no default configured — nothing to dub with.
+        await this.db
+          .updateTable('content_translations')
+          .set({ dub_status: 'failed', updated_at: sql`now()` })
+          .where('id', '=', row.id)
+          .execute();
+        return;
+      }
+      const mp3 = await this.elevenLabsTts.synthesize(text, voiceId);
+      const key = s3Keys.content.translation({
+        targetType: claimed.target_type,
+        targetId: claimed.target_id,
+        locale: claimed.locale,
+      }).dubbedAudio;
+      const bucket = this.configService.s3ContentBucket;
+      await this.s3Service.uploadFile({
+        bucket,
+        key,
+        data: mp3,
+        additionalParams: { ContentType: 'audio/mpeg' },
+      });
+      await this.db
+        .updateTable('content_translations')
+        .set({
+          dubbed_audio_s3_bucket: bucket,
+          dubbed_audio_s3_key: key,
+          dubbed_audio_mime_type: 'audio/mpeg',
+          dub_status: 'done',
+          updated_at: sql`now()`,
+        })
+        .where('id', '=', row.id)
+        .execute();
+    } catch (e) {
+      await this.db
+        .updateTable('content_translations')
+        .set({ dub_status: 'failed', updated_at: sql`now()` })
+        .where('id', '=', row.id)
+        .execute();
+      throw e;
+    }
+  }
+
+  /**
+   * Pick the voice to dub a target with: the owning coach's enrolled +
+   * consented cloned voice, else the configured default. Null when
+   * neither is available (the dub is skipped).
+   */
+  private async resolveDubVoiceId(
+    targetType: TranslationTargetType,
+    targetId: string,
+  ): Promise<string | null> {
+    const ownerId =
+      targetType === 'content_item'
+        ? (
+            await this.db
+              .selectFrom('content_items')
+              .select('owner_user_id')
+              .where('id', '=', targetId)
+              .executeTakeFirst()
+          )?.owner_user_id
+        : (
+            await this.db
+              .selectFrom('exercises')
+              .select('user_id')
+              .where('id', '=', targetId)
+              .executeTakeFirst()
+          )?.user_id;
+
+    if (ownerId) {
+      const owner = await this.db
+        .selectFrom('users')
+        .select(['elevenlabs_voice_id', 'voice_clone_consent_at'])
+        .where('id', '=', ownerId)
+        .executeTakeFirst();
+      if (owner?.elevenlabs_voice_id && owner.voice_clone_consent_at) {
+        return owner.elevenlabs_voice_id;
+      }
+    }
+    return this.configService.elevenLabsDefaultVoiceId ?? null;
   }
 
   private async runElevenLabsForTarget(

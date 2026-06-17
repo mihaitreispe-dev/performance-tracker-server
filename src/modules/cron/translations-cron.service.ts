@@ -23,4 +23,13 @@ export class TranslationsCronService {
       this.logger.error('Failed to advance translation transcription jobs', error as Error);
     }
   }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async syncDubJobs() {
+    try {
+      await this.translationsService.advanceDubJobs();
+    } catch (error) {
+      this.logger.error('Failed to advance translation dub jobs', error as Error);
+    }
+  }
 }

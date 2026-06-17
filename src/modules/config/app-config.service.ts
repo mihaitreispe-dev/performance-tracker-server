@@ -274,6 +274,16 @@ export class AppConfigService {
     return this.configService.get('ELEVENLABS_STT_MODEL') || 'scribe_v1';
   }
 
+  /** ElevenLabs TTS model for the dub — multilingual so it speaks any target language. */
+  get elevenLabsTtsModel(): string {
+    return this.configService.get('ELEVENLABS_TTS_MODEL') || 'eleven_multilingual_v2';
+  }
+
+  /** Fallback dub voice when a coach hasn't enrolled their own cloned voice. */
+  get elevenLabsDefaultVoiceId(): string | undefined {
+    return this.configService.get('ELEVENLABS_DEFAULT_VOICE_ID');
+  }
+
   /** How the local transcode fills the 16:9 frame: 'crop' or 'pad' (default). */
   get localTranscodeWideMode(): 'pad' | 'crop' {
     return this.configService.get('LOCAL_TRANSCODE_WIDE_MODE') === 'crop' ? 'crop' : 'pad';
