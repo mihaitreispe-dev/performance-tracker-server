@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Equals, IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 /**
  * Body for POST /v1/me/device-tokens. The token is the FCM registration
@@ -53,6 +53,41 @@ export class MeBillingPortalSessionBody {
   @IsString()
   @MaxLength(2000)
   returnUrl: string;
+}
+
+/**
+ * Body for POST /v1/me/voice-clone/upload-url — presign a PUT for the
+ * coach's voice-clone enrollment sample.
+ */
+export class VoiceCloneUploadUrlBody {
+  @ApiProperty({ description: 'Sample filename (e.g. sample.webm).' })
+  @IsString()
+  @MaxLength(200)
+  filename: string;
+
+  @ApiProperty({ description: 'Audio MIME type (audio/webm, audio/mpeg, audio/mp4, audio/wav).' })
+  @IsString()
+  mimeType: string;
+}
+
+/**
+ * Body for POST /v1/me/voice-clone — enroll the uploaded sample as a
+ * cloned voice. `consent` MUST be true: we will not clone a real
+ * person's voice without an explicit, recorded opt-in.
+ */
+export class EnrollVoiceCloneBody {
+  @ApiProperty({ description: 'S3 key returned by the upload-url call.' })
+  @IsString()
+  s3Key: string;
+
+  @ApiProperty({ description: 'Audio MIME type of the uploaded sample.' })
+  @IsString()
+  mimeType: string;
+
+  @ApiProperty({ description: 'Explicit consent to clone the coach\'s voice. Must be true.' })
+  @IsBoolean()
+  @Equals(true)
+  consent: boolean;
 }
 
 /**

@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Request } from 'express';
+
+import { s3Keys } from 'src/lib/util/s3-keys';
+import { ElevenLabsVoiceService } from 'src/modules/elevenlabs/elevenlabs-voice.service';
 
 import {
   ContentItemKind,
@@ -26,8 +29,15 @@ import {
   FeaturedItemKind,
   MyEntitlementsResponse,
   MyProductDTO,
+  VoiceCloneStatusResponse,
+  VoiceCloneUploadUrlResponse,
 } from './response.dto';
-import { ListFeaturedContentQuery, RegisterDeviceTokenBody } from './request.dto';
+import {
+  EnrollVoiceCloneBody,
+  ListFeaturedContentQuery,
+  RegisterDeviceTokenBody,
+  VoiceCloneUploadUrlBody,
+} from './request.dto';
 
 type AuthedReq = Request & { user: AuthUser; activeOrg?: ActiveOrgContext };
 
@@ -49,7 +59,94 @@ export class MeApiService {
     private readonly billingRepo: StripeBillingRepository,
     private readonly entitlementsRepo: ResourceEntitlementsRepository,
     private readonly publicBilling: PublicBillingService,
+    private readonly elevenLabsVoice: ElevenLabsVoiceService,
   ) {}
+
+  // -------- Voice-clone enrollment (cloned-voice dub) -----------------------
+
+  /** Presign a PUT for the coach's voice sample. */
+  async getVoiceCloneUploadUrl(
+    req: AuthedReq,
+    body: VoiceCloneUploadUrlBody,
+  ): Promise<VoiceCloneUploadUrlResponse> {
+    if (!this.elevenLabsVoice.enabled) {
+      throw new BadRequestException('Voice cloning is not available on this server.');
+    }
+    const key = s3Keys.upload.voiceSample({ userId: req.user.id, filename: body.filename }).audio;
+    const uploadUrl = await this.s3.getSignedUrlPUT({
+      bucket: this.s3.uploadBucket,
+      key,
+      contentType: body.mimeType,
+    });
+    return { data: { uploadUrl, s3Key: key } };
+  }
+
+  /**
+   * Clone the uploaded sample into an ElevenLabs voice and store it on
+   * the user with a consent timestamp. Replaces any prior voice. The
+   * `consent === true` invariant is enforced by the DTO.
+   */
+  async enrollVoiceClone(
+    req: AuthedReq,
+    body: EnrollVoiceCloneBody,
+  ): Promise<VoiceCloneStatusResponse> {
+    if (!this.elevenLabsVoice.enabled) {
+      throw new BadRequestException('Voice cloning is not available on this server.');
+    }
+    if (!body.s3Key.startsWith(`voice-samples/${req.user.id}/`)) {
+      throw new BadRequestException('Sample does not belong to the current user.');
+    }
+
+    const sample = await this.s3.getObject({ bucket: this.s3.uploadBucket, key: body.s3Key });
+    const user = await this.userRepo.findById(req.user.id);
+    if (!user) throw new NotFoundException('User not found.');
+
+    const voiceId = await this.elevenLabsVoice.cloneVoice({
+      name: `${user.display_name || 'Coach'} — ${req.user.id.slice(0, 8)}`,
+      audio: sample,
+      filename: body.s3Key.split('/').pop() || 'sample',
+      mimeType: body.mimeType,
+    });
+
+    // Replace any previous voice so we don't orphan clones at ElevenLabs.
+    if (user.elevenlabs_voice_id && user.elevenlabs_voice_id !== voiceId) {
+      await this.elevenLabsVoice.deleteVoice(user.elevenlabs_voice_id);
+    }
+
+    await this.userRepo.updateById(req.user.id, {
+      elevenlabs_voice_id: voiceId,
+      voice_clone_consent_at: new Date(),
+    });
+
+    // The sample has served its purpose — drop it.
+    await this.s3
+      .deleteObject({ bucket: this.s3.uploadBucket, key: body.s3Key })
+      .catch(() => undefined);
+
+    return this.getVoiceCloneStatus(req);
+  }
+
+  /** Whether the coach has a cloned voice + when they consented. */
+  async getVoiceCloneStatus(req: AuthedReq): Promise<VoiceCloneStatusResponse> {
+    const user = await this.userRepo.findById(req.user.id);
+    const consentAt = user?.voice_clone_consent_at
+      ? new Date(user.voice_clone_consent_at as unknown as string).toISOString()
+      : null;
+    return { data: { enrolled: !!user?.elevenlabs_voice_id, consentAt } };
+  }
+
+  /** Remove the cloned voice (deletes it at ElevenLabs + clears the pointer). */
+  async deleteVoiceClone(req: AuthedReq): Promise<VoiceCloneStatusResponse> {
+    const user = await this.userRepo.findById(req.user.id);
+    if (user?.elevenlabs_voice_id) {
+      await this.elevenLabsVoice.deleteVoice(user.elevenlabs_voice_id);
+    }
+    await this.userRepo.updateById(req.user.id, {
+      elevenlabs_voice_id: null,
+      voice_clone_consent_at: null,
+    });
+    return this.getVoiceCloneStatus(req);
+  }
 
   // --------------------------------------------------------------------------
   // Billing flow — delegates to PublicBillingService so /v1/me/* and

@@ -24,6 +24,14 @@ export const s3Keys = {
     workoutImport: ({ userId, filename }: { userId: string; filename: string }) => ({
       file: `workout-imports/${userId}/${filename}`,
     }),
+    /**
+     * Coach voice-clone enrollment sample. Short audio clip the coach
+     * records/uploads; the server forwards it to ElevenLabs to mint a
+     * cloned voice, then can discard it. Per-user prefix for cleanup.
+     */
+    voiceSample: ({ userId, filename }: { userId: string; filename: string }) => ({
+      audio: `voice-samples/${userId}/${filename}`,
+    }),
     contentItem: ({
       organisationId,
       contentItemId,

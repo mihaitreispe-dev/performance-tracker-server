@@ -21,15 +21,19 @@ import {
 
 import { MeApiService } from './me-api.service';
 import {
+  EnrollVoiceCloneBody,
   ListFeaturedContentQuery,
   MeBillingPortalSessionBody,
   MeCheckoutSessionBody,
   RegisterDeviceTokenBody,
+  VoiceCloneUploadUrlBody,
 } from './request.dto';
 import {
   DeviceTokenAckResponse,
   FeaturedContentResponse,
   MyEntitlementsResponse,
+  VoiceCloneStatusResponse,
+  VoiceCloneUploadUrlResponse,
 } from './response.dto';
 
 type AuthedReq = Request & { user: AuthUser; activeOrg?: ActiveOrgContext };
@@ -153,5 +157,41 @@ export class MeApiController {
   @ApiOkResponse({ type: PublicClientSubscriptionResponse })
   async getMySubscription(@Req() req: AuthedReq): Promise<PublicClientSubscriptionResponse> {
     return this.service.getMySubscription(req);
+  }
+
+  // -------- Voice-clone enrollment (cloned-voice dub) -----------------------
+
+  @Get('voice-clone')
+  @ApiOperation({ summary: 'Whether the coach has a cloned voice on file (+ consent timestamp).' })
+  @ApiOkResponse({ type: VoiceCloneStatusResponse })
+  async getVoiceCloneStatus(@Req() req: AuthedReq): Promise<VoiceCloneStatusResponse> {
+    return this.service.getVoiceCloneStatus(req);
+  }
+
+  @Post('voice-clone/upload-url')
+  @ApiOperation({ summary: 'Presign a PUT URL for the voice-clone enrollment sample.' })
+  @ApiCreatedResponse({ type: VoiceCloneUploadUrlResponse })
+  async getVoiceCloneUploadUrl(
+    @Req() req: AuthedReq,
+    @Body() body: VoiceCloneUploadUrlBody,
+  ): Promise<VoiceCloneUploadUrlResponse> {
+    return this.service.getVoiceCloneUploadUrl(req, body);
+  }
+
+  @Post('voice-clone')
+  @ApiOperation({ summary: 'Enroll the uploaded sample as a cloned voice (requires consent=true).' })
+  @ApiCreatedResponse({ type: VoiceCloneStatusResponse })
+  async enrollVoiceClone(
+    @Req() req: AuthedReq,
+    @Body() body: EnrollVoiceCloneBody,
+  ): Promise<VoiceCloneStatusResponse> {
+    return this.service.enrollVoiceClone(req, body);
+  }
+
+  @Delete('voice-clone')
+  @ApiOperation({ summary: 'Remove the cloned voice (deletes it at ElevenLabs + clears the pointer).' })
+  @ApiOkResponse({ type: VoiceCloneStatusResponse })
+  async deleteVoiceClone(@Req() req: AuthedReq): Promise<VoiceCloneStatusResponse> {
+    return this.service.deleteVoiceClone(req);
   }
 }

@@ -115,3 +115,31 @@ export class DeviceTokenAckResponse {
   @ApiProperty({ type: DeviceTokenAckDTO })
   data: DeviceTokenAckDTO;
 }
+
+// ----------------------------------------------------------------------------
+// Voice-clone enrollment (cloned-voice dub)
+// ----------------------------------------------------------------------------
+
+export class VoiceCloneUploadUrlDTO {
+  @ApiProperty({ description: 'Presigned S3 PUT URL for the voice sample.' })
+  uploadUrl: string;
+  @ApiProperty({ description: 'The S3 key to hand back to POST /me/voice-clone.' })
+  s3Key: string;
+}
+
+export class VoiceCloneUploadUrlResponse {
+  @ApiProperty({ type: VoiceCloneUploadUrlDTO })
+  data: VoiceCloneUploadUrlDTO;
+}
+
+export class VoiceCloneStatusDTO {
+  @ApiProperty({ description: "Whether the coach has a cloned voice on file." })
+  enrolled: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'When consent was given (ISO), if enrolled.' })
+  consentAt: string | null;
+}
+
+export class VoiceCloneStatusResponse {
+  @ApiProperty({ type: VoiceCloneStatusDTO })
+  data: VoiceCloneStatusDTO;
+}
