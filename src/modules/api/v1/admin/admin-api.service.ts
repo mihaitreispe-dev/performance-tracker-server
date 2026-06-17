@@ -1,6 +1,8 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Request } from 'express';
-import { Organisation, User, UserRole } from 'src/database/interfaces';
+import { Kysely, sql, type SqlBool } from 'kysely';
+import { InjectKysely } from 'nestjs-kysely';
+import { Database, Organisation, OrganisationRole, User, UserRole } from 'src/database/interfaces';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -11,17 +13,37 @@ import { UserRepository } from 'src/repositories/user.repository';
 import { authUserFromUser } from '../auth/auth-user.mapper';
 import { AuthSessionResponse } from '../auth/response.dto';
 import {
+  AdminActivityResponse,
+  AdminModuleStateDTO,
   AdminOrganisationDTO,
+  AdminOrganisationDetailResponse,
   AdminOrganisationListResponse,
+  AdminOverviewResponse,
   AdminUserDTO,
   AdminUserListResponse,
 } from './response.dto';
+
+/** Coerce a count/sum aggregate (Kysely returns string|bigint) to a number. */
+function num(v: unknown): number {
+  return Number(v ?? 0);
+}
+
+function toIso(v: unknown): string {
+  return v instanceof Date ? v.toISOString() : new Date(v as string).toISOString();
+}
+
+/** The latest of the given timestamps as ISO, or null if all are empty. */
+function maxIso(...vals: unknown[]): string | null {
+  const times = vals.filter(Boolean).map((v) => new Date(v as string).getTime());
+  return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
 
 @Injectable()
 export class AdminApiService {
   private readonly logger = new Logger(AdminApiService.name);
 
   constructor(
+    @InjectKysely() private readonly db: Kysely<Database>,
     private readonly userRepo: UserRepository,
     private readonly orgRepo: OrganisationRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
@@ -103,6 +125,160 @@ export class AdminApiService {
     this.logger.log(`admin ${req.user.id} impersonating ${targetUserId}`);
     return {
       data: { ...tokens, user: authUserFromUser(target) },
+    };
+  }
+
+  /** Top-line platform totals for the admin dashboard. */
+  async getOverview(): Promise<AdminOverviewResponse> {
+    const now = Date.now();
+    const d7 = new Date(now - 7 * 86_400_000);
+    const d30 = new Date(now - 30 * 86_400_000);
+
+    const [orgs, users, active7, active30, coaches, athletes, workouts, snacks, api] = await Promise.all([
+      this.db.selectFrom('organisations').select((eb) => eb.fn.countAll<string>().as('c')).executeTakeFirst(),
+      this.db.selectFrom('users').select((eb) => eb.fn.countAll<string>().as('c')).executeTakeFirst(),
+      this.db.selectFrom('users').select((eb) => eb.fn.countAll<string>().as('c')).where('last_sign_in_at', '>=', d7).executeTakeFirst(),
+      this.db.selectFrom('users').select((eb) => eb.fn.countAll<string>().as('c')).where('last_sign_in_at', '>=', d30).executeTakeFirst(),
+      this.db.selectFrom('organisation_memberships').select((eb) => eb.fn.count<string>('user_id').distinct().as('c')).where('role', '=', OrganisationRole.COACH).executeTakeFirst(),
+      this.db.selectFrom('organisation_memberships').select((eb) => eb.fn.count<string>('user_id').distinct().as('c')).where('role', '=', OrganisationRole.ATHLETE).executeTakeFirst(),
+      this.db.selectFrom('workout_executions').select((eb) => eb.fn.countAll<string>().as('c')).where('completed_at', 'is not', null).where('completed_at', '>=', d30).executeTakeFirst(),
+      this.db.selectFrom('snack_completions').select((eb) => eb.fn.countAll<string>().as('c')).where(sql<SqlBool>`completed_at >= ${d30.toISOString()}`).executeTakeFirst(),
+      this.db.selectFrom('organisation_api_usage_daily').select((eb) => eb.fn.sum<string>('request_count').as('s')).where('date', '>=', d30).executeTakeFirst(),
+    ]);
+
+    return {
+      data: {
+        organisations: num(orgs?.c),
+        users: num(users?.c),
+        activeUsers7d: num(active7?.c),
+        activeUsers30d: num(active30?.c),
+        coaches: num(coaches?.c),
+        athletes: num(athletes?.c),
+        workouts30d: num(workouts?.c),
+        snacks30d: num(snacks?.c),
+        apiRequests30d: num(api?.s),
+      },
+    };
+  }
+
+  /** Full detail for one org — roster by role, module state, key count, last activity. */
+  async getOrganisationDetail(id: string): Promise<AdminOrganisationDetailResponse> {
+    const org = await this.orgRepo.findById(id);
+    if (!org) throw new NotFoundException('Organisation not found');
+
+    const memberIds = (
+      await this.db.selectFrom('organisation_memberships').select('user_id').where('organisation_id', '=', id).execute()
+    ).map((r) => r.user_id);
+
+    const [roleRows, registry, settings, apiKeys, lastSnack, lastWorkout] = await Promise.all([
+      this.db
+        .selectFrom('organisation_memberships')
+        .select('role')
+        .select((eb) => eb.fn.countAll<string>().as('c'))
+        .where('organisation_id', '=', id)
+        .groupBy('role')
+        .execute(),
+      this.db.selectFrom('modules').select(['key', 'name', 'default_enabled']).orderBy('sort_order').execute(),
+      this.db.selectFrom('organisation_module_settings').select(['module_key', 'enabled']).where('organisation_id', '=', id).execute(),
+      this.db.selectFrom('organisation_api_keys').select((eb) => eb.fn.countAll<string>().as('c')).where('organisation_id', '=', id).where('revoked_at', 'is', null).executeTakeFirst(),
+      this.db.selectFrom('snack_completions').select((eb) => eb.fn.max('completed_at').as('m')).where('organisation_id', '=', id).executeTakeFirst(),
+      memberIds.length
+        ? this.db.selectFrom('workout_executions').select((eb) => eb.fn.max('completed_at').as('m')).where('user_id', 'in', memberIds).executeTakeFirst()
+        : Promise.resolve(undefined),
+    ]);
+
+    const roleCount = (r: OrganisationRole) => num(roleRows.find((x) => x.role === r)?.c);
+    const settingMap = new Map(settings.map((s) => [s.module_key, s.enabled]));
+    const modules: AdminModuleStateDTO[] = registry.map((m) => ({
+      key: m.key,
+      name: m.name,
+      enabled: settingMap.has(m.key) ? !!settingMap.get(m.key) : m.default_enabled,
+    }));
+    const owners = roleCount(OrganisationRole.OWNER);
+    const admins = roleCount(OrganisationRole.ADMIN);
+    const coaches = roleCount(OrganisationRole.COACH);
+    const athletes = roleCount(OrganisationRole.ATHLETE);
+
+    return {
+      data: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logoUrl: await this.signLogo(org),
+        orgType: String(org.org_type),
+        allowsSelfSignup: !!org.allows_self_signup,
+        usesExternalApp: !!org.uses_external_app,
+        roster: { owners, admins, coaches, athletes, total: owners + admins + coaches + athletes },
+        modules,
+        activeApiKeys: num(apiKeys?.c),
+        lastActiveAt: maxIso(lastSnack?.m, lastWorkout?.m),
+        createdAt: toIso(org.created_at),
+      },
+    };
+  }
+
+  /**
+   * Daily workout + snack activity for an org over a date range (default
+   * last 30 days), plus distinct active members + totals. Workouts are
+   * attributed via the org's member user ids; snacks carry the org id.
+   */
+  async getActivity(id: string, fromStr?: string, toStr?: string): Promise<AdminActivityResponse> {
+    const org = await this.orgRepo.findById(id);
+    if (!org) throw new NotFoundException('Organisation not found');
+
+    const to = toStr ? new Date(toStr) : new Date();
+    const from = fromStr ? new Date(fromStr) : new Date(to.getTime() - 30 * 86_400_000);
+
+    const memberIds = (
+      await this.db.selectFrom('organisation_memberships').select('user_id').where('organisation_id', '=', id).execute()
+    ).map((r) => r.user_id);
+
+    const day = sql<string>`to_char(date_trunc('day', completed_at), 'YYYY-MM-DD')`;
+
+    const [wRows, sRows, activeW, activeS] = await Promise.all([
+      memberIds.length
+        ? this.db
+            .selectFrom('workout_executions')
+            .select((eb) => [day.as('d'), eb.fn.countAll<string>().as('c')])
+            .where('user_id', 'in', memberIds)
+            .where('completed_at', '>=', from)
+            .where('completed_at', '<=', to)
+            .groupBy(day)
+            .execute()
+        : Promise.resolve([] as { d: string; c: string }[]),
+      this.db
+        .selectFrom('snack_completions')
+        .select((eb) => [day.as('d'), eb.fn.countAll<string>().as('c')])
+        .where('organisation_id', '=', id)
+        .where(sql<SqlBool>`completed_at >= ${from.toISOString()}`)
+        .where(sql<SqlBool>`completed_at <= ${to.toISOString()}`)
+        .groupBy(day)
+        .execute(),
+      memberIds.length
+        ? this.db.selectFrom('workout_executions').select('user_id').distinct().where('user_id', 'in', memberIds).where('completed_at', '>=', from).where('completed_at', '<=', to).execute()
+        : Promise.resolve([] as { user_id: string }[]),
+      this.db.selectFrom('snack_completions').select('user_id').distinct().where('organisation_id', '=', id).where(sql<SqlBool>`completed_at >= ${from.toISOString()}`).where(sql<SqlBool>`completed_at <= ${to.toISOString()}`).execute(),
+    ]);
+
+    const byDay = new Map<string, { workouts: number; snacks: number }>();
+    for (const r of wRows) byDay.set(r.d, { workouts: num(r.c), snacks: 0 });
+    for (const r of sRows) {
+      const e = byDay.get(r.d) ?? { workouts: 0, snacks: 0 };
+      e.snacks = num(r.c);
+      byDay.set(r.d, e);
+    }
+    const series = [...byDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, v]) => ({ date, workouts: v.workouts, snacks: v.snacks }));
+    const activeMembers = new Set([...activeW.map((r) => r.user_id), ...activeS.map((r) => r.user_id)]).size;
+
+    return {
+      data: {
+        series,
+        activeMembers,
+        totalWorkouts: series.reduce((s, p) => s + p.workouts, 0),
+        totalSnacks: series.reduce((s, p) => s + p.snacks, 0),
+      },
     };
   }
 

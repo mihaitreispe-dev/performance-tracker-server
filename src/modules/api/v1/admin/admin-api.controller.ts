@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { UserRole } from 'src/database/interfaces';
@@ -10,8 +10,14 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AuthSessionResponse } from '../auth/response.dto';
 import { AdminApiService } from './admin-api.service';
-import { AdminUserSearchQuery, ImpersonateDto } from './request.dto';
-import { AdminOrganisationListResponse, AdminUserListResponse } from './response.dto';
+import { AdminActivityQuery, AdminOrgIdParam, AdminUserSearchQuery, ImpersonateDto } from './request.dto';
+import {
+  AdminActivityResponse,
+  AdminOrganisationDetailResponse,
+  AdminOrganisationListResponse,
+  AdminOverviewResponse,
+  AdminUserListResponse,
+} from './response.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth('JWT')
@@ -32,6 +38,30 @@ export class AdminApiController {
     @Req() req: Request & { user: AuthUser },
   ): Promise<AdminOrganisationListResponse> {
     return this.service.listAllOrganisations(req);
+  }
+
+  @Get('overview')
+  @ApiOperation({ summary: 'Top-line platform totals (orgs, users, active users, coaches/athletes, workouts/snacks, API volume) for the admin dashboard.' })
+  @ApiOkResponse({ type: AdminOverviewResponse })
+  async getOverview(): Promise<AdminOverviewResponse> {
+    return this.service.getOverview();
+  }
+
+  @Get('organisations/:id')
+  @ApiOperation({ summary: 'One org in detail — roster by role, module state, active API key count, last activity.' })
+  @ApiOkResponse({ type: AdminOrganisationDetailResponse })
+  async getOrganisationDetail(@Param() params: AdminOrgIdParam): Promise<AdminOrganisationDetailResponse> {
+    return this.service.getOrganisationDetail(params.id);
+  }
+
+  @Get('organisations/:id/activity')
+  @ApiOperation({ summary: 'Daily workout + snack activity for an org over a date range, plus active members + totals.' })
+  @ApiOkResponse({ type: AdminActivityResponse })
+  async getActivity(
+    @Param() params: AdminOrgIdParam,
+    @Query() query: AdminActivityQuery,
+  ): Promise<AdminActivityResponse> {
+    return this.service.getActivity(params.id, query.from, query.to);
   }
 
   @Get('users')

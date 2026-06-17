@@ -16,3 +16,21 @@ export class AdminUserSearchQuery {
   @MaxLength(120)
   q?: string;
 }
+
+export class AdminOrgIdParam {
+  @ApiProperty({ description: 'Organisation id.' })
+  @IsUUID()
+  id: string;
+}
+
+export class AdminActivityQuery {
+  @ApiPropertyOptional({ description: 'Range start (ISO). Default: 30 days ago.' })
+  @IsString()
+  @IsOptional()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Range end (ISO). Default: now.' })
+  @IsString()
+  @IsOptional()
+  to?: string;
+}
