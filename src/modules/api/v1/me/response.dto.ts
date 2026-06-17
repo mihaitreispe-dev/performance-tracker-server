@@ -55,6 +55,32 @@ export class MyEntitlementsResponse {
 }
 
 // ----------------------------------------------------------------------------
+// Profile (read + edit the authed user's name)
+// ----------------------------------------------------------------------------
+
+export class MyProfileDTO {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty({ description: 'Name shown in app chrome.' })
+  displayName: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  firstName: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastName: string | null;
+}
+
+export class MyProfileResponse {
+  @ApiProperty({ type: MyProfileDTO })
+  data: MyProfileDTO;
+}
+
+// ----------------------------------------------------------------------------
 // Featured content
 // ----------------------------------------------------------------------------
 

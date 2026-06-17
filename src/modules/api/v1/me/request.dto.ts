@@ -91,6 +91,33 @@ export class EnrollVoiceCloneBody {
 }
 
 /**
+ * Body for PATCH /v1/me/profile. Lets the authed user rename themselves
+ * from a client settings screen. Every field is optional — the client
+ * sends only what changed. `displayName` is what the apps render in
+ * chrome (header, greetings); first/last are the structured split.
+ */
+export class UpdateMyProfileBody {
+  @ApiProperty({ required: false, description: 'Name shown in app chrome.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  firstName?: string;
+
+  @ApiProperty({ required: false, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  lastName?: string;
+}
+
+/**
  * Query for GET /v1/me/featured-content. Caller passes the resource
  * kinds it cares about — typically `workout,course,snack,plan` for a
  * home-screen carousel. Default: all kinds.

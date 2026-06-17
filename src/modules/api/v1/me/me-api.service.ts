@@ -12,6 +12,8 @@ import {
   CourseStatus,
   Database,
   EntitlementResourceType,
+  User,
+  UserUpdate,
   WorkoutVisibility,
 } from 'src/database/interfaces';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -29,6 +31,7 @@ import {
   FeaturedItemKind,
   MyEntitlementsResponse,
   MyProductDTO,
+  MyProfileResponse,
   VoiceCloneStatusResponse,
   VoiceCloneUploadUrlResponse,
 } from './response.dto';
@@ -36,6 +39,7 @@ import {
   EnrollVoiceCloneBody,
   ListFeaturedContentQuery,
   RegisterDeviceTokenBody,
+  UpdateMyProfileBody,
   VoiceCloneUploadUrlBody,
 } from './request.dto';
 
@@ -61,6 +65,44 @@ export class MeApiService {
     private readonly publicBilling: PublicBillingService,
     private readonly elevenLabsVoice: ElevenLabsVoiceService,
   ) {}
+
+  // -------- Profile (read + edit the authed user's name) --------------------
+
+  async getProfile(req: AuthedReq): Promise<MyProfileResponse> {
+    const user = await this.userRepo.findById(req.user.id);
+    if (!user) throw new NotFoundException('User not found');
+    return { data: this.mapProfile(user) };
+  }
+
+  async updateProfile(req: AuthedReq, body: UpdateMyProfileBody): Promise<MyProfileResponse> {
+    const update: UserUpdate = {};
+    if (body.displayName !== undefined) {
+      const trimmed = body.displayName.trim();
+      if (!trimmed) throw new BadRequestException('displayName cannot be empty');
+      update.display_name = trimmed;
+    }
+    if (body.firstName !== undefined) update.first_name = body.firstName.trim() || null;
+    if (body.lastName !== undefined) update.last_name = body.lastName.trim() || null;
+
+    if (Object.keys(update).length === 0) {
+      // Nothing to change — return the current record rather than issuing
+      // a no-op UPDATE (which would still bump updated_at).
+      return this.getProfile(req);
+    }
+
+    const user = await this.userRepo.updateById(req.user.id, update);
+    return { data: this.mapProfile(user) };
+  }
+
+  private mapProfile(user: User): MyProfileResponse['data'] {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name,
+      firstName: user.first_name,
+      lastName: user.last_name,
+    };
+  }
 
   // -------- Voice-clone enrollment (cloned-voice dub) -----------------------
 

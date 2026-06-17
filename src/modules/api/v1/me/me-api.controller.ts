@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -26,12 +26,14 @@ import {
   MeBillingPortalSessionBody,
   MeCheckoutSessionBody,
   RegisterDeviceTokenBody,
+  UpdateMyProfileBody,
   VoiceCloneUploadUrlBody,
 } from './request.dto';
 import {
   DeviceTokenAckResponse,
   FeaturedContentResponse,
   MyEntitlementsResponse,
+  MyProfileResponse,
   VoiceCloneStatusResponse,
   VoiceCloneUploadUrlResponse,
 } from './response.dto';
@@ -55,6 +57,25 @@ type AuthedReq = Request & { user: AuthUser; activeOrg?: ActiveOrgContext };
 @Controller('me')
 export class MeApiController {
   constructor(private readonly service: MeApiService) {}
+
+  // -------- Profile (read + edit the authed user's name) --------------------
+
+  @Get('profile')
+  @ApiOperation({ summary: 'The authed user’s profile (id, email, display name, first/last name).' })
+  @ApiOkResponse({ type: MyProfileResponse })
+  async getProfile(@Req() req: AuthedReq): Promise<MyProfileResponse> {
+    return this.service.getProfile(req);
+  }
+
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update the authed user’s name. Only the supplied fields change.' })
+  @ApiOkResponse({ type: MyProfileResponse })
+  async updateProfile(
+    @Req() req: AuthedReq,
+    @Body() body: UpdateMyProfileBody,
+  ): Promise<MyProfileResponse> {
+    return this.service.updateProfile(req, body);
+  }
 
   // -------- Entitlements ----------------------------------------------------
 

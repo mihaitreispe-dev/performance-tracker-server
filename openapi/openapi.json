@@ -20797,6 +20797,68 @@
         ]
       }
     },
+    "/v1/me/profile": {
+      "get": {
+        "operationId": "MeApiController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The authed user’s profile (id, email, display name, first/last name).",
+        "tags": [
+          "Me"
+        ]
+      },
+      "patch": {
+        "operationId": "MeApiController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyProfileBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update the authed user’s name. Only the supplied fields change.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
     "/v1/me/entitlements": {
       "get": {
         "operationId": "MeApiController_getEntitlements",
@@ -46169,6 +46231,62 @@
         "required": [
           "data"
         ]
+      },
+      "MyProfileDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Name shown in app chrome."
+          },
+          "firstName": {
+            "type": "object",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName"
+        ]
+      },
+      "MyProfileResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyProfileDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateMyProfileBody": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Name shown in app chrome."
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
       },
       "MyProductDTO": {
         "type": "object",
