@@ -223,6 +223,19 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   ELEVENLABS_API_KEY?: string;
 
+  // Which speech-to-text backend to use for the translation pipeline.
+  // Optional override; when unset the provider is inferred (ElevenLabs
+  // when ELEVENLABS_API_KEY is present, else AWS when ENABLE_AWS_TRANSCRIBE=Y).
+  @IsString()
+  @Matches('^aws|elevenlabs$', 'i')
+  @IsOptional()
+  TRANSCRIBE_PROVIDER?: string;
+
+  // ElevenLabs Scribe STT model id. Defaults to 'scribe_v1'.
+  @IsString()
+  @IsOptional()
+  ELEVENLABS_STT_MODEL?: string;
+
   // Garmin Integration
 
   @IsString()

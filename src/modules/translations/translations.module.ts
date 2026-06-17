@@ -3,6 +3,7 @@ import { DynamicModule, Module } from '@nestjs/common';
 import { AppConfigModule } from '../config/app-config.module';
 import { AwsTranscribeModule } from '../aws-transcribe/aws-transcribe.module';
 import { AwsTranslateModule } from '../aws-translate/aws-translate.module';
+import { ElevenLabsModule } from '../elevenlabs/elevenlabs.module';
 import { S3Module } from '../s3/s3.module';
 import { TranslationsService } from './translations.service';
 
@@ -28,6 +29,7 @@ export class TranslationsModule {
           AppConfigModule.register(),
           AwsTranslateModule,
           AwsTranscribeModule,
+          ElevenLabsModule,
           S3Module.register(),
         ],
         providers: [TranslationsService],

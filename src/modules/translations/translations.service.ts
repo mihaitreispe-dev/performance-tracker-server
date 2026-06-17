@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 
@@ -14,6 +20,7 @@ import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { AwsTranscribeService } from 'src/modules/aws-transcribe/aws-transcribe.service';
 import { AwsTranslateService } from 'src/modules/aws-translate/aws-translate.service';
+import { ElevenLabsSttService } from 'src/modules/elevenlabs/elevenlabs-stt.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 
 import { buildVttFromText } from './vtt';
@@ -49,6 +56,7 @@ export class TranslationsService {
     @InjectKysely() private readonly db: Kysely<Database>,
     private readonly translate: AwsTranslateService,
     private readonly transcribe: AwsTranscribeService,
+    private readonly elevenLabsStt: ElevenLabsSttService,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
   ) {}
@@ -172,22 +180,109 @@ export class TranslationsService {
    * shared transcript is fetched once.
    */
   async advanceTranscriptionJobs(): Promise<void> {
-    if (!this.transcribe.enabled) return;
-    const pending = await this.db
+    // AWS path — rows carry a real job handle; poll each to completion.
+    if (this.transcribe.enabled) {
+      const pending = await this.db
+        .selectFrom('content_translations')
+        .select(['transcribe_job_name'])
+        .where('transcribe_status', 'in', ['queued', 'running'])
+        .where('transcribe_job_name', 'is not', null)
+        .groupBy('transcribe_job_name')
+        .execute();
+
+      for (const { transcribe_job_name: jobName } of pending) {
+        if (!jobName) continue;
+        try {
+          await this.completeTranscriptionJob(jobName);
+        } catch (e) {
+          this.logger.error(`Transcribe poll failed for ${jobName}: ${String(e)}`);
+        }
+      }
+    }
+
+    // ElevenLabs path — rows queued without a job handle. Run Scribe
+    // synchronously here (background worker), one target at a time.
+    if (this.elevenLabsStt.enabled) {
+      await this.advanceElevenLabsTranscriptions();
+    }
+  }
+
+  /** ElevenLabs-backed transcription for rows queued without a job handle. */
+  private async advanceElevenLabsTranscriptions(): Promise<void> {
+    const targets = await this.db
       .selectFrom('content_translations')
-      .select(['transcribe_job_name'])
-      .where('transcribe_status', 'in', ['queued', 'running'])
-      .where('transcribe_job_name', 'is not', null)
-      .groupBy('transcribe_job_name')
+      .select(['target_type', 'target_id'])
+      .where('transcribe_status', '=', 'queued')
+      .where('transcribe_job_name', 'is', null)
+      .groupBy(['target_type', 'target_id'])
       .execute();
 
-    for (const { transcribe_job_name: jobName } of pending) {
-      if (!jobName) continue;
+    for (const t of targets) {
       try {
-        await this.completeTranscriptionJob(jobName);
+        await this.runElevenLabsForTarget(t.target_type, t.target_id);
       } catch (e) {
-        this.logger.error(`Transcribe poll failed for ${jobName}: ${String(e)}`);
+        this.logger.error(`ElevenLabs STT failed for ${t.target_type}/${t.target_id}: ${String(e)}`);
       }
+    }
+  }
+
+  private async runElevenLabsForTarget(
+    targetType: TranslationTargetType,
+    targetId: string,
+  ): Promise<void> {
+    // Claim the target's queued rows so a concurrent tick skips them.
+    const claimed = await this.db
+      .updateTable('content_translations')
+      .set({ transcribe_status: 'running', updated_at: sql`now()` })
+      .where('target_type', '=', targetType)
+      .where('target_id', '=', targetId)
+      .where('transcribe_status', '=', 'queued')
+      .where('transcribe_job_name', 'is', null)
+      .returningAll()
+      .execute();
+    if (claimed.length === 0) return; // another worker took it
+
+    try {
+      const source = await this.resolveSource(targetType, targetId);
+      if (!source.media) {
+        // Authored-text sources are never queued; defensive guard.
+        throw new Error('Queued transcription target has no media.');
+      }
+      const url = await this.s3Service.getSignedUrlGET({
+        bucket: source.media.bucket,
+        key: source.media.key,
+        expires: 3600,
+      });
+      const sourceLocale = claimed[0].source_locale ?? 'en';
+      const { text } = await this.elevenLabsStt.transcribe(url, sourceLocale);
+      const trimmed = (text ?? '').trim();
+
+      for (const row of claimed) {
+        const translated = trimmed
+          ? await this.safeTranslate(trimmed, row.locale, row.source_locale)
+          : '';
+        await this.db
+          .updateTable('content_translations')
+          .set({
+            source_text: trimmed,
+            translated_text: translated,
+            transcribe_status: 'done',
+            review_status: 'machine_translated',
+            updated_at: sql`now()`,
+          })
+          .where('id', '=', row.id)
+          .execute();
+      }
+    } catch (e) {
+      await this.db
+        .updateTable('content_translations')
+        .set({ transcribe_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
+        .where('target_type', '=', targetType)
+        .where('target_id', '=', targetId)
+        .where('transcribe_status', '=', 'running')
+        .where('transcribe_job_name', 'is', null)
+        .execute();
+      throw e;
     }
   }
 
@@ -265,19 +360,47 @@ export class TranslationsService {
     media: { bucket: string; key: string; mime: string | null };
   }): Promise<void> {
     const { targetType, targetId, sourceLocale, media } = opts;
-    const jobName = `tr-${targetId}-${Math.random().toString(36).slice(2, 8)}`;
-    const mediaLocale = TRANSCRIBE_LOCALE[sourceLocale] ?? sourceLocale;
-    await this.transcribe.startTranscription({
-      jobName,
-      mediaS3Uri: `s3://${media.bucket}/${media.key}`,
-      mediaLocale,
-      mediaFormat: AwsTranscribeService.mediaFormatForMime(media.mime),
-    });
+    const provider = this.configService.transcribeProvider;
+    if (provider === 'off') {
+      throw new ServiceUnavailableException(
+        'No speech-to-text provider is configured (set ELEVENLABS_API_KEY or ENABLE_AWS_TRANSCRIBE=Y).',
+      );
+    }
+
+    if (provider === 'aws') {
+      // AWS Transcribe is a real async job — start it now and store the
+      // handle; the cron polls it to completion.
+      const jobName = `tr-${targetId}-${Math.random().toString(36).slice(2, 8)}`;
+      const mediaLocale = TRANSCRIBE_LOCALE[sourceLocale] ?? sourceLocale;
+      await this.transcribe.startTranscription({
+        jobName,
+        mediaS3Uri: `s3://${media.bucket}/${media.key}`,
+        mediaLocale,
+        mediaFormat: AwsTranscribeService.mediaFormatForMime(media.mime),
+      });
+      await this.db
+        .updateTable('content_translations')
+        .set({
+          transcribe_job_name: jobName,
+          transcribe_status: 'running',
+          review_status: 'transcribing',
+          updated_at: sql`now()`,
+        })
+        .where('target_type', '=', targetType)
+        .where('target_id', '=', targetId)
+        .where('locale', 'in', opts.locales)
+        .execute();
+      return;
+    }
+
+    // ElevenLabs Scribe is a synchronous call — defer it to the cron so
+    // the request returns fast. Mark the rows queued (no job handle); the
+    // cron re-resolves the media, transcribes, and translates.
     await this.db
       .updateTable('content_translations')
       .set({
-        transcribe_job_name: jobName,
-        transcribe_status: 'running',
+        transcribe_job_name: null,
+        transcribe_status: 'queued',
         review_status: 'transcribing',
         updated_at: sql`now()`,
       })

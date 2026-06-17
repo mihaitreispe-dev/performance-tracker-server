@@ -270,11 +270,33 @@ export class AppConfigService {
   }
 
   /**
-   * ElevenLabs API key for the cloned-voice dub (Layer 2). Absent until
-   * the org provisions it; the dub step stays disabled while null.
+   * ElevenLabs API key for the cloned-voice dub (Layer 2) AND the Scribe
+   * speech-to-text model (Layer 1, when ElevenLabs is the STT provider).
+   * Absent until the org provisions it.
    */
   get elevenLabsApiKey(): string | undefined {
     return this.configService.get('ELEVENLABS_API_KEY');
+  }
+
+  /** ElevenLabs Scribe STT model id. */
+  get elevenLabsSttModel(): string {
+    return this.configService.get('ELEVENLABS_STT_MODEL') || 'scribe_v1';
+  }
+
+  /**
+   * The speech-to-text backend for the translation pipeline. An explicit
+   * TRANSCRIBE_PROVIDER wins; otherwise we infer — prefer ElevenLabs
+   * (one vendor with the dub) when its key is present, else AWS when
+   * Transcribe is enabled, else 'off' (no STT — only authored cue/script
+   * text can be translated).
+   */
+  get transcribeProvider(): 'aws' | 'elevenlabs' | 'off' {
+    const explicit = this.configService.get('TRANSCRIBE_PROVIDER')?.toLowerCase();
+    if (explicit === 'elevenlabs') return this.elevenLabsApiKey ? 'elevenlabs' : 'off';
+    if (explicit === 'aws') return this.enableAwsTranscribe ? 'aws' : 'off';
+    if (this.elevenLabsApiKey) return 'elevenlabs';
+    if (this.enableAwsTranscribe) return 'aws';
+    return 'off';
   }
 
   /** How the local transcode fills the 16:9 frame: 'crop' or 'pad' (default). */
