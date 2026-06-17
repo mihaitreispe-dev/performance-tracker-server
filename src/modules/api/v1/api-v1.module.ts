@@ -47,6 +47,7 @@ import { RaceCalendarApiModule } from './race-calendar/race-calendar-api.module'
 import { RacePredictionApiModule } from './race-prediction/race-prediction-api.module';
 import { RecoveryJournalModule } from './recovery-journal/recovery-journal.module';
 import { SleepApiModule } from './sleep/sleep-api.module';
+import { TranslationsApiModule } from './translations/translations-api.module';
 import { WearablesApiModule } from './wearables/wearables-api.module';
 import { WellnessModule } from './wellness/wellness.module';
 import { WorkoutExecutionsApiModule } from './workout-executions/workout-executions-api.module';
@@ -99,6 +100,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     NotificationRulesApiModule.register(),
     ContentItemsApiModule.register(),
     CoursesApiModule.register(),
+    TranslationsApiModule.register(),
     PublicApiModule.register(),
     StripeWebhookModule.register(),
   ],

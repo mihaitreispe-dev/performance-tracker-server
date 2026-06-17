@@ -205,6 +205,24 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   LOCAL_TRANSCODE_WIDE_MODE?: string;
 
+  // Content translation pipeline (voice-over + intro translation).
+  // AWS Translate (machine translation) + Transcribe (speech-to-text)
+  // are opt-in; off by default so the feature ships dark until an org
+  // turns it on. ElevenLabs key is for the later cloned-voice dub.
+  @IsString()
+  @Matches('^Y|N$', 'i')
+  @IsOptional()
+  ENABLE_AWS_TRANSLATE?: string;
+
+  @IsString()
+  @Matches('^Y|N$', 'i')
+  @IsOptional()
+  ENABLE_AWS_TRANSCRIBE?: string;
+
+  @IsString()
+  @IsOptional()
+  ELEVENLABS_API_KEY?: string;
+
   // Garmin Integration
 
   @IsString()

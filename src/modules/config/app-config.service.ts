@@ -249,6 +249,34 @@ export class AppConfigService {
     return this.configService.get('ENABLE_LOCAL_TRANSCODE') === 'Y';
   }
 
+  // Content translation pipeline
+
+  /**
+   * AWS Translate opt-in (machine translation of voice-over scripts +
+   * transcripts). Off by default — when off, the translate endpoints
+   * return 503. Uses the same AWS credentials as S3/MediaConvert.
+   */
+  get enableAwsTranslate(): boolean {
+    return this.configService.get('ENABLE_AWS_TRANSLATE') === 'Y';
+  }
+
+  /**
+   * AWS Transcribe opt-in (speech-to-text for recorded voice-overs +
+   * talking-head intros). Off by default. Writes its output to the
+   * content bucket and is polled by cron.
+   */
+  get enableAwsTranscribe(): boolean {
+    return this.configService.get('ENABLE_AWS_TRANSCRIBE') === 'Y';
+  }
+
+  /**
+   * ElevenLabs API key for the cloned-voice dub (Layer 2). Absent until
+   * the org provisions it; the dub step stays disabled while null.
+   */
+  get elevenLabsApiKey(): string | undefined {
+    return this.configService.get('ELEVENLABS_API_KEY');
+  }
+
   /** How the local transcode fills the 16:9 frame: 'crop' or 'pad' (default). */
   get localTranscodeWideMode(): 'pad' | 'crop' {
     return this.configService.get('LOCAL_TRANSCODE_WIDE_MODE') === 'crop' ? 'crop' : 'pad';

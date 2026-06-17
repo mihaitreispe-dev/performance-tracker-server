@@ -41,6 +41,8 @@ const makeUser = (overrides: Partial<User> = {}): User => ({
   created_at: new Date('2026-05-19T10:00:00Z') as never,
   updated_at: new Date('2026-05-19T10:00:00Z') as never,
   last_sign_in_at: null,
+  voice_clone_consent_at: null,
+  elevenlabs_voice_id: null,
   ...overrides,
 });
 

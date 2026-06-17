@@ -10,6 +10,7 @@ import { LocalTranscodeModule } from 'src/modules/local-transcode/local-transcod
 import { MediaConvertModule } from 'src/modules/mediaconvert/mediaconvert.module';
 import { OpenWearablesModule } from 'src/modules/openwearables/openwearables.module';
 import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
+import { TranslationsModule } from 'src/modules/translations/translations.module';
 import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.repository';
 import { AthleteRaceRepository } from 'src/repositories/athlete-race.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
@@ -32,6 +33,7 @@ import { CronService } from './cron.service';
 import { LoadModelingCronService } from './load-modeling-cron.service';
 import { PredictionCronService } from './prediction-cron.service';
 import { ScheduledPromptsCronService } from './scheduled-prompts-cron.service';
+import { TranslationsCronService } from './translations-cron.service';
 import { WeatherRefreshCronService } from './weather-refresh-cron.service';
 
 @Module({
@@ -47,6 +49,7 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     NotificationRulesModule.register(),
     AdvancedMetricsApiModule.register(),
     RacePredictionApiModule.register(),
+    TranslationsModule.register(),
   ],
   providers: [
     CronService,
@@ -55,6 +58,7 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     LoadModelingCronService,
     PredictionCronService,
     WeatherRefreshCronService,
+    TranslationsCronService,
     AthleteIntakeRepository,
     AthleteRaceRepository,
     CoachAthleteRelationshipRepository,

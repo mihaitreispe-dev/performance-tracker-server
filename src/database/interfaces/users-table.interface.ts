@@ -23,6 +23,11 @@ export interface UsersTable {
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
   last_sign_in_at: Timestamp | null;
+  // Cloned-voice dub (translation feature). Consent is an explicit,
+  // timestamped opt-in — the dub step won't clone a coach's voice
+  // without it. `elevenlabs_voice_id` is the cloned-voice handle.
+  voice_clone_consent_at: Timestamp | null;
+  elevenlabs_voice_id: string | null;
 }
 
 export type User = Selectable<UsersTable>;

@@ -92,6 +92,29 @@ export const s3Keys = {
         thumbnailSquare: `${square}/video_thumbnail.0000000.jpg`,
       };
     },
+    /**
+     * Per-(target, locale) translation outputs. Keyed by the same
+     * (target_type, target_id, locale) triple as the content_translations
+     * row so a row's outputs are derivable without extra columns:
+     *   translations/{targetType}/{targetId}/{locale}/captions.vtt
+     *   translations/{targetType}/{targetId}/{locale}/voiceover.mp3
+     */
+    translation: ({
+      targetType,
+      targetId,
+      locale,
+    }: {
+      targetType: string;
+      targetId: string;
+      locale: string;
+    }) => {
+      const base = `translations/${targetType}/${targetId}/${locale}`;
+      return {
+        base,
+        captionVtt: `${base}/captions.vtt`,
+        dubbedAudio: `${base}/voiceover.mp3`,
+      };
+    },
   },
   dataImportArchive: (userId: string, importType: string, filename: string) =>
     `data-imports/${userId}/${importType}/${Date.now()}_${filename}`,

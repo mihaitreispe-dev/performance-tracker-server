@@ -36,6 +36,7 @@ import { HrvBaselineDailyTable } from './hrv-baseline-daily-table.interface';
 import { IllnessLogsTable } from './illness-logs-table.interface';
 import { LoadModelParametersTable } from './load-model-parameters-table.interface';
 import { ContentItemsTable } from './content-items-table.interface';
+import { ContentTranslationsTable } from './content-translations-table.interface';
 import { InlineImagesTable } from './inline-images-table.interface';
 import { MembershipAuditLogTable } from './membership-audit-log-table.interface';
 import {
@@ -248,6 +249,9 @@ export interface Database {
 
   // Content layer (snacks, courses, exercise intros)
   content_items: ContentItemsTable;
+  // Multi-language translations of voice-overs + talking-head intros.
+  // One row per (target, locale). See migration 1774404200000.
+  content_translations: ContentTranslationsTable;
   // Inline images embedded in rich-text descriptions.
   inline_images: InlineImagesTable;
   // Append-only log of membership mutations for ops forensics.
