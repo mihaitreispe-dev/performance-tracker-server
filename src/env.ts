@@ -266,18 +266,6 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   OPENWEARABLES_API_KEY?: string;
 
-  // RunSignUp API (Race Calendar)
-
-  @IsString()
-  @IsOptional()
-  RUNSIGNUP_API_KEY?: string;
-
-  // ACTIVE Network API
-
-  @IsString()
-  @IsOptional()
-  ACTIVE_API_KEY?: string;
-
   // TrainingPeaks Integration
 
   @IsString()
@@ -291,18 +279,6 @@ export class Env extends BoostrapEnv {
   @IsString()
   @IsOptional()
   TRAININGPEAKS_REDIRECT_URI?: string;
-
-  // World Triathlon API
-
-  @IsString()
-  @IsOptional()
-  WORLD_TRIATHLON_API_KEY?: string;
-
-  // OpenTrack API
-
-  @IsString()
-  @IsOptional()
-  OPENTRACK_API_KEY?: string;
 
   // OpenWeather API (Race Weather Forecasts)
 

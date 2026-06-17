@@ -330,27 +330,4 @@ export class AppConfigService {
     return this.configService.get('OPENWEARABLES_API_KEY');
   }
 
-  // RunSignUp API (Race Calendar)
-
-  get runsignupApiKey(): string | undefined {
-    return this.configService.get('RUNSIGNUP_API_KEY');
-  }
-
-  // ACTIVE Network API
-
-  get activeApiKey(): string | undefined {
-    return this.configService.get('ACTIVE_API_KEY');
-  }
-
-  // World Triathlon API
-
-  get worldTriathlonApiKey(): string | undefined {
-    return this.configService.get('WORLD_TRIATHLON_API_KEY');
-  }
-
-  // OpenTrack API
-
-  get opentrackApiKey(): string | undefined {
-    return this.configService.get('OPENTRACK_API_KEY');
-  }
 }

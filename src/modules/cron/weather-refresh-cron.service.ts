@@ -65,13 +65,19 @@ export class WeatherRefreshCronService {
             continue;
           }
 
-          // Get race event for location
-          if (!athleteRace.race_event_id) {
-            continue; // No location data
+          // Resolve race location. The GPX-derived coordinates on the
+          // race itself take priority; legacy rows that still carry a
+          // race event fall back to the event's location.
+          let latitude = athleteRace.latitude;
+          let longitude = athleteRace.longitude;
+          if ((latitude == null || longitude == null) && athleteRace.race_event_id) {
+            const raceEvent = await this.raceEventRepository.findById(athleteRace.race_event_id);
+            if (raceEvent && raceEvent.latitude != null && raceEvent.longitude != null) {
+              latitude = Number.parseFloat(raceEvent.latitude.toString());
+              longitude = Number.parseFloat(raceEvent.longitude.toString());
+            }
           }
-
-          const raceEvent = await this.raceEventRepository.findById(athleteRace.race_event_id);
-          if (!raceEvent || !raceEvent.latitude || !raceEvent.longitude) {
+          if (latitude == null || longitude == null) {
             continue; // No location data
           }
 
@@ -91,8 +97,8 @@ export class WeatherRefreshCronService {
           const newForecast = await this.weatherForecastService.fetchForecast(
             plan.athlete_race_id,
             raceDate,
-            Number.parseFloat(raceEvent.latitude.toString()),
-            Number.parseFloat(raceEvent.longitude.toString()),
+            latitude,
+            longitude,
             undefined,
           );
 

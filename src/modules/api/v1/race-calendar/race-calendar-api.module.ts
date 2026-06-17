@@ -14,7 +14,6 @@ import { CourseAnalysisService } from '../race-prediction/services/course-analys
 import { CourseFileProcessorService } from '../race-prediction/services/course-file-processor.service';
 import { RunningPredictionService } from '../race-prediction/services/running-prediction.service';
 import { WorkoutFileParserService } from '../workout-file-imports/workout-file-parser.service';
-import { ActiveNetworkService, OpenTrackService, RunSignUpService, WorldTriathlonService } from './race-apis';
 import { RaceCalendarApiController } from './race-calendar-api.controller';
 import { RaceCalendarApiService } from './race-calendar-api.service';
 
@@ -42,10 +41,6 @@ export class RaceCalendarApiModule {
           AthleteProfileMetricsRepository,
           FitnessMetricsRepository,
           PersonalRecordRepository,
-          ActiveNetworkService,
-          RunSignUpService,
-          WorldTriathlonService,
-          OpenTrackService,
           CourseFileProcessorService,
           CourseAnalysisService,
           RunningPredictionService,

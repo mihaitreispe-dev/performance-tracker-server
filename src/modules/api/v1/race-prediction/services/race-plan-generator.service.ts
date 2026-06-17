@@ -88,21 +88,28 @@ export class RacePlanGeneratorService {
       segments = this.createFlatCourseSegments(distanceMeters, predictedTimeSeconds);
     }
 
-    // 4. Fetch/refresh weather forecast (if location available)
+    // 4. Fetch/refresh weather forecast (if location available). The
+    // GPX-derived coordinates on the race take priority; legacy rows that
+    // still carry a race event fall back to the event's location.
     let weatherForecast = null;
-    if (athleteRace.race_event_id) {
-      // Try to get location from race event
+    let latitude = athleteRace.latitude;
+    let longitude = athleteRace.longitude;
+    if ((latitude == null || longitude == null) && athleteRace.race_event_id) {
       const raceEvent = await this.raceEventRepository.findById(athleteRace.race_event_id);
-      if (raceEvent && raceEvent.latitude && raceEvent.longitude && athleteRace.manual_date) {
-        weatherForecast = await this.weatherForecastService.getOrRefreshForecast(
-          athleteRaceId,
-          new Date(athleteRace.manual_date),
-          Number.parseFloat(raceEvent.latitude.toString()),
-          Number.parseFloat(raceEvent.longitude.toString()),
-          undefined,
-          options.forceRefresh,
-        );
+      if (raceEvent && raceEvent.latitude != null && raceEvent.longitude != null) {
+        latitude = Number.parseFloat(raceEvent.latitude.toString());
+        longitude = Number.parseFloat(raceEvent.longitude.toString());
       }
+    }
+    if (latitude != null && longitude != null && athleteRace.manual_date) {
+      weatherForecast = await this.weatherForecastService.getOrRefreshForecast(
+        athleteRaceId,
+        new Date(athleteRace.manual_date),
+        latitude,
+        longitude,
+        undefined,
+        options.forceRefresh,
+      );
     }
 
     // 5. Apply weather adjustments to segment paces

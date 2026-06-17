@@ -17,6 +17,11 @@ export interface AthleteRacesTable {
   goal_time_seconds: number | null;
   priority: RacePriority | null;
   course_file_path: string | null;
+  // Start location, derived from the uploaded course file's first route
+  // point. Drives the race-day weather forecast now that external
+  // race-search providers (which used to supply lat/long) are gone.
+  latitude: number | null;
+  longitude: number | null;
   notes: string | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;

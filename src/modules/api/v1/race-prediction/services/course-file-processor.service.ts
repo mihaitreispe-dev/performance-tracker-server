@@ -55,11 +55,22 @@ export class CourseFileProcessorService {
     // Calculate elevation gain/loss
     const { gain, loss } = this.calculateElevationChanges(elevationPoints);
 
+    // Start coordinates from the first route point. These seed the
+    // race-day weather forecast (the external race-search providers that
+    // used to supply lat/long are gone). Guard against NaN/absent geo.
+    const start = parsed.routePoints[0];
+    const startLatitude =
+      start && typeof start.latitude === 'number' && !Number.isNaN(start.latitude) ? start.latitude : null;
+    const startLongitude =
+      start && typeof start.longitude === 'number' && !Number.isNaN(start.longitude) ? start.longitude : null;
+
     const profile: CourseProfile = {
       points: elevationPoints,
       totalDistanceMeters: totalDistance,
       totalElevationGain: gain,
       totalElevationLoss: loss,
+      startLatitude,
+      startLongitude,
     };
 
     // Validate the profile

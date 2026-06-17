@@ -20,17 +20,8 @@ import {
 import { CourseFileProcessorService } from '../race-prediction/services/course-file-processor.service';
 import { RunningPredictionService } from '../race-prediction/services/running-prediction.service';
 import {
-  ActiveNetworkService,
-  ExternalRaceEvent,
-  OpenTrackService,
-  RaceSearchParams,
-  RunSignUpService,
-  WorldTriathlonService,
-} from './race-apis';
-import {
   CreateAthleteRaceBody,
   GeneratePeriodizationQuery,
-  SearchRacesQuery,
   UpdateAthleteRaceBody,
   UpdatePeriodizationBody,
   UploadCourseBody,
@@ -55,10 +46,6 @@ export class RaceCalendarApiService {
     private readonly athleteRaceRepo: AthleteRaceRepository,
     private readonly periodizationPlanRepo: PeriodizationPlanRepository,
     private readonly racePredictionRepo: RacePredictionRepository,
-    private readonly activeNetworkService: ActiveNetworkService,
-    private readonly runSignUpService: RunSignUpService,
-    private readonly worldTriathlonService: WorldTriathlonService,
-    private readonly openTrackService: OpenTrackService,
     private readonly s3Service: S3Service,
     private readonly courseFileProcessorService: CourseFileProcessorService,
     private readonly courseAnalysisService: CourseAnalysisService,
@@ -66,166 +53,6 @@ export class RaceCalendarApiService {
     private readonly athleteProfileMetricsRepo: AthleteProfileMetricsRepository,
     private readonly fitnessMetricsRepo: FitnessMetricsRepository,
   ) {}
-
-  // ==========================================================================
-  // Race Event Search
-  // ==========================================================================
-
-  async searchRaces(query: SearchRacesQuery): Promise<RaceEventDTO[]> {
-    this.logger.log(`searchRaces called with query: ${JSON.stringify(query)}`);
-
-    // Build search params for external APIs
-    const searchParams: RaceSearchParams = {
-      eventType: query.event_type,
-      location: query.location,
-      latitude: query.latitude,
-      longitude: query.longitude,
-      radiusKm: query.radius_km,
-      startDate: query.start_date ? new Date(query.start_date) : undefined,
-      endDate: query.end_date ? new Date(query.end_date) : undefined,
-      page: query.page,
-      limit: query.limit,
-    };
-
-    // Search external APIs in parallel
-    const [activeResults, runSignUpResults, worldTriathlonResults, openTrackResults] = await Promise.all([
-      this.activeNetworkService.search(searchParams).catch((err) => {
-        this.logger.warn(`ACTIVE Network search failed: ${err}`);
-        return [] as ExternalRaceEvent[];
-      }),
-      this.runSignUpService.search(searchParams).catch((err) => {
-        this.logger.warn(`RunSignUp search failed: ${err}`);
-        return [] as ExternalRaceEvent[];
-      }),
-      this.worldTriathlonService.search(searchParams).catch((err) => {
-        this.logger.warn(`World Triathlon search failed: ${err}`);
-        return [] as ExternalRaceEvent[];
-      }),
-      this.openTrackService.search(searchParams).catch((err) => {
-        this.logger.warn(`OpenTrack search failed: ${err}`);
-        return [] as ExternalRaceEvent[];
-      }),
-    ]);
-
-    this.logger.log(
-      `External API results - ACTIVE: ${activeResults.length}, RunSignUp: ${runSignUpResults.length}, WorldTriathlon: ${worldTriathlonResults.length}, OpenTrack: ${openTrackResults.length}`,
-    );
-
-    // Combine and cache results
-    const externalEvents = [...activeResults, ...runSignUpResults, ...worldTriathlonResults, ...openTrackResults];
-    const cachedEvents: RaceEventDTO[] = [];
-
-    for (const event of externalEvents) {
-      try {
-        // Check if already cached
-        let dbEvent = await this.raceEventRepo.findByExternalId(event.externalId, event.source);
-
-        if (!dbEvent) {
-          // Cache the new event
-          dbEvent = await this.raceEventRepo.create({
-            external_id: event.externalId,
-            source: event.source,
-            name: event.name,
-            description: event.description,
-            event_type: event.eventType,
-            date: event.date,
-            location_city: event.locationCity,
-            location_country: event.locationCountry,
-            latitude: event.latitude,
-            longitude: event.longitude,
-            distance_meters: event.distanceMeters,
-            elevation_gain_meters: event.elevationGainMeters,
-            url: event.url,
-          });
-          this.logger.debug(`Cached new event: ${event.name} (${event.source})`);
-        }
-
-        cachedEvents.push(this.mapRaceEventToDTO(dbEvent));
-      } catch (err) {
-        this.logger.warn(`Failed to cache event ${event.externalId}: ${err}`);
-      }
-    }
-
-    // Also include any previously cached events from the database that match the query
-    const dbEvents = await this.raceEventRepo.findMany({
-      filter: {
-        eventType: query.event_type,
-        locationCity: query.location,
-        startDate: query.start_date ? new Date(query.start_date) : undefined,
-        endDate: query.end_date ? new Date(query.end_date) : undefined,
-      },
-      limit: query.limit,
-      offset: ((query.page ?? 1) - 1) * (query.limit ?? 20),
-    });
-
-    // Merge cached events with DB events, avoiding duplicates
-    const seenIds = new Set(cachedEvents.map((e) => e.id));
-    const mergedResults = [...cachedEvents];
-
-    for (const dbEvent of dbEvents) {
-      if (!seenIds.has(dbEvent.id)) {
-        mergedResults.push(this.mapRaceEventToDTO(dbEvent));
-        seenIds.add(dbEvent.id);
-      }
-    }
-
-    // Sort by date and apply limit
-    mergedResults.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const result = mergedResults.slice(0, query.limit ?? 20);
-
-    this.logger.log(`searchRaces returning ${result.length} events`);
-    return result;
-  }
-
-  async getRaceDetails(externalId: string, source: string): Promise<RaceEventDTO> {
-    // First check if we have it cached
-    let event = await this.raceEventRepo.findByExternalId(
-      externalId,
-      source as 'active' | 'runsignup' | 'worldtriathlon' | 'opentrack' | 'manual',
-    );
-
-    if (!event) {
-      // Try to fetch from external API
-      this.logger.log(`Race ${externalId} not cached, fetching from ${source}`);
-
-      let externalEvent: ExternalRaceEvent | null = null;
-
-      if (source === 'active') {
-        externalEvent = await this.activeNetworkService.getDetails(externalId);
-      } else if (source === 'runsignup') {
-        externalEvent = await this.runSignUpService.getDetails(externalId);
-      } else if (source === 'worldtriathlon') {
-        externalEvent = await this.worldTriathlonService.getDetails(externalId);
-      } else if (source === 'opentrack') {
-        externalEvent = await this.openTrackService.getDetails(externalId);
-      }
-
-      if (externalEvent) {
-        // Cache and return
-        event = await this.raceEventRepo.create({
-          external_id: externalEvent.externalId,
-          source: externalEvent.source,
-          name: externalEvent.name,
-          description: externalEvent.description,
-          event_type: externalEvent.eventType,
-          date: externalEvent.date,
-          location_city: externalEvent.locationCity,
-          location_country: externalEvent.locationCountry,
-          latitude: externalEvent.latitude,
-          longitude: externalEvent.longitude,
-          distance_meters: externalEvent.distanceMeters,
-          elevation_gain_meters: externalEvent.elevationGainMeters,
-          url: externalEvent.url,
-        });
-      }
-    }
-
-    if (!event) {
-      throw new NotFoundException('Race event not found');
-    }
-
-    return this.mapRaceEventToDTO(event);
-  }
 
   // ==========================================================================
   // Athlete Races
@@ -370,9 +197,12 @@ export class RaceCalendarApiService {
       }
     }
 
-    // Update athlete race with course file path
+    // Update athlete race with course file path + GPX-derived start
+    // location (seeds the race-day weather forecast).
     await this.athleteRaceRepo.updateById(raceId, {
       course_file_path: s3Key,
+      latitude: courseProfile.startLatitude,
+      longitude: courseProfile.startLongitude,
     });
 
     // Calculate course metrics
@@ -473,9 +303,11 @@ export class RaceCalendarApiService {
     // Supersede course-based prediction
     await this.racePredictionRepo.supersedePreviousPredictions(userId, raceId);
 
-    // Update race to remove course file path
+    // Update race to remove course file path + the location it supplied
     await this.athleteRaceRepo.updateById(raceId, {
       course_file_path: null,
+      latitude: null,
+      longitude: null,
     });
   }
 
@@ -488,6 +320,8 @@ export class RaceCalendarApiService {
       totalDistanceMeters: number;
       totalElevationGain: number;
       totalElevationLoss: number;
+      startLatitude: number | null;
+      startLongitude: number | null;
     },
     segmentDistanceMeters: number,
   ): Promise<CourseBasedPredictionDTO> {

@@ -142,6 +142,8 @@ export class AthleteRaceRepository {
       goal_time_seconds: row.goal_time_seconds as number | null,
       priority: row.priority as AthleteRace['priority'],
       course_file_path: row.course_file_path as string | null,
+      latitude: row.latitude as number | null,
+      longitude: row.longitude as number | null,
       notes: row.notes as string | null,
       created_at: row.created_at as Date,
       updated_at: row.updated_at as Date,

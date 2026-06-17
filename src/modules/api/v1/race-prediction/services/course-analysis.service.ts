@@ -27,6 +27,11 @@ export interface CourseProfile {
   totalDistanceMeters: number;
   totalElevationGain: number;
   totalElevationLoss: number;
+  // Start coordinates (first route point). Null when the source file has
+  // no geo data (e.g. a treadmill FIT). Used to seed the race-day weather
+  // forecast now that external race-search providers are gone.
+  startLatitude: number | null;
+  startLongitude: number | null;
 }
 
 export interface CourseSegmentPrediction {

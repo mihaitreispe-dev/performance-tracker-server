@@ -24,7 +24,6 @@ import { RaceCalendarApiService } from './race-calendar-api.service';
 import {
   CreateAthleteRaceBody,
   GeneratePeriodizationQuery,
-  SearchRacesQuery,
   UpdateAthleteRaceBody,
   UpdatePeriodizationBody,
   UploadCourseBody,
@@ -34,7 +33,6 @@ import {
   CourseBasedPredictionDTO,
   CourseUploadResponseDTO,
   PeriodizationPlanDTO,
-  RaceEventDTO,
 } from './response.dto';
 
 @ApiTags('Race Calendar')
@@ -43,29 +41,6 @@ import {
 @SkipActiveOrg()
 export class RaceCalendarApiController {
   constructor(private readonly service: RaceCalendarApiService) {}
-
-  // ==========================================================================
-  // Race Event Search
-  // ==========================================================================
-
-  @Version('1')
-  @Get('races/search')
-  @ApiOperation({ summary: 'Search for race events' })
-  @ApiResponse({ status: 200, type: [RaceEventDTO] })
-  async searchRaces(@Query() query: SearchRacesQuery): Promise<RaceEventDTO[]> {
-    return this.service.searchRaces(query);
-  }
-
-  @Version('1')
-  @Get('races/:externalId')
-  @ApiOperation({ summary: 'Get race event details' })
-  @ApiResponse({ status: 200, type: RaceEventDTO })
-  async getRaceDetails(
-    @Param('externalId') externalId: string,
-    @Query('source') source: string,
-  ): Promise<RaceEventDTO> {
-    return this.service.getRaceDetails(externalId, source);
-  }
 
   // ==========================================================================
   // Athlete Races
