@@ -25,6 +25,7 @@ import {
   AdminApiKeyListResponse,
   AdminApiUsageResponse,
   AdminIssuedApiKeyResponse,
+  AdminModuleListResponse,
   AdminOnboardResponse,
   AdminOrganisationDetailResponse,
   AdminOrganisationListResponse,
@@ -75,6 +76,13 @@ export class AdminApiController {
     @Query() query: AdminActivityQuery,
   ): Promise<AdminActivityResponse> {
     return this.service.getActivity(params.id, query.from, query.to);
+  }
+
+  @Get('modules')
+  @ApiOperation({ summary: 'Module registry (key + name + default-enabled) for the onboarding form.' })
+  @ApiOkResponse({ type: AdminModuleListResponse })
+  async listModules(): Promise<AdminModuleListResponse> {
+    return this.service.listModules();
   }
 
   @Post('organisations')

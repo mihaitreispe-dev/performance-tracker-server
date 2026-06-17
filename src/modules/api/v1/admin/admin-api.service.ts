@@ -367,6 +367,12 @@ export class AdminApiService {
     };
   }
 
+  /** The module registry (key + name + default-enabled) for the onboarding form. */
+  async listModules(): Promise<{ data: AdminModuleStateDTO[] }> {
+    const modules = await this.moduleRepo.listModules();
+    return { data: modules.map((m) => ({ key: m.key, name: m.name, enabled: m.default_enabled })) };
+  }
+
   // ---- API keys ------------------------------------------------------------
 
   async listApiKeys(orgId: string): Promise<AdminApiKeyListResponse> {

@@ -94,6 +94,11 @@ export class AdminModuleStateDTO {
   @ApiProperty() enabled: boolean;
 }
 
+export class AdminModuleListResponse {
+  @ApiProperty({ type: [AdminModuleStateDTO], description: 'Module registry; `enabled` = the default-enabled flag.' })
+  data: AdminModuleStateDTO[];
+}
+
 export class AdminOrganisationDetailDTO {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
