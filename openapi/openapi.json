@@ -635,6 +635,15 @@
             }
           },
           {
+            "name": "equipmentIds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated equipment ids; matches exercises linked to ANY of them.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -1224,6 +1233,103 @@
         ]
       }
     },
+    "/v1/exercises/{id}/voiceover/generate": {
+      "post": {
+        "operationId": "ExercisesApiController_generateVoiceover",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Exercise ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateExerciseVoiceoverBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExerciseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No script + no cues to read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Google TTS not enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Generate voice-over via Google Cloud TTS (admin only)",
+        "tags": [
+          "exercises"
+        ]
+      }
+    },
     "/v1/exercises/{id}/upload-completion": {
       "post": {
         "operationId": "ExercisesApiController_markUploadComplete",
@@ -1565,6 +1671,88 @@
         "summary": "Remove exercise from its chain (admin only)",
         "tags": [
           "exercises"
+        ]
+      }
+    },
+    "/v1/equipment": {
+      "get": {
+        "operationId": "EquipmentApiController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List all equipment (shared reference data)",
+        "tags": [
+          "equipment"
+        ]
+      },
+      "post": {
+        "operationId": "EquipmentApiController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEquipmentBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Create equipment (idempotent by name)",
+        "tags": [
+          "equipment"
         ]
       }
     },
@@ -7449,6 +7637,361 @@
           }
         ],
         "summary": "List every organisation on the platform with the caller's own membership role (null when they are dropping in as platform admin).",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminApiController_onboardOrganisation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardOrganisationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOnboardResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Onboard a new org with preconfigured settings (modules, theme, flags, optional owner + first API key).",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/overview": {
+      "get": {
+        "operationId": "AdminApiController_getOverview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Top-line platform totals (orgs, users, active users, coaches/athletes, workouts/snacks, API volume) for the admin dashboard.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/organisations/{id}": {
+      "get": {
+        "operationId": "AdminApiController_getOrganisationDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrganisationDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "One org in detail — roster by role, module state, active API key count, last activity.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/organisations/{id}/activity": {
+      "get": {
+        "operationId": "AdminApiController_getActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Range start (ISO). Default: 30 days ago.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Range end (ISO). Default: now.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminActivityResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Daily workout + snack activity for an org over a date range, plus active members + totals.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/modules": {
+      "get": {
+        "operationId": "AdminApiController_listModules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminModuleListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Module registry (key + name + default-enabled) for the onboarding form.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/organisations/{id}/api-keys": {
+      "get": {
+        "operationId": "AdminApiController_listApiKeys",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminApiKeyListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List an org's API keys (prefixes + metadata; never the secret).",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "post": {
+        "operationId": "AdminApiController_issueApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueApiKeyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminIssuedApiKeyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Issue a new API key for an org. Returns the cleartext key once.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/api-keys/{id}/revoke": {
+      "post": {
+        "operationId": "AdminApiController_revokeApiKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "API key id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminApiKeyDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Revoke an API key by id.",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/v1/admin/organisations/{id}/api-usage": {
+      "get": {
+        "operationId": "AdminApiController_getApiUsage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Organisation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Range start (ISO). Default: 30 days ago.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Range end (ISO). Default: now.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminApiUsageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Daily API request/error series + top endpoints for an org over a range.",
         "tags": [
           "Admin"
         ]
@@ -16464,170 +17007,6 @@
         ]
       }
     },
-    "/v1/races/search": {
-      "get": {
-        "operationId": "RaceCalendarApiController_searchRaces",
-        "parameters": [
-          {
-            "name": "event_type",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "run",
-                "cycle",
-                "triathlon",
-                "swim"
-              ]
-            }
-          },
-          {
-            "name": "location",
-            "required": false,
-            "in": "query",
-            "description": "Location to search near",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "latitude",
-            "required": false,
-            "in": "query",
-            "description": "Latitude for geo-search",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "longitude",
-            "required": false,
-            "in": "query",
-            "description": "Longitude for geo-search",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "radius_km",
-            "required": false,
-            "in": "query",
-            "description": "Search radius in km",
-            "schema": {
-              "default": 50,
-              "type": "number"
-            }
-          },
-          {
-            "name": "start_date",
-            "required": false,
-            "in": "query",
-            "description": "Start date (YYYY-MM-DD)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "end_date",
-            "required": false,
-            "in": "query",
-            "description": "End date (YYYY-MM-DD)",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "Page number",
-            "schema": {
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Results per page",
-            "schema": {
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/RaceEventDTO"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Search for race events",
-        "tags": [
-          "Race Calendar"
-        ]
-      }
-    },
-    "/v1/races/{externalId}": {
-      "get": {
-        "operationId": "RaceCalendarApiController_getRaceDetails",
-        "parameters": [
-          {
-            "name": "externalId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "source",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RaceEventDTO"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Get race event details",
-        "tags": [
-          "Race Calendar"
-        ]
-      }
-    },
     "/v1/users/{userId}/races": {
       "get": {
         "operationId": "RaceCalendarApiController_listAthleteRaces",
@@ -20418,6 +20797,403 @@
         ]
       }
     },
+    "/v1/me/entitlements": {
+      "get": {
+        "operationId": "MeApiController_getEntitlements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEntitlementsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aggregate roll-up of products this user owns + the per-kind list of resource ids those products unlock.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/featured-content": {
+      "get": {
+        "operationId": "MeApiController_listFeatured",
+        "parameters": [
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated kinds: workout,course,snack,plan. Default: all.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum rows per kind. Default 12, cap 50.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeaturedContentResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Featured workouts / courses / snacks / plans whose window covers NOW(). Each item is lock-stamped against the user.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/device-tokens": {
+      "post": {
+        "operationId": "MeApiController_registerDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceTokenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenAckResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Register an FCM device token for push delivery. Idempotent — repeated calls with the same token return the same ack.",
+        "tags": [
+          "Me"
+        ]
+      },
+      "delete": {
+        "operationId": "MeApiController_unregisterDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceTokenBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenAckResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Unregister an FCM device token (e.g. on sign-out from a device).",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/products": {
+      "get": {
+        "operationId": "MeApiController_listProducts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBillingProductListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Active products in the active org — subscribe-tab catalog.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/checkout-session": {
+      "post": {
+        "operationId": "MeApiController_createCheckoutSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeCheckoutSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCheckoutSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Start a Stripe Checkout Session for the authed user. Returns the hosted-checkout URL.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/billing-portal-session": {
+      "post": {
+        "operationId": "MeApiController_createBillingPortalSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeBillingPortalSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBillingPortalSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Open the Stripe Billing Portal for the authed user. Requires a prior checkout.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/subscription": {
+      "get": {
+        "operationId": "MeApiController_getMySubscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicClientSubscriptionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Current single-row subscription for the user. `data: null` when there's no Stripe customer yet.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/voice-clone": {
+      "get": {
+        "operationId": "MeApiController_getVoiceCloneStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCloneStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Whether the coach has a cloned voice on file (+ consent timestamp).",
+        "tags": [
+          "Me"
+        ]
+      },
+      "post": {
+        "operationId": "MeApiController_enrollVoiceClone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollVoiceCloneBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCloneStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enroll the uploaded sample as a cloned voice (requires consent=true).",
+        "tags": [
+          "Me"
+        ]
+      },
+      "delete": {
+        "operationId": "MeApiController_deleteVoiceClone",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCloneStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the cloned voice (deletes it at ElevenLabs + clears the pointer).",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
+    "/v1/me/voice-clone/upload-url": {
+      "post": {
+        "operationId": "MeApiController_getVoiceCloneUploadUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceCloneUploadUrlBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceCloneUploadUrlResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Presign a PUT URL for the voice-clone enrollment sample.",
+        "tags": [
+          "Me"
+        ]
+      }
+    },
     "/v1/organisations/{id}/modules/catalogue": {
       "get": {
         "operationId": "ModulesApiController_listCatalogue",
@@ -20635,6 +21411,186 @@
         "summary": "Clear a per-athlete override so the org default applies again",
         "tags": [
           "Modules"
+        ]
+      }
+    },
+    "/v1/notification-rules": {
+      "get": {
+        "operationId": "NotificationRulesApiController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRuleListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List notification rules for the active org",
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "post": {
+        "operationId": "NotificationRulesApiController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationRuleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRuleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a notification rule",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notification-rules/{id}": {
+      "patch": {
+        "operationId": "NotificationRulesApiController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationRuleBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRuleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update a notification rule",
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "delete": {
+        "operationId": "NotificationRulesApiController_delete",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a notification rule",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notification-rules/{id}/deliveries": {
+      "get": {
+        "operationId": "NotificationRulesApiController_listDeliveries",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationRuleDeliveriesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List recent deliveries for a rule — append-only audit log. Newest first, capped at 200.",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/v1/notification-rules/{id}/test": {
+      "post": {
+        "operationId": "NotificationRulesApiController_testSend",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDispatchResultResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fire a rule immediately for its current audience, bypassing the dedupe window. Useful for previewing copy.",
+        "tags": [
+          "Notifications"
         ]
       }
     },
@@ -20890,6 +21846,166 @@
           }
         ],
         "summary": "Mark the video upload as complete (verifies the S3 object exists, flips status to READY)",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/{id}/completions": {
+      "post": {
+        "operationId": "ContentItemsApiController_logCompletion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogSnackCompletionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Log a completed snack play. Idempotent on duplicate completions — re-watching counts as a separate play.",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/me/completions": {
+      "get": {
+        "operationId": "ContentItemsApiController_listMyCompletions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnackCompletionListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reverse-chronological list of the caller's completed snack plays, enriched with title + thumbnail.",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/{id}/schedules": {
+      "post": {
+        "operationId": "ContentItemsApiController_scheduleSnack",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleSnackBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnackScheduleResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Schedule a snack onto the caller’s calendar for a given date.",
+        "tags": [
+          "Content Items"
+        ]
+      }
+    },
+    "/v1/content-items/me/schedules": {
+      "get": {
+        "operationId": "ContentItemsApiController_listMySchedules",
+        "parameters": [
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive lower bound (YYYY-MM-DD)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive upper bound (YYYY-MM-DD)",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnackScheduleListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The caller's scheduled snacks, optionally date-windowed (dateFrom / dateTo) for the calendar.",
         "tags": [
           "Content Items"
         ]
@@ -21286,6 +22402,216 @@
         "summary": "Get the current user’s progress through this course",
         "tags": [
           "Courses"
+        ]
+      }
+    },
+    "/v1/translations": {
+      "post": {
+        "operationId": "TranslationsApiController_request",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestTranslationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Translation disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Request machine translation of a voice-over / intro into one or more languages",
+        "tags": [
+          "translations"
+        ]
+      },
+      "get": {
+        "operationId": "TranslationsApiController_list",
+        "parameters": [
+          {
+            "name": "targetType",
+            "required": true,
+            "in": "query",
+            "description": "What is being translated.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "exercise_voiceover",
+                "exercise_intro",
+                "content_item"
+              ]
+            }
+          },
+          {
+            "name": "targetId",
+            "required": true,
+            "in": "query",
+            "description": "Exercise id or content-item id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List translations for a target (exercise voice-over / intro / content item)",
+        "tags": [
+          "translations"
+        ]
+      }
+    },
+    "/v1/translations/{id}": {
+      "patch": {
+        "operationId": "TranslationsApiController_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "content_translations.id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditTranslationBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Edit the reviewed translated text (moves it to in_review)",
+        "tags": [
+          "translations"
+        ]
+      }
+    },
+    "/v1/translations/{id}/status": {
+      "post": {
+        "operationId": "TranslationsApiController_setStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "content_translations.id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReviewStatusBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "Set review status (in_review / approved / published). Publishing renders the caption track.",
+        "tags": [
+          "translations"
         ]
       }
     },
@@ -22099,7 +23425,7 @@
             "apiKey": []
           }
         ],
-        "summary": "Exchange a single-use authorization code for a session (access + refresh tokens) for the user.",
+        "summary": "Exchange a single-use authorization code for a session. Supports private-key (Bearer) and public-client (PKCE) callers.",
         "tags": [
           "Public"
         ]
@@ -22411,6 +23737,43 @@
           }
         ],
         "summary": "List a client's personal records across exercise types.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
+    "/v1/public/clients/{id}/pending-notifications": {
+      "get": {
+        "operationId": "PublicAthletesController_listPendingNotifications",
+        "parameters": [
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "ISO timestamp. Only return deliveries with sent_at > since. The integrator persists the most-recent sent_at it has seen and passes it on the next poll for a tight watermark.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPendingNotificationsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Integrator-poll endpoint. Returns notifications queued for the client with route='external_app'. Pass `since=<last-seen sentAt>` as the watermark on subsequent polls.",
         "tags": [
           "Public"
         ]
@@ -26385,6 +27748,37 @@
           "name"
         ]
       },
+      "ExerciseTranslationDTO": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "description": "'exercise_voiceover' | 'exercise_intro'"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "translatedText": {
+            "type": "string",
+            "nullable": true
+          },
+          "captionVttUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "dubbedAudioUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "targetType",
+          "locale",
+          "translatedText",
+          "captionVttUrl",
+          "dubbedAudioUrl"
+        ]
+      },
       "ExerciseDTO": {
         "type": "object",
         "properties": {
@@ -26509,6 +27903,12 @@
           "voiceoverScript": {
             "type": "string",
             "nullable": true
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExerciseTranslationDTO"
+            }
           },
           "createdAt": {
             "type": "string"
@@ -26802,6 +28202,15 @@
           "mimeType"
         ]
       },
+      "GenerateExerciseVoiceoverBody": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "Override script. Falls back to saved voiceover_script or joined cues when omitted."
+          }
+        }
+      },
       "ExerciseChainMemberDTO": {
         "type": "object",
         "properties": {
@@ -26877,6 +28286,32 @@
           "memberIds"
         ]
       },
+      "EquipmentListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateEquipmentBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Equipment name (idempotent — reuses an existing match)."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
       "CardioCategoryDTO": {
         "type": "object",
         "properties": {
@@ -26904,6 +28339,21 @@
           "name"
         ]
       },
+      "EquipmentInfoDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "ExerciseInfoDTO": {
         "type": "object",
         "properties": {
@@ -26915,6 +28365,12 @@
           },
           "picture": {
             "type": "string"
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EquipmentInfoDTO"
+            }
           }
         },
         "required": [
@@ -27184,6 +28640,23 @@
               "$ref": "#/components/schemas/WorkoutItemDTO"
             }
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True when this workout has at least one configured entitlement requirement AND the caller does not hold any product that unlocks it. False when the workout is free (no entitlements configured) OR the caller has already unlocked it. Computed server-side per-caller; authoring callers can ignore — it reflects the requester's own entitlements."
+          },
+          "previewPicture": {
+            "type": "string",
+            "nullable": true,
+            "description": "Best-effort representative picture for the workout — picked from the first exercise instance with a picture (walking groups too). Null when no exercise in the workout has a transcoded picture yet. Used by listing surfaces (Library / Featured / search) to give every workout card a visual without requiring authors to upload a separate cover."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -27199,6 +28672,7 @@
           "visibility",
           "userId",
           "items",
+          "locked",
           "createdAt",
           "updatedAt"
         ]
@@ -27670,6 +29144,14 @@
             "items": {
               "$ref": "#/components/schemas/WorkoutItemBody"
             }
+          },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -27724,6 +29206,10 @@
             "type": "string",
             "description": "Execution ID"
           },
+          "partial": {
+            "type": "boolean",
+            "description": "True when this execution ended early or skipped exercise(s). Lets calendar / history surfaces show a \"Partial\" marker without a second fetch against the execution row."
+          },
           "durationSeconds": {
             "type": "number",
             "description": "Duration in seconds"
@@ -27766,7 +29252,8 @@
           }
         },
         "required": [
-          "id"
+          "id",
+          "partial"
         ]
       },
       "WorkoutScheduleDTO": {
@@ -28213,7 +29700,11 @@
         "properties": {
           "workoutScheduleId": {
             "type": "string",
-            "description": "Workout schedule ID to start executing"
+            "description": "Workout schedule ID to start executing. Mutually exclusive with workoutId — pass one or the other."
+          },
+          "workoutId": {
+            "type": "string",
+            "description": "Workout ID for an ad-hoc execution. Server auto-creates a schedule for today and starts the execution against it. Mutually exclusive with workoutScheduleId."
           },
           "startedAt": {
             "type": "string",
@@ -28224,10 +29715,7 @@
             "type": "string",
             "description": "Optional notes"
           }
-        },
-        "required": [
-          "workoutScheduleId"
-        ]
+        }
       },
       "UpdateWorkoutExecutionBody": {
         "type": "object",
@@ -34071,6 +35559,615 @@
           "data"
         ]
       },
+      "AdminOverviewDTO": {
+        "type": "object",
+        "properties": {
+          "organisations": {
+            "type": "number"
+          },
+          "users": {
+            "type": "number"
+          },
+          "activeUsers7d": {
+            "type": "number",
+            "description": "Users with a sign-in in the last 7 days."
+          },
+          "activeUsers30d": {
+            "type": "number",
+            "description": "Users with a sign-in in the last 30 days."
+          },
+          "coaches": {
+            "type": "number"
+          },
+          "athletes": {
+            "type": "number"
+          },
+          "workouts30d": {
+            "type": "number",
+            "description": "Workout executions completed in the last 30 days."
+          },
+          "snacks30d": {
+            "type": "number",
+            "description": "Snack completions in the last 30 days."
+          },
+          "apiRequests30d": {
+            "type": "number",
+            "description": "API requests in the last 30 days (rolled-up daily counts)."
+          }
+        },
+        "required": [
+          "organisations",
+          "users",
+          "activeUsers7d",
+          "activeUsers30d",
+          "coaches",
+          "athletes",
+          "workouts30d",
+          "snacks30d",
+          "apiRequests30d"
+        ]
+      },
+      "AdminOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminOverviewDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminRosterDTO": {
+        "type": "object",
+        "properties": {
+          "owners": {
+            "type": "number"
+          },
+          "admins": {
+            "type": "number"
+          },
+          "coaches": {
+            "type": "number"
+          },
+          "athletes": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "owners",
+          "admins",
+          "coaches",
+          "athletes",
+          "total"
+        ]
+      },
+      "AdminModuleStateDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "enabled"
+        ]
+      },
+      "AdminOrganisationDetailDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "orgType": {
+            "type": "string"
+          },
+          "allowsSelfSignup": {
+            "type": "boolean"
+          },
+          "usesExternalApp": {
+            "type": "boolean"
+          },
+          "roster": {
+            "$ref": "#/components/schemas/AdminRosterDTO"
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminModuleStateDTO"
+            }
+          },
+          "activeApiKeys": {
+            "type": "number",
+            "description": "Count of non-revoked API keys."
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Most recent activity (workout/snack) across members."
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "orgType",
+          "allowsSelfSignup",
+          "usesExternalApp",
+          "roster",
+          "modules",
+          "activeApiKeys",
+          "createdAt"
+        ]
+      },
+      "AdminOrganisationDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminOrganisationDetailDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminActivityPointDTO": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "UTC calendar day (YYYY-MM-DD)."
+          },
+          "workouts": {
+            "type": "number"
+          },
+          "snacks": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "workouts",
+          "snacks"
+        ]
+      },
+      "AdminActivityDTO": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminActivityPointDTO"
+            }
+          },
+          "activeMembers": {
+            "type": "number",
+            "description": "Distinct members active (workout or snack) in the range."
+          },
+          "totalWorkouts": {
+            "type": "number"
+          },
+          "totalSnacks": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "series",
+          "activeMembers",
+          "totalWorkouts",
+          "totalSnacks"
+        ]
+      },
+      "AdminActivityResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminActivityDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminModuleListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "description": "Module registry; `enabled` = the default-enabled flag.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminModuleStateDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "OnboardModuleDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Module key (e.g. workouts, courses)."
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "enabled"
+        ]
+      },
+      "OnboardThemeDTO": {
+        "type": "object",
+        "properties": {
+          "themeTokens": {
+            "type": "object",
+            "description": "Light-mode theme tokens (token → value)."
+          },
+          "themeTokensDark": {
+            "type": "object",
+            "description": "Dark-mode theme tokens."
+          },
+          "copyOverrides": {
+            "type": "object",
+            "description": "Copy overrides (key → text)."
+          },
+          "fontFamily": {
+            "type": "string"
+          }
+        }
+      },
+      "OnboardApiKeyDTO": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human label for the key (\"Production\", \"Mobile app\")."
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "description": "Key band. Default \"live\"."
+          },
+          "scopes": {
+            "description": "Permission scopes for /v1/public/*.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "redirectUris": {
+            "description": "Allowed OAuth redirect URIs (public clients).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isPublicClient": {
+            "type": "boolean",
+            "description": "Public client (SPA/mobile) → PKCE instead of secret. Default false."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "OnboardOrganisationBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-safe identifier; must be unique."
+          },
+          "orgType": {
+            "type": "string",
+            "enum": [
+              "organisation",
+              "individual"
+            ]
+          },
+          "allowsSelfSignup": {
+            "type": "boolean"
+          },
+          "usesExternalApp": {
+            "type": "boolean"
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardModuleDTO"
+            }
+          },
+          "theme": {
+            "$ref": "#/components/schemas/OnboardThemeDTO"
+          },
+          "ownerEmail": {
+            "type": "string",
+            "description": "Email of an existing user to set as OWNER."
+          },
+          "apiKey": {
+            "description": "Issue a first API key during onboarding.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OnboardApiKeyDTO"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ]
+      },
+      "AdminOnboardResultDTO": {
+        "type": "object",
+        "properties": {
+          "organisation": {
+            "$ref": "#/components/schemas/AdminOrganisationDetailDTO"
+          },
+          "apiKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "Cleartext of the issued API key — shown ONCE."
+          }
+        },
+        "required": [
+          "organisation"
+        ]
+      },
+      "AdminOnboardResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminOnboardResultDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminApiKeyDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string",
+            "description": "Visible key prefix (e.g. sz_live_a1b2c3d4)."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isPublicClient": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "revokedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "keyPrefix",
+          "scopes",
+          "isPublicClient",
+          "createdAt"
+        ]
+      },
+      "AdminApiKeyListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminApiKeyDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "IssueApiKeyBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human label for the key (\"Production\", \"Mobile app\")."
+          },
+          "band": {
+            "type": "string",
+            "enum": [
+              "live",
+              "test"
+            ],
+            "description": "Key band. Default \"live\"."
+          },
+          "scopes": {
+            "description": "Permission scopes for /v1/public/*.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "redirectUris": {
+            "description": "Allowed OAuth redirect URIs (public clients).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isPublicClient": {
+            "type": "boolean",
+            "description": "Public client (SPA/mobile) → PKCE instead of secret. Default false."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "AdminIssuedApiKeyDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The full cleartext key — shown ONCE; store it now."
+          },
+          "apiKey": {
+            "$ref": "#/components/schemas/AdminApiKeyDTO"
+          }
+        },
+        "required": [
+          "key",
+          "apiKey"
+        ]
+      },
+      "AdminIssuedApiKeyResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminIssuedApiKeyDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AdminUsageDayDTO": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "number"
+          },
+          "errors": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "requests",
+          "errors"
+        ]
+      },
+      "AdminUsageEndpointDTO": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "number"
+          },
+          "errors": {
+            "type": "number"
+          },
+          "p95ResponseMs": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "endpoint",
+          "requests",
+          "errors"
+        ]
+      },
+      "AdminApiUsageDTO": {
+        "type": "object",
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUsageDayDTO"
+            }
+          },
+          "endpoints": {
+            "description": "Top endpoints by request volume.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUsageEndpointDTO"
+            }
+          },
+          "totalRequests": {
+            "type": "number"
+          },
+          "totalErrors": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "series",
+          "endpoints",
+          "totalRequests",
+          "totalErrors"
+        ]
+      },
+      "AdminApiUsageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminApiUsageDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "AdminUserDTO": {
         "type": "object",
         "properties": {
@@ -34375,6 +36472,14 @@
           "userId": {
             "type": "string"
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -34536,6 +36641,14 @@
           "userId": {
             "type": "string"
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -34692,6 +36805,14 @@
             "description": "Duration in weeks (1-52)",
             "minimum": 1,
             "maximum": 52
+          },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -42392,6 +44513,10 @@
             "type": "boolean",
             "description": "When true, the client-app subdomain shows a self-signup form for general-population clients."
           },
+          "usesExternalApp": {
+            "type": "boolean",
+            "description": "When true, the org has built (or licensed) their own white-label client app. Push notifications, checkout deep-links, and onboarding redirects target the org's own app instead of our first-party athlete app."
+          },
           "createdAt": {
             "type": "string"
           }
@@ -42402,6 +44527,7 @@
           "slug",
           "orgType",
           "allowsSelfSignup",
+          "usesExternalApp",
           "createdAt"
         ]
       },
@@ -42444,6 +44570,10 @@
             "type": "boolean",
             "description": "When true, the client-app subdomain shows a self-signup form for general-population clients."
           },
+          "usesExternalApp": {
+            "type": "boolean",
+            "description": "When true, the org has built (or licensed) their own white-label client app. Push notifications, checkout deep-links, and onboarding redirects target the org's own app instead of our first-party athlete app."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -42463,6 +44593,7 @@
           "slug",
           "orgType",
           "allowsSelfSignup",
+          "usesExternalApp",
           "createdAt",
           "myRole"
         ]
@@ -42559,6 +44690,9 @@
           },
           "allowsSelfSignup": {
             "type": "boolean"
+          },
+          "usesExternalApp": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -42566,7 +44700,8 @@
           "name",
           "slug",
           "orgType",
-          "allowsSelfSignup"
+          "allowsSelfSignup",
+          "usesExternalApp"
         ]
       },
       "PublicOrganisationResponse": {
@@ -42590,6 +44725,9 @@
             "type": "string"
           },
           "allowsSelfSignup": {
+            "type": "boolean"
+          },
+          "usesExternalApp": {
             "type": "boolean"
           }
         }
@@ -42805,6 +44943,13 @@
               "coach",
               "athlete"
             ]
+          },
+          "clientType": {
+            "type": "string",
+            "enum": [
+              "general",
+              "athlete"
+            ]
           }
         },
         "required": [
@@ -42978,6 +45123,10 @@
               "type": "string"
             }
           },
+          "isPublicClient": {
+            "type": "boolean",
+            "description": "True when this key is a public client (PKCE-only on /token, no bcrypt secret check, Origin gated against redirect URIs)."
+          },
           "lastUsedAt": {
             "type": "object",
             "nullable": true
@@ -43004,6 +45153,7 @@
           "keyPrefix",
           "scopes",
           "redirectUris",
+          "isPublicClient",
           "createdByUserId",
           "createdAt"
         ]
@@ -43063,7 +45213,12 @@
                 "cardio:read",
                 "cardio:write",
                 "billing:read",
-                "billing:write"
+                "billing:write",
+                "plans:read",
+                "me:read",
+                "entitlements:read",
+                "featured:read",
+                "notifications:write"
               ]
             }
           },
@@ -43077,6 +45232,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "isPublicClient": {
+            "type": "boolean",
+            "description": "Mark this key as a public client (browser SPA / mobile / native). Public keys skip the bcrypt secret check on /v1/public/auth/token and require PKCE instead. Default false — keeps the private integrator-backend flow."
           }
         },
         "required": [
@@ -43113,6 +45272,10 @@
               "type": "string"
             }
           },
+          "isPublicClient": {
+            "type": "boolean",
+            "description": "True when this key is a public client (PKCE-only on /token, no bcrypt secret check, Origin gated against redirect URIs)."
+          },
           "lastUsedAt": {
             "type": "object",
             "nullable": true
@@ -43143,6 +45306,7 @@
           "keyPrefix",
           "scopes",
           "redirectUris",
+          "isPublicClient",
           "createdByUserId",
           "createdAt",
           "fullKey"
@@ -44006,6 +46170,520 @@
           "data"
         ]
       },
+      "MyProductDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "active"
+        ]
+      },
+      "MyUnlockedResourcesDTO": {
+        "type": "object",
+        "properties": {
+          "workout": {
+            "description": "workout ids the user can play",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "course": {
+            "description": "course ids the user can play",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content_item": {
+            "description": "content_item ids (movement snacks + course lessons) the user can play",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "workout",
+          "course",
+          "content_item"
+        ]
+      },
+      "MyEntitlementsDTO": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyProductDTO"
+            }
+          },
+          "unlockedResources": {
+            "$ref": "#/components/schemas/MyUnlockedResourcesDTO"
+          }
+        },
+        "required": [
+          "products",
+          "unlockedResources"
+        ]
+      },
+      "MyEntitlementsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MyEntitlementsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "FeaturedItemDTO": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "workout",
+              "course",
+              "snack",
+              "plan"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "coverUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "featuredFrom": {
+            "type": "object",
+            "nullable": true,
+            "description": "ISO timestamp; null if open-ended."
+          },
+          "featuredUntil": {
+            "type": "object",
+            "nullable": true,
+            "description": "ISO timestamp; null if evergreen."
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True if the user cannot currently play this resource."
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "title",
+          "locked"
+        ]
+      },
+      "FeaturedContentResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeaturedItemDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "RegisterDeviceTokenBody": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "FCM registration token from Firebase Messaging."
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "ios",
+              "android"
+            ]
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "DeviceTokenAckDTO": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Tokens currently stored for the user after the op."
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "DeviceTokenAckResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DeviceTokenAckDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicBillingPriceDTO": {
+        "type": "object",
+        "properties": {
+          "stripePriceId": {
+            "type": "string",
+            "description": "Stripe price id — pass this to /checkout-session."
+          },
+          "nickname": {
+            "type": "object",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO-4217 currency code, lowercase."
+          },
+          "unitAmount": {
+            "type": "number",
+            "description": "Amount in the smallest currency unit (cents for USD)."
+          },
+          "interval": {
+            "type": "string",
+            "description": "'month' | 'year'."
+          },
+          "intervalCount": {
+            "type": "number"
+          },
+          "trialPeriodDays": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stripePriceId",
+          "currency",
+          "unitAmount",
+          "interval",
+          "intervalCount",
+          "active"
+        ]
+      },
+      "PublicBillingProductDTO": {
+        "type": "object",
+        "properties": {
+          "stripeProductId": {
+            "type": "string",
+            "description": "Stripe product id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "prices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicBillingPriceDTO"
+            }
+          }
+        },
+        "required": [
+          "stripeProductId",
+          "name",
+          "active",
+          "prices"
+        ]
+      },
+      "PublicBillingProductListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicBillingProductDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MeCheckoutSessionBody": {
+        "type": "object",
+        "properties": {
+          "priceId": {
+            "type": "string",
+            "description": "Stripe price id (price_...) for the plan the user is buying."
+          },
+          "successUrl": {
+            "type": "string",
+            "description": "Where to send the user after a successful checkout."
+          },
+          "cancelUrl": {
+            "type": "string",
+            "description": "Where to send the user if they cancel before paying."
+          },
+          "promotionCodeId": {
+            "type": "string",
+            "description": "Optional Stripe promotion code id."
+          }
+        },
+        "required": [
+          "priceId",
+          "successUrl",
+          "cancelUrl"
+        ]
+      },
+      "PublicCheckoutSessionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stripe Checkout Session id (cs_...)."
+          },
+          "url": {
+            "type": "string",
+            "description": "Hosted Checkout URL — redirect the customer's browser here."
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "PublicCheckoutSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicCheckoutSessionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MeBillingPortalSessionBody": {
+        "type": "object",
+        "properties": {
+          "returnUrl": {
+            "type": "string",
+            "description": "Where Stripe should return the user after they close the portal."
+          }
+        },
+        "required": [
+          "returnUrl"
+        ]
+      },
+      "PublicBillingPortalSessionDTO": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Hosted billing portal URL — redirect the customer here."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "PublicBillingPortalSessionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PublicBillingPortalSessionDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicClientSubscriptionDTO": {
+        "type": "object",
+        "properties": {
+          "stripeSubscriptionId": {
+            "type": "string"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Stripe subscription status: 'trialing'|'active'|'past_due'|'canceled'|..."
+          },
+          "currentPeriodStart": {
+            "type": "object",
+            "nullable": true
+          },
+          "currentPeriodEnd": {
+            "type": "object",
+            "nullable": true
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean"
+          },
+          "trialEnd": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "stripeSubscriptionId",
+          "stripePriceId",
+          "status",
+          "cancelAtPeriodEnd"
+        ]
+      },
+      "PublicClientSubscriptionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicClientSubscriptionDTO"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "VoiceCloneStatusDTO": {
+        "type": "object",
+        "properties": {
+          "enrolled": {
+            "type": "boolean",
+            "description": "Whether the coach has a cloned voice on file."
+          },
+          "consentAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When consent was given (ISO), if enrolled."
+          }
+        },
+        "required": [
+          "enrolled",
+          "consentAt"
+        ]
+      },
+      "VoiceCloneStatusResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/VoiceCloneStatusDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "VoiceCloneUploadUrlBody": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Sample filename (e.g. sample.webm)."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Audio MIME type (audio/webm, audio/mpeg, audio/mp4, audio/wav)."
+          }
+        },
+        "required": [
+          "filename",
+          "mimeType"
+        ]
+      },
+      "VoiceCloneUploadUrlDTO": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "description": "Presigned S3 PUT URL for the voice sample."
+          },
+          "s3Key": {
+            "type": "string",
+            "description": "The S3 key to hand back to POST /me/voice-clone."
+          }
+        },
+        "required": [
+          "uploadUrl",
+          "s3Key"
+        ]
+      },
+      "VoiceCloneUploadUrlResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/VoiceCloneUploadUrlDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnrollVoiceCloneBody": {
+        "type": "object",
+        "properties": {
+          "s3Key": {
+            "type": "string",
+            "description": "S3 key returned by the upload-url call."
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "Audio MIME type of the uploaded sample."
+          },
+          "consent": {
+            "type": "boolean",
+            "description": "Explicit consent to clone the coach's voice. Must be true."
+          }
+        },
+        "required": [
+          "s3Key",
+          "mimeType",
+          "consent"
+        ]
+      },
       "ModuleDTO": {
         "type": "object",
         "properties": {
@@ -44165,6 +46843,308 @@
           "enabled"
         ]
       },
+      "NotificationRuleDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "organisationId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "triggerType": {
+            "type": "string",
+            "enum": [
+              "recurring",
+              "on_action_completion",
+              "on_plan_adherence",
+              "on_daily_schedule"
+            ]
+          },
+          "cronExpression": {
+            "type": "object",
+            "nullable": true
+          },
+          "eventFilter": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "conditionParams": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "audienceFilter": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "clickAction": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organisationId",
+          "name",
+          "enabled",
+          "triggerType",
+          "eventFilter",
+          "conditionParams",
+          "audienceFilter",
+          "title",
+          "body",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "NotificationRuleListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationRuleDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AudienceFilterDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "all_athletes",
+              "general_pop",
+              "one_to_one",
+              "specific",
+              "coach"
+            ]
+          },
+          "userIds": {
+            "description": "Required when type=specific.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "coachId": {
+            "type": "string",
+            "description": "Required when type=coach — the coach user id."
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "CreateNotificationRuleBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "triggerType": {
+            "type": "string",
+            "enum": [
+              "recurring",
+              "on_action_completion",
+              "on_plan_adherence",
+              "on_daily_schedule"
+            ]
+          },
+          "cronExpression": {
+            "type": "string",
+            "description": "Standard 5-field cron expression. Required for recurring + daily-schedule."
+          },
+          "eventFilter": {
+            "type": "object",
+            "description": "Event-filter JSON (action-completion trigger)."
+          },
+          "conditionParams": {
+            "type": "object",
+            "description": "Condition params JSON (plan-adherence trigger)."
+          },
+          "audienceFilter": {
+            "$ref": "#/components/schemas/AudienceFilterDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "clickAction": {
+            "type": "string",
+            "description": "Optional deep-link to open on tap (e.g. /library)."
+          }
+        },
+        "required": [
+          "name",
+          "triggerType",
+          "audienceFilter",
+          "title",
+          "body"
+        ]
+      },
+      "NotificationRuleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationRuleDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateNotificationRuleBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "cronExpression": {
+            "type": "string"
+          },
+          "eventFilter": {
+            "type": "object"
+          },
+          "conditionParams": {
+            "type": "object"
+          },
+          "audienceFilter": {
+            "$ref": "#/components/schemas/AudienceFilterDto"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "clickAction": {
+            "type": "string"
+          }
+        }
+      },
+      "NotificationRuleDeliveryDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userDisplayName": {
+            "type": "string"
+          },
+          "userEmail": {
+            "type": "string"
+          },
+          "sentAt": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "fcm",
+              "external_app"
+            ]
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "ruleId",
+          "userId",
+          "userDisplayName",
+          "userEmail",
+          "sentAt",
+          "route",
+          "ok"
+        ]
+      },
+      "NotificationRuleDeliveriesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationRuleDeliveryDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "NotificationDispatchResultDTO": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "number"
+          },
+          "deduped": {
+            "type": "number"
+          },
+          "failed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "delivered",
+          "deduped",
+          "failed"
+        ]
+      },
+      "NotificationDispatchResultResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/NotificationDispatchResultDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "ContentItemDTO": {
         "type": "object",
         "properties": {
@@ -44225,6 +47205,18 @@
               "type": "string"
             }
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True when this resource has at least one configured entitlement requirement AND the caller does not hold any product that unlocks it. False when the resource is free (no entitlements configured) OR the caller has already unlocked it. Computed server-side per-caller; do not rely on this field for authoring callers since it reflects the requester's own entitlements."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -44239,6 +47231,7 @@
           "title",
           "status",
           "tags",
+          "locked",
           "createdAt",
           "updatedAt"
         ]
@@ -44365,6 +47358,18 @@
               "type": "string"
             }
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
+          "locked": {
+            "type": "boolean",
+            "description": "True when this resource has at least one configured entitlement requirement AND the caller does not hold any product that unlocks it. False when the resource is free (no entitlements configured) OR the caller has already unlocked it. Computed server-side per-caller; do not rely on this field for authoring callers since it reflects the requester's own entitlements."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -44389,6 +47394,7 @@
           "title",
           "status",
           "tags",
+          "locked",
           "createdAt",
           "updatedAt"
         ]
@@ -44430,8 +47436,143 @@
           },
           "durationSeconds": {
             "type": "number"
+          },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
           }
         }
+      },
+      "LogSnackCompletionBody": {
+        "type": "object",
+        "properties": {
+          "durationSeconds": {
+            "type": "number",
+            "description": "Seconds the user spent in the player before completion fired."
+          }
+        }
+      },
+      "SnackCompletionDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contentItemId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "contentItemId",
+          "title",
+          "completedAt"
+        ]
+      },
+      "SnackCompletionListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SnackCompletionDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ScheduleSnackBody": {
+        "type": "object",
+        "properties": {
+          "scheduledDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Date to schedule the snack (YYYY-MM-DD)"
+          }
+        },
+        "required": [
+          "scheduledDate"
+        ]
+      },
+      "SnackScheduleDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "contentItemId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledDate": {
+            "type": "string",
+            "format": "date",
+            "description": "YYYY-MM-DD"
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "contentItemId",
+          "title",
+          "scheduledDate"
+        ]
+      },
+      "SnackScheduleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SnackScheduleDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SnackScheduleListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SnackScheduleDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "CourseDTO": {
         "type": "object",
@@ -44467,6 +47608,14 @@
           },
           "lessonCount": {
             "type": "number"
+          },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
           },
           "createdAt": {
             "type": "string"
@@ -44557,6 +47706,14 @@
           "lessonCount": {
             "type": "number"
           },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string"
           },
@@ -44633,6 +47790,14 @@
               "published",
               "archived"
             ]
+          },
+          "featuredFrom": {
+            "type": "string",
+            "nullable": true
+          },
+          "featuredUntil": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -44718,6 +47883,169 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "RequestTranslationBody": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "exercise_voiceover",
+              "exercise_intro",
+              "content_item"
+            ],
+            "description": "What is being translated."
+          },
+          "targetId": {
+            "type": "string",
+            "description": "Exercise id or content-item id."
+          },
+          "locales": {
+            "description": "BCP-47 language subtags to translate into (e.g. [\"es\",\"fr\",\"de\"]).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceLocale": {
+            "type": "string",
+            "description": "Source language (default \"en\")."
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId",
+          "locales"
+        ]
+      },
+      "TranslationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "sourceLocale": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string"
+          },
+          "sourceText": {
+            "type": "string",
+            "nullable": true
+          },
+          "translatedText": {
+            "type": "string",
+            "nullable": true
+          },
+          "transcribeStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "dubStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "captionVttUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "dubbedAudioUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "locale",
+          "sourceLocale",
+          "reviewStatus",
+          "sourceText",
+          "translatedText",
+          "transcribeStatus",
+          "dubStatus",
+          "captionVttUrl",
+          "dubbedAudioUrl",
+          "reviewedAt",
+          "publishedAt",
+          "updatedAt"
+        ]
+      },
+      "TranslationListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranslationDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EditTranslationBody": {
+        "type": "object",
+        "properties": {
+          "translatedText": {
+            "type": "string",
+            "description": "The human-reviewed translated text."
+          }
+        },
+        "required": [
+          "translatedText"
+        ]
+      },
+      "TranslationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TranslationDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "SetReviewStatusBody": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_review",
+              "approved",
+              "published"
+            ],
+            "description": "New review status."
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "CreatePublicClientBody": {
@@ -45132,6 +48460,17 @@
           "state": {
             "type": "string",
             "description": "Opaque value echoed back to the relying party. CSRF defence."
+          },
+          "codeChallenge": {
+            "type": "string",
+            "description": "PKCE code challenge (RFC 7636) — base64url(SHA256(code_verifier)). Required for public-client keys."
+          },
+          "codeChallengeMethod": {
+            "type": "string",
+            "enum": [
+              "S256"
+            ],
+            "description": "PKCE challenge method. Only S256 is supported; plain is disallowed by policy."
           }
         },
         "required": [
@@ -45188,6 +48527,14 @@
           "redirectUri": {
             "type": "string",
             "description": "Must be byte-identical to the redirect_uri used to mint the code."
+          },
+          "codeVerifier": {
+            "type": "string",
+            "description": "PKCE code verifier (RFC 7636). Required when the code was minted with a code_challenge; required for all public-client keys."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Public-client identifier (the API key prefix or full key). Required for public-client keys, ignored otherwise — the Bearer header is the canonical auth for private keys."
           }
         },
         "required": [
@@ -45260,13 +48607,17 @@
           },
           "user": {
             "$ref": "#/components/schemas/PublicAuthUserDTO"
+          },
+          "organisationId": {
+            "type": "string"
           }
         },
         "required": [
           "accessToken",
           "refreshToken",
           "tokenType",
-          "user"
+          "user",
+          "organisationId"
         ]
       },
       "PublicAuthSessionResponse": {
@@ -45667,6 +49018,55 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PublicPersonalRecordDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PublicPendingNotificationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "Server-rendered title for the push notification."
+          },
+          "body": {
+            "type": "string",
+            "description": "Server-rendered body."
+          },
+          "clickAction": {
+            "type": "object",
+            "nullable": true,
+            "description": "Optional in-app deep link the integrator should open on tap."
+          },
+          "sentAt": {
+            "type": "string",
+            "description": "ISO timestamp the rule queued this delivery."
+          }
+        },
+        "required": [
+          "id",
+          "ruleId",
+          "title",
+          "body",
+          "sentAt"
+        ]
+      },
+      "PublicPendingNotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPendingNotificationDTO"
             }
           }
         },
@@ -46854,94 +50254,6 @@
           "data"
         ]
       },
-      "PublicBillingPriceDTO": {
-        "type": "object",
-        "properties": {
-          "stripePriceId": {
-            "type": "string",
-            "description": "Stripe price id — pass this to /checkout-session."
-          },
-          "nickname": {
-            "type": "object",
-            "nullable": true
-          },
-          "currency": {
-            "type": "string",
-            "description": "ISO-4217 currency code, lowercase."
-          },
-          "unitAmount": {
-            "type": "number",
-            "description": "Amount in the smallest currency unit (cents for USD)."
-          },
-          "interval": {
-            "type": "string",
-            "description": "'month' | 'year'."
-          },
-          "intervalCount": {
-            "type": "number"
-          },
-          "trialPeriodDays": {
-            "type": "object",
-            "nullable": true
-          },
-          "active": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "stripePriceId",
-          "currency",
-          "unitAmount",
-          "interval",
-          "intervalCount",
-          "active"
-        ]
-      },
-      "PublicBillingProductDTO": {
-        "type": "object",
-        "properties": {
-          "stripeProductId": {
-            "type": "string",
-            "description": "Stripe product id."
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "object",
-            "nullable": true
-          },
-          "active": {
-            "type": "boolean"
-          },
-          "prices": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicBillingPriceDTO"
-            }
-          }
-        },
-        "required": [
-          "stripeProductId",
-          "name",
-          "active",
-          "prices"
-        ]
-      },
-      "PublicBillingProductListResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PublicBillingProductDTO"
-            }
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
       "CreateCheckoutSessionBody": {
         "type": "object",
         "properties": {
@@ -46968,34 +50280,6 @@
           "cancelUrl"
         ]
       },
-      "PublicCheckoutSessionDTO": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Stripe Checkout Session id (cs_...)."
-          },
-          "url": {
-            "type": "string",
-            "description": "Hosted Checkout URL — redirect the customer's browser here."
-          }
-        },
-        "required": [
-          "id",
-          "url"
-        ]
-      },
-      "PublicCheckoutSessionResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/PublicCheckoutSessionDTO"
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
       "CreateBillingPortalSessionBody": {
         "type": "object",
         "properties": {
@@ -47006,82 +50290,6 @@
         },
         "required": [
           "returnUrl"
-        ]
-      },
-      "PublicBillingPortalSessionDTO": {
-        "type": "object",
-        "properties": {
-          "url": {
-            "type": "string",
-            "description": "Hosted billing portal URL — redirect the customer here."
-          }
-        },
-        "required": [
-          "url"
-        ]
-      },
-      "PublicBillingPortalSessionResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/PublicBillingPortalSessionDTO"
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "PublicClientSubscriptionDTO": {
-        "type": "object",
-        "properties": {
-          "stripeSubscriptionId": {
-            "type": "string"
-          },
-          "stripePriceId": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "description": "Stripe subscription status: 'trialing'|'active'|'past_due'|'canceled'|..."
-          },
-          "currentPeriodStart": {
-            "type": "object",
-            "nullable": true
-          },
-          "currentPeriodEnd": {
-            "type": "object",
-            "nullable": true
-          },
-          "cancelAtPeriodEnd": {
-            "type": "boolean"
-          },
-          "trialEnd": {
-            "type": "object",
-            "nullable": true
-          }
-        },
-        "required": [
-          "stripeSubscriptionId",
-          "stripePriceId",
-          "status",
-          "cancelAtPeriodEnd"
-        ]
-      },
-      "PublicClientSubscriptionResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PublicClientSubscriptionDTO"
-              }
-            ]
-          }
-        },
-        "required": [
-          "data"
         ]
       },
       "CreateScheduledPromptBody": {
