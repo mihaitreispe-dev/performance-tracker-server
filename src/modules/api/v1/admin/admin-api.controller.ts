@@ -10,9 +10,20 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 import { AuthSessionResponse } from '../auth/response.dto';
 import { AdminApiService } from './admin-api.service';
-import { AdminActivityQuery, AdminOrgIdParam, AdminUserSearchQuery, ImpersonateDto } from './request.dto';
+import {
+  AdminActivityQuery,
+  AdminApiKeyIdParam,
+  AdminOrgIdParam,
+  AdminUserSearchQuery,
+  ImpersonateDto,
+  IssueApiKeyBody,
+} from './request.dto';
 import {
   AdminActivityResponse,
+  AdminApiKeyDTO,
+  AdminApiKeyListResponse,
+  AdminApiUsageResponse,
+  AdminIssuedApiKeyResponse,
   AdminOrganisationDetailResponse,
   AdminOrganisationListResponse,
   AdminOverviewResponse,
@@ -62,6 +73,41 @@ export class AdminApiController {
     @Query() query: AdminActivityQuery,
   ): Promise<AdminActivityResponse> {
     return this.service.getActivity(params.id, query.from, query.to);
+  }
+
+  @Get('organisations/:id/api-keys')
+  @ApiOperation({ summary: "List an org's API keys (prefixes + metadata; never the secret)." })
+  @ApiOkResponse({ type: AdminApiKeyListResponse })
+  async listApiKeys(@Param() params: AdminOrgIdParam): Promise<AdminApiKeyListResponse> {
+    return this.service.listApiKeys(params.id);
+  }
+
+  @Post('organisations/:id/api-keys')
+  @ApiOperation({ summary: 'Issue a new API key for an org. Returns the cleartext key once.' })
+  @ApiOkResponse({ type: AdminIssuedApiKeyResponse })
+  async issueApiKey(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AdminOrgIdParam,
+    @Body() body: IssueApiKeyBody,
+  ): Promise<AdminIssuedApiKeyResponse> {
+    return this.service.issueApiKey(params.id, req.user.id, body);
+  }
+
+  @Post('api-keys/:id/revoke')
+  @ApiOperation({ summary: 'Revoke an API key by id.' })
+  @ApiOkResponse({ type: AdminApiKeyDTO })
+  async revokeApiKey(@Param() params: AdminApiKeyIdParam): Promise<AdminApiKeyDTO> {
+    return this.service.revokeApiKey(params.id);
+  }
+
+  @Get('organisations/:id/api-usage')
+  @ApiOperation({ summary: 'Daily API request/error series + top endpoints for an org over a range.' })
+  @ApiOkResponse({ type: AdminApiUsageResponse })
+  async getApiUsage(
+    @Param() params: AdminOrgIdParam,
+    @Query() query: AdminActivityQuery,
+  ): Promise<AdminApiUsageResponse> {
+    return this.service.getApiUsage(params.id, query.from, query.to);
   }
 
   @Get('users')

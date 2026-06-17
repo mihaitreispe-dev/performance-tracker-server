@@ -132,3 +132,56 @@ export class AdminActivityDTO {
 export class AdminActivityResponse {
   @ApiProperty({ type: AdminActivityDTO }) data: AdminActivityDTO;
 }
+
+// ---- API keys ---------------------------------------------------------------
+
+export class AdminApiKeyDTO {
+  @ApiProperty() id: string;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'Visible key prefix (e.g. sz_live_a1b2c3d4).' }) keyPrefix: string;
+  @ApiProperty({ type: [String] }) scopes: string[];
+  @ApiProperty() isPublicClient: boolean;
+  @ApiPropertyOptional({ type: String, nullable: true }) lastUsedAt: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) revokedAt: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) expiresAt: string | null;
+  @ApiProperty() createdAt: string;
+}
+
+export class AdminApiKeyListResponse {
+  @ApiProperty({ type: [AdminApiKeyDTO] }) data: AdminApiKeyDTO[];
+}
+
+export class AdminIssuedApiKeyDTO {
+  @ApiProperty({ description: 'The full cleartext key — shown ONCE; store it now.' }) key: string;
+  @ApiProperty({ type: AdminApiKeyDTO }) apiKey: AdminApiKeyDTO;
+}
+
+export class AdminIssuedApiKeyResponse {
+  @ApiProperty({ type: AdminIssuedApiKeyDTO }) data: AdminIssuedApiKeyDTO;
+}
+
+// ---- API usage --------------------------------------------------------------
+
+export class AdminUsageDayDTO {
+  @ApiProperty() date: string;
+  @ApiProperty() requests: number;
+  @ApiProperty() errors: number;
+}
+
+export class AdminUsageEndpointDTO {
+  @ApiProperty() endpoint: string;
+  @ApiProperty() requests: number;
+  @ApiProperty() errors: number;
+  @ApiPropertyOptional({ type: Number, nullable: true }) p95ResponseMs: number | null;
+}
+
+export class AdminApiUsageDTO {
+  @ApiProperty({ type: [AdminUsageDayDTO] }) series: AdminUsageDayDTO[];
+  @ApiProperty({ type: [AdminUsageEndpointDTO], description: 'Top endpoints by request volume.' }) endpoints: AdminUsageEndpointDTO[];
+  @ApiProperty() totalRequests: number;
+  @ApiProperty() totalErrors: number;
+}
+
+export class AdminApiUsageResponse {
+  @ApiProperty({ type: AdminApiUsageDTO }) data: AdminApiUsageDTO;
+}

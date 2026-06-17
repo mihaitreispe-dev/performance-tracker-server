@@ -1,6 +1,8 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { S3Module } from 'src/modules/s3/s3.module';
+import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
+import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -16,7 +18,14 @@ export class AdminApiModule {
       this.instance = {
         module: AdminApiModule,
         imports: [AuthModule.register(), S3Module.register()],
-        providers: [AdminApiService, UserRepository, OrganisationRepository, OrganisationMembershipRepository],
+        providers: [
+          AdminApiService,
+          UserRepository,
+          OrganisationRepository,
+          OrganisationMembershipRepository,
+          OrganisationApiKeyRepository,
+          OrganisationApiUsageRepository,
+        ],
         controllers: [AdminApiController],
       };
     }

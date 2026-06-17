@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class ImpersonateDto {
   @ApiProperty({ description: 'User id to impersonate.' })
@@ -33,4 +33,41 @@ export class AdminActivityQuery {
   @IsString()
   @IsOptional()
   to?: string;
+}
+
+export class AdminApiKeyIdParam {
+  @ApiProperty({ description: 'API key id.' })
+  @IsUUID()
+  id: string;
+}
+
+export class IssueApiKeyBody {
+  @ApiProperty({ description: 'Human label for the key ("Production", "Mobile app").' })
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @ApiPropertyOptional({ enum: ['live', 'test'], description: 'Key band. Default "live".' })
+  @IsIn(['live', 'test'])
+  @IsOptional()
+  band?: 'live' | 'test';
+
+  @ApiPropertyOptional({ type: [String], description: 'Permission scopes for /v1/public/*.' })
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(50)
+  @IsOptional()
+  scopes?: string[];
+
+  @ApiPropertyOptional({ type: [String], description: 'Allowed OAuth redirect URIs (public clients).' })
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(20)
+  @IsOptional()
+  redirectUris?: string[];
+
+  @ApiPropertyOptional({ description: 'Public client (SPA/mobile) → PKCE instead of secret. Default false.' })
+  @IsBoolean()
+  @IsOptional()
+  isPublicClient?: boolean;
 }

@@ -3,9 +3,12 @@ import { Request } from 'express';
 import { Kysely, sql, type SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Database, Organisation, OrganisationRole, User, UserRole } from 'src/database/interfaces';
+import { type ApiKeyBand, generateApiKey, hashApiKey } from 'src/modules/auth/api-key/api-key.util';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { OrganisationApiKeyRepository } from 'src/repositories/organisation-api-key.repository';
+import { OrganisationApiUsageRepository } from 'src/repositories/organisation-api-usage.repository';
 import { OrganisationRepository } from 'src/repositories/organisation.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -14,14 +17,20 @@ import { authUserFromUser } from '../auth/auth-user.mapper';
 import { AuthSessionResponse } from '../auth/response.dto';
 import {
   AdminActivityResponse,
+  AdminApiKeyDTO,
+  AdminApiKeyListResponse,
+  AdminApiUsageResponse,
+  AdminIssuedApiKeyResponse,
   AdminModuleStateDTO,
   AdminOrganisationDTO,
   AdminOrganisationDetailResponse,
   AdminOrganisationListResponse,
   AdminOverviewResponse,
+  AdminUsageEndpointDTO,
   AdminUserDTO,
   AdminUserListResponse,
 } from './response.dto';
+import { OrganisationApiKey } from 'src/database/interfaces';
 
 /** Coerce a count/sum aggregate (Kysely returns string|bigint) to a number. */
 function num(v: unknown): number {
@@ -47,6 +56,8 @@ export class AdminApiService {
     private readonly userRepo: UserRepository,
     private readonly orgRepo: OrganisationRepository,
     private readonly membershipRepo: OrganisationMembershipRepository,
+    private readonly apiKeyRepo: OrganisationApiKeyRepository,
+    private readonly apiUsageRepo: OrganisationApiUsageRepository,
     private readonly authService: AuthService,
     private readonly s3Service: S3Service,
   ) {}
@@ -280,6 +291,101 @@ export class AdminApiService {
         totalSnacks: series.reduce((s, p) => s + p.snacks, 0),
       },
     };
+  }
+
+  // ---- API keys ------------------------------------------------------------
+
+  async listApiKeys(orgId: string): Promise<AdminApiKeyListResponse> {
+    await this.requireOrg(orgId);
+    const keys = await this.apiKeyRepo.listByOrganisation(orgId);
+    return { data: keys.map((k) => this.mapApiKey(k)) };
+  }
+
+  /** Mint a key — returns the cleartext once; only the hash is stored. */
+  async issueApiKey(
+    orgId: string,
+    actorUserId: string,
+    body: { name: string; band?: ApiKeyBand; scopes?: string[]; redirectUris?: string[]; isPublicClient?: boolean },
+  ): Promise<AdminIssuedApiKeyResponse> {
+    await this.requireOrg(orgId);
+    const { fullKey, prefix } = generateApiKey(body.band ?? 'live');
+    const keyHash = await hashApiKey(fullKey);
+    const row = await this.apiKeyRepo.create({
+      organisation_id: orgId,
+      name: body.name,
+      key_prefix: prefix,
+      key_hash: keyHash,
+      scopes: body.scopes ?? [],
+      redirect_uris: body.redirectUris ?? [],
+      is_public_client: body.isPublicClient ?? false,
+      created_by_user_id: actorUserId,
+    });
+    return { data: { key: fullKey, apiKey: this.mapApiKey(row) } };
+  }
+
+  async revokeApiKey(keyId: string): Promise<AdminApiKeyDTO> {
+    const existing = await this.apiKeyRepo.findById(keyId);
+    if (!existing) throw new NotFoundException('API key not found');
+    const revoked = await this.apiKeyRepo.revoke(keyId);
+    return this.mapApiKey(revoked);
+  }
+
+  /** Daily request/error series + top endpoints for an org over a range. */
+  async getApiUsage(orgId: string, fromStr?: string, toStr?: string): Promise<AdminApiUsageResponse> {
+    await this.requireOrg(orgId);
+    const to = toStr ? new Date(toStr) : new Date();
+    const from = fromStr ? new Date(fromStr) : new Date(to.getTime() - 30 * 86_400_000);
+    const points = await this.apiUsageRepo.dailyForRange(orgId, from, to);
+
+    const byDay = new Map<string, { requests: number; errors: number }>();
+    const byEndpoint = new Map<string, { requests: number; errors: number; p95: number | null }>();
+    for (const p of points) {
+      const d = byDay.get(p.date) ?? { requests: 0, errors: 0 };
+      d.requests += p.requestCount;
+      d.errors += p.errorCount;
+      byDay.set(p.date, d);
+
+      const e = byEndpoint.get(p.endpoint) ?? { requests: 0, errors: 0, p95: null };
+      e.requests += p.requestCount;
+      e.errors += p.errorCount;
+      e.p95 = e.p95 == null ? p.p95ResponseMs : Math.max(e.p95, p.p95ResponseMs ?? 0);
+      byEndpoint.set(p.endpoint, e);
+    }
+    const series = [...byDay.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, v]) => ({ date, requests: v.requests, errors: v.errors }));
+    const endpoints: AdminUsageEndpointDTO[] = [...byEndpoint.entries()]
+      .map(([endpoint, v]) => ({ endpoint, requests: v.requests, errors: v.errors, p95ResponseMs: v.p95 }))
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 20);
+
+    return {
+      data: {
+        series,
+        endpoints,
+        totalRequests: series.reduce((s, p) => s + p.requests, 0),
+        totalErrors: series.reduce((s, p) => s + p.errors, 0),
+      },
+    };
+  }
+
+  private mapApiKey(k: OrganisationApiKey): AdminApiKeyDTO {
+    return {
+      id: k.id,
+      name: k.name,
+      keyPrefix: k.key_prefix,
+      scopes: k.scopes ?? [],
+      isPublicClient: !!k.is_public_client,
+      lastUsedAt: k.last_used_at ? toIso(k.last_used_at) : null,
+      revokedAt: k.revoked_at ? toIso(k.revoked_at) : null,
+      expiresAt: k.expires_at ? toIso(k.expires_at) : null,
+      createdAt: toIso(k.created_at),
+    };
+  }
+
+  private async requireOrg(id: string): Promise<void> {
+    const org = await this.orgRepo.findById(id);
+    if (!org) throw new NotFoundException('Organisation not found');
   }
 
   private async mapUserToDTO(u: User): Promise<AdminUserDTO> {
