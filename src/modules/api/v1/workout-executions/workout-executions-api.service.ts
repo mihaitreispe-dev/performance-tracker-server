@@ -463,6 +463,30 @@ export class WorkoutExecutionsApiService {
       schedule = await this.resolveAdHocSchedule(req.user.id, body.workoutId!);
     }
 
+    // Resume an in-progress (unfinished) execution for this schedule that
+    // was started TODAY, so re-opening the same workout the same day
+    // continues the session where the user left off rather than spawning
+    // a duplicate. A finished execution — or an unfinished one from a
+    // previous day — does NOT resume: the latter is treated as abandoned
+    // and a fresh execution starts. ("Done" is the only thing that
+    // completes a session.)
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [openToday] = await this.workoutExecutionRepository.findMany({
+      filter: {
+        userId: req.user.id,
+        workoutScheduleId: schedule.id,
+        completed: false,
+        dateFrom: todayStart,
+      },
+      sort: [{ field: 'started_at', direction: 'desc' }],
+      limit: 1,
+    });
+    if (openToday) {
+      const workout = await this.workoutRepository.findById(schedule.workout_id);
+      return { data: this.mapExecutionToDTO(openToday, workout) };
+    }
+
     const execution = await this.workoutExecutionRepository.create({
       user_id: req.user.id,
       workout_schedule_id: schedule.id,
@@ -515,11 +539,28 @@ export class WorkoutExecutionsApiService {
       }
     }
 
+    // Reuse today's unfinished ad-hoc schedule for this workout if one
+    // already exists, so starting the same workout twice in a day doesn't
+    // litter the calendar with duplicate entries (and so the same-day
+    // resume in start() has a stable schedule to hang off). A finished
+    // schedule, or one from a previous day, isn't reused — a fresh start
+    // after completion (or on a new day) gets its own entry.
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const [existing] = await this.workoutScheduleRepository.findMany({
+      organisationId: workout.organisation_id,
+      filter: { userId, workoutId: workout.id, completed: false, dateFrom: todayStart, dateTo: todayEnd },
+      sort: [{ field: 'created_at', direction: 'desc' }],
+      limit: 1,
+    });
+    if (existing) return existing;
+
     return this.workoutScheduleRepository.create({
       organisation_id: workout.organisation_id,
       user_id: userId,
       workout_id: workout.id,
-      scheduled_date: new Date(),
+      scheduled_date: now,
     });
   }
 
