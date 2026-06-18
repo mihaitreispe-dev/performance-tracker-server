@@ -5,9 +5,8 @@ import { AwsTranslateService } from './aws-translate.service';
 
 /**
  * @Global so the translations feature injects AwsTranslateService
- * without re-importing the module. Mirrors GoogleTtsModule's wiring —
- * AppConfigModule.register() reuses the single env-bound config
- * instance.
+ * without re-importing the module. AppConfigModule.register() reuses
+ * the single env-bound config instance.
  */
 @Global()
 @Module({

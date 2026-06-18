@@ -1233,103 +1233,6 @@
         ]
       }
     },
-    "/v1/exercises/{id}/voiceover/generate": {
-      "post": {
-        "operationId": "ExercisesApiController_generateVoiceover",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Exercise ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenerateExerciseVoiceoverBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExerciseResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "No script + no cues to read",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Google TTS not enabled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "JWT": []
-          }
-        ],
-        "summary": "Generate voice-over via Google Cloud TTS (admin only)",
-        "tags": [
-          "exercises"
-        ]
-      }
-    },
     "/v1/exercises/{id}/upload-completion": {
       "post": {
         "operationId": "ExercisesApiController_markUploadComplete",
@@ -28263,15 +28166,6 @@
         "required": [
           "mimeType"
         ]
-      },
-      "GenerateExerciseVoiceoverBody": {
-        "type": "object",
-        "properties": {
-          "script": {
-            "type": "string",
-            "description": "Override script. Falls back to saved voiceover_script or joined cues when omitted."
-          }
-        }
       },
       "ExerciseChainMemberDTO": {
         "type": "object",

@@ -83,7 +83,7 @@ export class TranslationsService {
     sourceLocale?: string;
   }): Promise<ContentTranslation[]> {
     const { targetType, targetId } = opts;
-    const sourceLocale = opts.sourceLocale ?? 'en';
+    const sourceLocale = opts.sourceLocale ?? 'ro';
     const locales = [...new Set(opts.locales.map((l) => l.trim()).filter(Boolean))].filter(
       (l) => l !== sourceLocale,
     );

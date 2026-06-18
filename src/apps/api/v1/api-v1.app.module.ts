@@ -12,7 +12,6 @@ import { ApiV1Module } from 'src/modules/api/v1/api-v1.module';
 import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { DatabaseModule } from 'src/modules/database/database.module';
-import { GoogleTtsModule } from 'src/modules/google-tts/google-tts.module';
 
 @Module({
   imports: [
@@ -21,10 +20,6 @@ import { GoogleTtsModule } from 'src/modules/google-tts/google-tts.module';
     MulterModule.register({
       dest: uploadsDir(),
     }),
-    // @Global TTS service so exercise voice-over (and future
-    // course/snack hooks) can inject GoogleTtsService without
-    // re-importing per feature module.
-    GoogleTtsModule,
     ApiV1Module,
   ],
 })

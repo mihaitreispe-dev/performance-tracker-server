@@ -36,7 +36,6 @@
     "@aws-sdk/cloudfront-signer": "^3.978.0",
     "@aws-sdk/lib-storage": "^3.980.0",
     "@aws-sdk/s3-request-presigner": "^3.980.0",
-    "@google-cloud/text-to-speech": "^6.0.1",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

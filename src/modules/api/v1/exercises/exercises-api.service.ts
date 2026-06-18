@@ -25,7 +25,6 @@ import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { LocalTranscodeService } from 'src/modules/local-transcode/local-transcode.service';
-import { GoogleTtsService } from 'src/modules/google-tts/google-tts.service';
 import { MediaConvertService } from 'src/modules/mediaconvert/mediaconvert.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
@@ -77,10 +76,6 @@ export class ExercisesApiService {
     private readonly vimeoService: VimeoService,
     private readonly smartCropService: SmartCropService,
     private readonly localTranscodeService: LocalTranscodeService,
-    // Google Cloud TTS — used by generateVoiceover. Lazy-imports
-    // the SDK on first call; throws 503 when ENABLE_GOOGLE_TTS is
-    // off. @Global in GoogleTtsModule so no per-module import.
-    private readonly googleTts: GoogleTtsService,
     // Content-translation reads — published voice-over / intro
     // translations are embedded in the single-exercise GET so the
     // player can pick captions / translated narration by locale.
@@ -520,78 +515,6 @@ export class ExercisesApiService {
     });
 
     return { data: { audio: uploadUrl } };
-  }
-
-  /**
-   * Server-side voice-over generation via Google Cloud TTS.
-   *
-   * Reads the override script from the body, or falls back to the
-   * exercise's `voiceover_script` (already authored), or finally to
-   * the exercise's `cues` joined with full stops. Whichever wins is
-   * also persisted to `voiceover_script` so reads stay consistent.
-   *
-   * The resulting MP3 is uploaded to the same per-exercise voice-
-   * over S3 slot as a recorded upload would use, so the player path
-   * is identical regardless of how the audio was authored. Mode stays
-   * `generated_from_cues` (not 'recorded') so the editor knows
-   * "this is regeneratable" — recorded mode means "the coach owns
-   * this file; don't overwrite it."
-   *
-   * Returns 503 when ENABLE_GOOGLE_TTS is off so the client knows
-   * to keep using the Web Speech fallback.
-   */
-  async generateVoiceover(
-    req: AuthedRequest,
-    params: ExerciseIdParam,
-    body: { script?: string | null },
-  ): Promise<ExerciseResponse> {
-    this.requireWriteRole(req);
-    const organisationId = assertActiveOrg(req);
-    const existing = await this.loadEditable(params.id, organisationId);
-
-    // Resolve the script with the precedence: explicit body override
-    // → previously-saved script → joined cues. Reject when nothing's
-    // available rather than handing TTS an empty string.
-    const script =
-      (body.script && body.script.trim()) ||
-      (existing.voiceover_script && existing.voiceover_script.trim()) ||
-      (existing.cues?.length ? existing.cues.join('. ') : '');
-    if (!script) {
-      throw new BadRequestException(
-        'Cannot generate voice-over: no script in body, no saved voiceover_script, and no cues. Add at least one cue or pass a script.',
-      );
-    }
-
-    // Synthesise + upload + stamp pointer. The Google service throws
-    // ServiceUnavailableException when the feature isn't configured —
-    // let it propagate so the client gets a clear 503.
-    const mp3 = await this.googleTts.synthesizeMp3(script);
-
-    const filename = `${uuidv4()}.mp3`;
-    const s3Key = s3Keys.upload.exerciseVoiceover({
-      visitorId: existing.user_id,
-      exerciseId: existing.id,
-      filename,
-    }).audio;
-    await this.s3Service.uploadFile({
-      bucket: this.s3Service.uploadBucket,
-      key: s3Key,
-      data: mp3,
-      additionalParams: { ContentType: 'audio/mpeg' },
-    });
-
-    // Persist: the generated file's S3 pointer + mode stays
-    // generated_from_cues + script written back so the editor's
-    // textarea shows what was actually spoken.
-    const updated = await this.exerciseRepo.updateById(existing.id, {
-      voiceover_s3_bucket: this.s3Service.uploadBucket,
-      voiceover_s3_key: s3Key,
-      voiceover_mime_type: 'audio/mpeg',
-      voiceover_mode: ExerciseVoiceoverMode.GENERATED_FROM_CUES,
-      voiceover_script: script,
-    });
-
-    return { data: await this.mapExerciseToDTO(updated) };
   }
 
   async markUploadComplete(req: AuthedRequest, params: ExerciseIdParam): Promise<ExerciseResponse> {
