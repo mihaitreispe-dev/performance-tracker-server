@@ -4,6 +4,7 @@ import { Kysely, sql, type SqlBool } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { Database, Organisation, OrganisationRole, User, UserRole } from 'src/database/interfaces';
 import { type ApiKeyBand, generateApiKey, hashApiKey } from 'src/modules/auth/api-key/api-key.util';
+import { PUBLIC_CLIENT_DEFAULT_SCOPES } from 'src/modules/auth/api-key/api-key.scopes';
 import { AuthService } from 'src/modules/auth/services/auth.service';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 import { S3Service } from 'src/modules/s3/s3.service';
@@ -385,9 +386,24 @@ export class AdminApiService {
   async issueApiKey(
     orgId: string,
     actorUserId: string,
-    body: { name: string; band?: ApiKeyBand; scopes?: string[]; redirectUris?: string[]; isPublicClient?: boolean },
+    body: {
+      name: string;
+      band?: ApiKeyBand;
+      scopes?: string[];
+      redirectUris?: string[];
+      isPublicClient?: boolean;
+      preset?: 'public-client';
+    },
   ): Promise<AdminIssuedApiKeyResponse> {
     await this.requireOrg(orgId);
+    // The "public-client" preset provisions a white-label app key in one shot:
+    // it forces is_public_client and, when no explicit scopes are given, fills
+    // the standard consumer bundle — so the onboarder can't ship a client key
+    // that's missing auth:exchange or accidentally a confidential one.
+    const isPublicClientPreset = body.preset === 'public-client';
+    const scopes = body.scopes ?? (isPublicClientPreset ? [...PUBLIC_CLIENT_DEFAULT_SCOPES] : []);
+    const isPublicClient = isPublicClientPreset || (body.isPublicClient ?? false);
+
     const { fullKey, prefix } = generateApiKey(body.band ?? 'live');
     const keyHash = await hashApiKey(fullKey);
     const row = await this.apiKeyRepo.create({
@@ -395,9 +411,9 @@ export class AdminApiService {
       name: body.name,
       key_prefix: prefix,
       key_hash: keyHash,
-      scopes: body.scopes ?? [],
+      scopes,
       redirect_uris: body.redirectUris ?? [],
-      is_public_client: body.isPublicClient ?? false,
+      is_public_client: isPublicClient,
       created_by_user_id: actorUserId,
     });
     return { data: { key: fullKey, apiKey: this.mapApiKey(row) } };

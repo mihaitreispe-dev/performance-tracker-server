@@ -83,6 +83,15 @@ export class IssueApiKeyBody {
   @IsBoolean()
   @IsOptional()
   isPublicClient?: boolean;
+
+  @ApiPropertyOptional({
+    enum: ['public-client'],
+    description:
+      'Provisioning preset. "public-client" mints a white-label end-user app key: forces isPublicClient and, when scopes are omitted, fills the standard consumer scope bundle (read/consumption + self-tracking + auth:exchange, minus back-office authoring).',
+  })
+  @IsIn(['public-client'])
+  @IsOptional()
+  preset?: 'public-client';
 }
 
 // ---- Onboarding -------------------------------------------------------------

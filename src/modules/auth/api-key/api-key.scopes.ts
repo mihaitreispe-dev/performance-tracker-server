@@ -59,3 +59,30 @@ export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 export function isApiKeyScope(value: string): value is ApiKeyScope {
   return (API_KEY_SCOPES as readonly string[]).includes(value);
 }
+
+/**
+ * Coach / back-office authoring scopes. These let a key create clients, author
+ * questionnaires, or generate workouts — power that belongs to the org's admin
+ * surface, never to a key shipped inside a public end-user app. Kept as the
+ * exclusion list (rather than an allow-list) so any future consumption scope is
+ * granted to client apps by default, while a new *authoring* scope has to be
+ * added here deliberately.
+ */
+const BACK_OFFICE_SCOPES: readonly ApiKeyScope[] = [
+  'clients:read',
+  'clients:create',
+  'questionnaires:write',
+  'workouts:generate',
+];
+
+/**
+ * The scope bundle a white-label end-user client app (SPA / mobile) needs: the
+ * full read/consumption + self-tracking surface plus `auth:exchange` for
+ * branded sign-in, minus the back-office authoring scopes above. This is the
+ * "public-client" onboarding preset — it removes the foot-gun of hand-picking
+ * scopes (and forgetting auth:exchange / is_public_client) when provisioning a
+ * white-label org's app key.
+ */
+export const PUBLIC_CLIENT_DEFAULT_SCOPES: ApiKeyScope[] = API_KEY_SCOPES.filter(
+  (s) => !BACK_OFFICE_SCOPES.includes(s),
+);
