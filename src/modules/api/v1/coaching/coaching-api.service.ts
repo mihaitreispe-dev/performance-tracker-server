@@ -437,9 +437,11 @@ export class CoachingApiService {
     const organisationId = assertActiveOrg(req);
     // Relationship is verified by guard
 
-    // Verify workout exists and belongs to coach
+    // Verify the workout exists, belongs to the coach, AND lives in the active
+    // org — so a coach with memberships in several orgs can't pull one org's
+    // workout into another org's roster.
     const workout = await this.workoutRepo.findById(body.workoutId);
-    if (!workout || workout.user_id !== req.user.id) {
+    if (!workout || workout.user_id !== req.user.id || workout.organisation_id !== organisationId) {
       throw new NotFoundException('Workout not found');
     }
 
@@ -483,8 +485,14 @@ export class CoachingApiService {
     athleteId: string,
     assignmentId: string,
   ): Promise<void> {
+    const organisationId = assertActiveOrg(req);
     const assignment = await this.assignedWorkoutRepo.findById(assignmentId);
-    if (!assignment || assignment.coach_id !== req.user.id || assignment.athlete_id !== athleteId) {
+    if (
+      !assignment ||
+      assignment.coach_id !== req.user.id ||
+      assignment.athlete_id !== athleteId ||
+      assignment.organisation_id !== organisationId
+    ) {
       throw new NotFoundException('Assignment not found');
     }
 

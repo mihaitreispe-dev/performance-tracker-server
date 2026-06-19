@@ -34,6 +34,20 @@ export class WorkoutScheduleRepository {
   }
 
   /**
+   * Tenant-scoped single fetch. Returns undefined when the row exists but
+   * belongs to another org — so request paths can't reach a schedule outside
+   * the caller's active organisation (a user may belong to several orgs).
+   */
+  async findByIdInOrg(id: string, organisationId: string): Promise<WorkoutSchedule | undefined> {
+    return this.db
+      .selectFrom('workout_schedules')
+      .where('id', '=', id)
+      .where('organisation_id', '=', organisationId)
+      .selectAll()
+      .executeTakeFirst();
+  }
+
+  /**
    * Bulk fetch workout schedules by IDs - more efficient than multiple findById calls
    */
   async findByIds(ids: string[]): Promise<WorkoutSchedule[]> {

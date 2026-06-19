@@ -170,8 +170,10 @@ export class WorkoutSchedulesApiService {
     return result;
   }
 
-  async getById(req: Request & { user: AuthUser }, id: string): Promise<WorkoutScheduleResponse> {
-    const schedule = await this.workoutScheduleRepository.findById(id);
+  async getById(req: AuthedRequest, id: string): Promise<WorkoutScheduleResponse> {
+    // Scope to the active org first — a user can belong to several orgs, so
+    // their own schedule in another org must not be reachable from this one.
+    const schedule = await this.workoutScheduleRepository.findByIdInOrg(id, assertActiveOrg(req));
     if (!schedule) {
       throw new NotFoundException('Workout schedule not found');
     }
@@ -231,7 +233,7 @@ export class WorkoutSchedulesApiService {
     id: string,
     body: UpdateWorkoutScheduleBody,
   ): Promise<WorkoutScheduleResponse> {
-    const schedule = await this.workoutScheduleRepository.findById(id);
+    const schedule = await this.workoutScheduleRepository.findByIdInOrg(id, assertActiveOrg(req));
     if (!schedule) {
       throw new NotFoundException('Workout schedule not found');
     }
@@ -259,7 +261,7 @@ export class WorkoutSchedulesApiService {
   }
 
   async delete(req: Request & { user: AuthUser }, id: string): Promise<void> {
-    const schedule = await this.workoutScheduleRepository.findById(id);
+    const schedule = await this.workoutScheduleRepository.findByIdInOrg(id, assertActiveOrg(req));
     if (!schedule) {
       throw new NotFoundException('Workout schedule not found');
     }
