@@ -23396,6 +23396,43 @@
         ]
       }
     },
+    "/v1/public/auth/session": {
+      "post": {
+        "operationId": "PublicOAuthController_session",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FirebaseSessionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAuthSessionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Exchange a Firebase ID token for an org-scoped session directly (branded in-app sign-in — no hosted redirect). Supports private-key (Bearer) and public-client (clientId) callers.",
+        "tags": [
+          "Public"
+        ]
+      }
+    },
     "/v1/public/clients/{id}/scheduled-workouts": {
       "get": {
         "operationId": "PublicAthletesController_listScheduledWorkouts",
@@ -48641,6 +48678,26 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "FirebaseSessionBody": {
+        "type": "object",
+        "properties": {
+          "firebaseIdToken": {
+            "type": "string",
+            "description": "Firebase ID token from the branded in-app sign-in. Proves the user just authenticated with Firebase."
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Public-client identifier (the API key prefix or full key). Required for public-client keys; private keys authenticate via the Bearer header instead."
+          },
+          "fcmToken": {
+            "type": "string",
+            "description": "FCM device token to register for push notifications at sign-in."
+          }
+        },
+        "required": [
+          "firebaseIdToken"
         ]
       },
       "PublicScheduledWorkoutDTO": {

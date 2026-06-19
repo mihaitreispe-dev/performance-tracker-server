@@ -13,7 +13,7 @@ import type { ApiKeyContext } from 'src/modules/auth/api-key/api-key.guard';
 import { OptionalPublicApiRoute } from 'src/modules/auth/api-key/public-api-route.decorator';
 
 import { PublicOAuthService } from './public-oauth.service';
-import { AuthorizeBody, TokenExchangeBody } from './request.dto';
+import { AuthorizeBody, FirebaseSessionBody, TokenExchangeBody } from './request.dto';
 import { AuthorizeResponse, PublicAuthSessionResponse } from './response.dto';
 
 type PublicRequest = Request & { apiKey?: ApiKeyContext };
@@ -87,6 +87,34 @@ export class PublicOAuthController {
       // Origin is browser-set; server-to-server callers don't send it. Used
       // for the public-client CORS-style allow-list check inside the service.
       origin: typeof req.headers.origin === 'string' ? req.headers.origin : undefined,
+    });
+    return { data };
+  }
+
+  /**
+   * Direct branded sign-in — trade a Firebase ID token for an org-scoped
+   * session in one call, skipping the hosted page + authorization-code
+   * round-trip that /authorize + /token require. Used by the ReHabit in-app
+   * sign-in. Same dual auth as /token: private keys send a Bearer, public
+   * clients name themselves via `clientId`.
+   */
+  @Post('session')
+  @OptionalPublicApiRoute('auth:exchange')
+  @ApiSecurity('apiKey')
+  @ApiOperation({
+    summary:
+      'Exchange a Firebase ID token for an org-scoped session directly (branded in-app sign-in — no hosted redirect). Supports private-key (Bearer) and public-client (clientId) callers.',
+  })
+  @ApiCreatedResponse({ type: PublicAuthSessionResponse })
+  async session(
+    @Req() req: PublicRequest,
+    @Body() body: FirebaseSessionBody,
+  ): Promise<PublicAuthSessionResponse> {
+    const data = await this.service.signInWithFirebase({
+      firebaseIdToken: body.firebaseIdToken,
+      apiKey: req.apiKey,
+      clientId: body.clientId,
+      fcmToken: body.fcmToken,
     });
     return { data };
   }

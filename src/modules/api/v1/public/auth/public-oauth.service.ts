@@ -229,6 +229,69 @@ export class PublicOAuthService {
   }
 
   /**
+   * Direct branded sign-in — trade a Firebase ID token for an org-scoped
+   * session in a single call, with no hosted page and no authorization-code
+   * round-trip. Used by the ReHabit in-app branded sign-in.
+   *
+   * The org is whichever the API key belongs to; the Firebase ID token is the
+   * proof of identity. Auth modes mirror /token:
+   *   - PRIVATE: ApiKeyAuthGuard authenticated a Bearer key upstream → req.apiKey.
+   *   - PUBLIC : no Bearer; a `clientId` in the body names a public-client key.
+   *
+   * Provisioning policy matches the hosted flow: resolve-or-create the user and
+   * ensure an athlete membership in the org (open self-provisioning — the same
+   * "anyone who signs in becomes this coach's client" behaviour as /authorize).
+   * There is no redirect/PKCE here because there is no browser redirect to
+   * protect — the short-lived Firebase token is the bearer of identity.
+   */
+  async signInWithFirebase(input: {
+    firebaseIdToken: string;
+    /** Set when ApiKeyAuthGuard ran (private-client Bearer path). */
+    apiKey?: { apiKeyId: string; organisationId: string };
+    /** Public-client identifier from the body — required when `apiKey` isn't set. */
+    clientId?: string;
+    /** Optional FCM device token to register for push at sign-in. */
+    fcmToken?: string;
+  }): Promise<PublicAuthSessionDTO> {
+    let organisationId: string;
+    if (input.apiKey) {
+      // Private key already authenticated by the Bearer secret upstream.
+      organisationId = input.apiKey.organisationId;
+    } else {
+      if (!input.clientId) {
+        throw new UnauthorizedException('clientId required in body for public-client sign-in.');
+      }
+      const apiKey = await this.resolveActiveApiKey(input.clientId);
+      // No Bearer was presented, so this must be a public-client key. A private
+      // key's prefix alone is not sufficient — its bearer secret is what
+      // authenticates it — so refuse to mint a session from just the prefix.
+      if (!apiKey.is_public_client) {
+        throw new UnauthorizedException('This client_id requires Bearer API-key authentication.');
+      }
+      organisationId = apiKey.organisation_id;
+    }
+
+    const user = await this.resolveUserFromFirebase(input.firebaseIdToken);
+    await this.ensureAthleteMembership(user.id, organisationId);
+    if (input.fcmToken) {
+      await this.userRepo.addFcmToken(user.id, input.fcmToken);
+    }
+
+    const tokens = this.authService.generateTokens(user.id, { organisationId });
+    await this.refreshTokenRepo.create({
+      user_id: user.id,
+      hash: await this.authService.hash(tokens.refreshToken),
+    });
+    await this.userRepo.updateById(user.id, { last_sign_in_at: new Date() });
+
+    return {
+      ...tokens,
+      user: authUserFromUser(user),
+      organisationId,
+    };
+  }
+
+  /**
    * Validate the public-client (PKCE) exchange path. Throws on any
    * mismatch; returns normally if everything lines up. Pulled out of the
    * main exchangeCode body so the two paths read clearly side-by-side.

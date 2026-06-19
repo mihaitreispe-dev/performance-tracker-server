@@ -85,3 +85,34 @@ export class TokenExchangeBody {
   @MaxLength(200)
   clientId?: string;
 }
+
+/**
+ * Direct branded sign-in: trade a Firebase ID token for an org-scoped session
+ * in one call, with no hosted page / authorization-code round-trip. The
+ * Firebase token is the proof of identity; the API key (Bearer for private
+ * clients, `clientId` for public ones) identifies the org.
+ */
+export class FirebaseSessionBody {
+  @ApiProperty({
+    description:
+      'Firebase ID token from the branded in-app sign-in. Proves the user just authenticated with Firebase.',
+  })
+  @IsString()
+  @MinLength(20)
+  firebaseIdToken: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Public-client identifier (the API key prefix or full key). Required for public-client keys; private keys authenticate via the Bearer header instead.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  clientId?: string;
+
+  @ApiPropertyOptional({ description: 'FCM device token to register for push notifications at sign-in.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4096)
+  fcmToken?: string;
+}

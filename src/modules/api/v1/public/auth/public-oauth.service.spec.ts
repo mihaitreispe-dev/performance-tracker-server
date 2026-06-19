@@ -517,4 +517,70 @@ describe('PublicOAuthService', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
   });
+
+  // ---- signInWithFirebase — direct branded sign-in (no code/redirect) ----
+
+  describe('signInWithFirebase', () => {
+    const membership = {
+      id: 'm1',
+      organisation_id: ORG,
+      user_id: 'u-1',
+      role: OrganisationRole.ATHLETE,
+    } as unknown as OrganisationMembership;
+
+    it('mints an org-scoped session for a public client (no code, no redirect)', async () => {
+      apiKeyRepo.findActiveByPrefix.mockResolvedValue(makeApiKey({ is_public_client: true }));
+      userRepo.findByFirebaseUid.mockResolvedValue(makeUser());
+      membershipRepo.findByUserAndOrg.mockResolvedValue(membership);
+      userRepo.updateById.mockResolvedValue(makeUser());
+
+      const result = await service.signInWithFirebase({
+        firebaseIdToken: 'fb',
+        clientId: 'sz_live_abcd1234',
+      });
+
+      expect(result.organisationId).toBe(ORG);
+      expect(result.accessToken).toBe('access-token');
+      expect(authService.generateTokens).toHaveBeenCalledWith('u-1', { organisationId: ORG });
+      expect(refreshRepo.create).toHaveBeenCalledWith({ user_id: 'u-1', hash: 'hashed-refresh' });
+    });
+
+    it('uses the Bearer-authenticated key org for a private client (no prefix lookup)', async () => {
+      userRepo.findByFirebaseUid.mockResolvedValue(makeUser());
+      membershipRepo.findByUserAndOrg.mockResolvedValue(membership);
+      userRepo.updateById.mockResolvedValue(makeUser());
+
+      const result = await service.signInWithFirebase({
+        firebaseIdToken: 'fb',
+        apiKey: { apiKeyId: 'key-1', organisationId: ORG },
+      });
+
+      expect(result.organisationId).toBe(ORG);
+      expect(apiKeyRepo.findActiveByPrefix).not.toHaveBeenCalled();
+      expect(authService.generateTokens).toHaveBeenCalledWith('u-1', { organisationId: ORG });
+    });
+
+    it('rejects when neither a Bearer key nor a clientId is supplied', async () => {
+      await expect(service.signInWithFirebase({ firebaseIdToken: 'fb' })).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(authService.generateTokens).not.toHaveBeenCalled();
+    });
+
+    it('refuses a private-client key presented via clientId alone (Bearer required)', async () => {
+      apiKeyRepo.findActiveByPrefix.mockResolvedValue(makeApiKey({ is_public_client: false }));
+      await expect(
+        service.signInWithFirebase({ firebaseIdToken: 'fb', clientId: 'sz_live_abcd1234' }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(authService.generateTokens).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid Firebase token', async () => {
+      apiKeyRepo.findActiveByPrefix.mockResolvedValue(makeApiKey({ is_public_client: true }));
+      firebase.verifyIdToken.mockRejectedValueOnce(new Error('bad token'));
+      await expect(
+        service.signInWithFirebase({ firebaseIdToken: 'fb', clientId: 'sz_live_abcd1234' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
 });
