@@ -14,10 +14,12 @@ import { OrganisationMembershipRepository } from 'src/repositories/organisation-
 import { OrganisationThemeRepository } from 'src/repositories/organisation-theme.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
+import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { MembershipAuditLogRepository } from 'src/repositories/membership-audit-log.repository';
 import { UserRepository } from 'src/repositories/user.repository';
 import { WorkoutRepository } from 'src/repositories/workout.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { ApiKeysApiController } from './api-keys/api-keys-api.controller';
 import { ApiKeysApiService } from './api-keys/api-keys-api.service';
@@ -81,6 +83,10 @@ export class OrganisationsApiModule {
           // Append-only audit log written on every membership
           // mutation (invite/accept/role_changed/removed/self_left).
           MembershipAuditLogRepository,
+          // Deprovisioning cascade on membership removal cleans the
+          // departing user's org-scoped coaching assignments + schedules.
+          CoachAssignedWorkoutRepository,
+          WorkoutScheduleRepository,
         ],
         controllers: [
           OrganisationsApiController,

@@ -394,7 +394,9 @@ export class CoachingApiService {
     }
 
     await this.relationshipRepo.updateById(relationship.id, { status: CoachAthleteStatus.REMOVED });
-    await this.assignedWorkoutRepo.deleteByAthleteId(athleteId);
+    // Scope the cleanup to the relationship's org — this athlete may be coached
+    // in another org too, and that roster must stay intact.
+    await this.assignedWorkoutRepo.deleteByAthleteInOrg(athleteId, relationship.organisation_id);
   }
 
   // Athlete's Coach
@@ -425,7 +427,7 @@ export class CoachingApiService {
     }
 
     await this.relationshipRepo.updateById(relationship.id, { status: CoachAthleteStatus.REMOVED });
-    await this.assignedWorkoutRepo.deleteByAthleteId(req.user.id);
+    await this.assignedWorkoutRepo.deleteByAthleteInOrg(req.user.id, relationship.organisation_id);
   }
 
   // Workout Assignment

@@ -227,6 +227,19 @@ export class WorkoutScheduleRepository {
   }
 
   /**
+   * Deprovisioning path: drop every schedule a user owns within a single org.
+   * Called when the user's membership in that org is revoked so no stale tenant
+   * rows survive. Org-scoped, so the user's schedules in other orgs are untouched.
+   */
+  async deleteByUserInOrg(userId: string, organisationId: string): Promise<void> {
+    await this.db
+      .deleteFrom('workout_schedules')
+      .where('user_id', '=', userId)
+      .where('organisation_id', '=', organisationId)
+      .execute();
+  }
+
+  /**
    * Find a schedule where:
    * - The schedule belongs to the specified user (athlete)
    * - The schedule is for the specified workout

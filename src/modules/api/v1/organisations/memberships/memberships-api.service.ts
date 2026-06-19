@@ -16,10 +16,12 @@ import {
 } from 'src/database/interfaces';
 import { isPlatformAdmin } from 'src/lib/util/platform-admin';
 import { AuthUser } from 'src/modules/auth/types/authenticated-user';
+import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { MembershipAuditLogRepository } from 'src/repositories/membership-audit-log.repository';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { ClientProvisioningService } from '../client-profiles/client-provisioning.service';
 import { NotificationsApiService } from '../../notifications/notifications-api.service';
@@ -62,6 +64,11 @@ export class MembershipsApiService {
     private readonly coachAthleteRepo: CoachAthleteRelationshipRepository,
     private readonly auditRepo: MembershipAuditLogRepository,
     private readonly notificationsService: NotificationsApiService,
+    // Deprovisioning cascade: when a membership is revoked we sever the
+    // user's coaching relationships and drop their org-scoped data so no
+    // orphaned rows survive in the org they no longer belong to.
+    private readonly assignedWorkoutRepo: CoachAssignedWorkoutRepository,
+    private readonly scheduleRepo: WorkoutScheduleRepository,
   ) {}
 
   async listMembers(req: Request & { user: AuthUser }, orgId: string): Promise<MembershipsListResponse> {
@@ -274,6 +281,7 @@ export class MembershipsApiService {
     // admin can remove anyone below or at admin tier but not the
     // owner.
     this.assertCanTargetRole(inviterRole, membership.role);
+    await this.deprovisionMember(membership.user_id, orgId);
     await this.membershipRepo.deleteById(membershipId);
     await this.auditRepo.record({
       organisation_id: orgId,
@@ -330,6 +338,7 @@ export class MembershipsApiService {
         'Owners must transfer ownership to another member before leaving the organisation',
       );
     }
+    await this.deprovisionMember(req.user.id, orgId);
     await this.membershipRepo.deleteById(membership.id);
     await this.auditRepo.record({
       organisation_id: orgId,
@@ -342,6 +351,50 @@ export class MembershipsApiService {
       actor_role: membership.role,
       metadata: {},
     });
+  }
+
+  /**
+   * Cascade-clean a user's org-scoped footprint when their membership is
+   * revoked (removed by a manager, or a self-service leave). Without this the
+   * membership row vanishes but the user lingers in coach rosters as an ACTIVE
+   * relationship and their schedules / assigned workouts stay behind as
+   * orphaned tenant rows. Every step is org-scoped, so the user's data and
+   * relationships in any other org they belong to are untouched.
+   */
+  private async deprovisionMember(userId: string, orgId: string): Promise<void> {
+    const live = [CoachAthleteStatus.ACTIVE, CoachAthleteStatus.PENDING];
+
+    // 1. Relationships where the user is the athlete in this org: sever them
+    //    and drop whatever their coach had assigned them here.
+    const asAthlete = await this.coachAthleteRepo.findMany({
+      organisationId: orgId,
+      athleteId: userId,
+      status: live,
+    });
+    for (const rel of asAthlete) {
+      await this.coachAthleteRepo.updateById(rel.id, { status: CoachAthleteStatus.REMOVED });
+    }
+    if (asAthlete.length > 0) {
+      await this.assignedWorkoutRepo.deleteByAthleteInOrg(userId, orgId);
+    }
+
+    // 2. Relationships where the user is the coach in this org: sever them
+    //    (those athletes lose this coach) and drop everything this coach
+    //    assigned in the org.
+    const asCoach = await this.coachAthleteRepo.findMany({
+      organisationId: orgId,
+      coachId: userId,
+      status: live,
+    });
+    for (const rel of asCoach) {
+      await this.coachAthleteRepo.updateById(rel.id, { status: CoachAthleteStatus.REMOVED });
+    }
+    if (asCoach.length > 0) {
+      await this.assignedWorkoutRepo.deleteByCoachInOrg(userId, orgId);
+    }
+
+    // 3. The user's own schedules in this org.
+    await this.scheduleRepo.deleteByUserInOrg(userId, orgId);
   }
 
   private async ensureMember(userId: string, orgId: string): Promise<void> {

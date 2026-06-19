@@ -60,7 +60,29 @@ export class CoachAssignedWorkoutRepository {
     await this.db.deleteFrom('coach_assigned_workouts').where('id', '=', id).execute();
   }
 
-  async deleteByAthleteId(athleteId: string): Promise<void> {
-    await this.db.deleteFrom('coach_assigned_workouts').where('athlete_id', '=', athleteId).execute();
+  /**
+   * Remove every workout assigned to an athlete within one org. A user can be
+   * an athlete in several orgs, so severing a relationship (or revoking a
+   * membership) in one org must not wipe the assigned workouts they still have
+   * in another — hence the mandatory org scope.
+   */
+  async deleteByAthleteInOrg(athleteId: string, organisationId: string): Promise<void> {
+    await this.db
+      .deleteFrom('coach_assigned_workouts')
+      .where('athlete_id', '=', athleteId)
+      .where('organisation_id', '=', organisationId)
+      .execute();
+  }
+
+  /**
+   * Drop everything a coach has assigned within one org — used when the coach
+   * themselves is deprovisioned from that org and their athletes lose them.
+   */
+  async deleteByCoachInOrg(coachId: string, organisationId: string): Promise<void> {
+    await this.db
+      .deleteFrom('coach_assigned_workouts')
+      .where('coach_id', '=', coachId)
+      .where('organisation_id', '=', organisationId)
+      .execute();
   }
 }
