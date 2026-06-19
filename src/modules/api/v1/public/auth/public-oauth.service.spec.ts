@@ -313,7 +313,8 @@ describe('PublicOAuthService', () => {
       expect(result.accessToken).toBe('access-token');
       expect(result.refreshToken).toBe('refresh-token');
       expect(refreshRepo.create).toHaveBeenCalledWith({ user_id: 'u-1', hash: 'hashed-refresh' });
-      expect(authService.generateTokens).toHaveBeenCalledWith('u-1');
+      // The token is now scoped to the API key's org via the `org` claim.
+      expect(authService.generateTokens).toHaveBeenCalledWith('u-1', { organisationId: 'org-1' });
     });
 
     it('rejects unknown / expired / already-used codes uniformly', async () => {

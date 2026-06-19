@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { OrganisationRole, UserRole } from 'src/database/interfaces';
 import { OrganisationMembershipRepository } from 'src/repositories/organisation-membership.repository';
 import { UserRepository } from 'src/repositories/user.repository';
+import { AuthUser } from 'src/modules/auth/types/authenticated-user';
 
 const SKIP_ACTIVE_ORG_KEY = 'SKIP_ACTIVE_ORG_KEY';
 export const SkipActiveOrg = () => SetMetadata(SKIP_ACTIVE_ORG_KEY, true);
@@ -45,12 +46,24 @@ export class ActiveOrgGuard implements CanActivate {
       return true;
     }
 
+    // Prefer the org baked into the verified JWT (`org` claim) — it's signed
+    // by us and can't be spoofed. Fall back to the X-Organisation-Id header
+    // for org-agnostic tokens (the coach/athlete apps that switch active org
+    // client-side). The header fallback is transitional and will be removed
+    // once every client carries the claim.
+    const claimOrg = (request.user as AuthUser).organisationId;
     const raw = request.headers[ACTIVE_ORG_HEADER];
-    const orgId = Array.isArray(raw) ? raw[0] : raw;
-    if (!orgId || typeof orgId !== 'string') {
-      throw new BadRequestException(`Missing ${ACTIVE_ORG_HEADER} header`);
+    const headerOrg = Array.isArray(raw) ? raw[0] : raw;
+    const orgId = claimOrg ?? (typeof headerOrg === 'string' ? headerOrg : undefined);
+    if (!orgId) {
+      throw new BadRequestException(
+        `Missing organisation context (no token org claim or ${ACTIVE_ORG_HEADER} header)`,
+      );
     }
 
+    // Membership is still verified even when the org came from the signed
+    // claim — defence in depth, and it's how the org-level role is resolved
+    // (and how access is revoked if a membership is removed mid-token-life).
     const membership = await this.membershipRepo.findByUserAndOrg(request.user.id, orgId);
     if (membership) {
       request.activeOrg = { organisationId: orgId, role: membership.role } satisfies ActiveOrgContext;

@@ -7,4 +7,11 @@ export interface AuthUser {
    * on ordinary requests.
    */
   impersonatorId?: string;
+  /**
+   * The organisation this token is scoped to, from the JWT's `org` claim.
+   * Present for org-scoped first-party sessions (ReHabit / public OAuth);
+   * ActiveOrgGuard trusts it over the X-Organisation-Id header. Absent for
+   * org-agnostic tokens, which select their org via that header instead.
+   */
+  organisationId?: string;
 }

@@ -24,14 +24,25 @@ describe('ActiveOrgGuard', () => {
     guard = new ActiveOrgGuard(membershipRepo, userRepo, reflector);
   });
 
-  function makeContext(opts: { user?: { id: string }; headers?: Record<string, unknown> }): {
+  function makeContext(opts: {
+    user?: { id: string; organisationId?: string };
+    headers?: Record<string, unknown>;
+  }): {
     context: ExecutionContext;
-    request: { user?: { id: string }; headers: Record<string, unknown>; activeOrg?: unknown };
+    request: {
+      user?: { id: string; organisationId?: string };
+      headers: Record<string, unknown>;
+      activeOrg?: unknown;
+    };
   } {
     const request = {
       user: opts.user,
       headers: opts.headers ?? {},
-    } as { user?: { id: string }; headers: Record<string, unknown>; activeOrg?: unknown };
+    } as {
+      user?: { id: string; organisationId?: string };
+      headers: Record<string, unknown>;
+      activeOrg?: unknown;
+    };
     const context = {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => undefined,
@@ -91,6 +102,43 @@ describe('ActiveOrgGuard', () => {
     });
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.activeOrg).toEqual({ organisationId: 'org-1', role: OrganisationRole.COACH });
+  });
+
+  it('sources the org from the verified JWT `org` claim (no header needed)', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    membershipRepo.findByUserAndOrg.mockResolvedValue({
+      id: 'm1',
+      organisation_id: 'org-claim',
+      user_id: 'u1',
+      role: OrganisationRole.ATHLETE,
+    } as unknown as OrganisationMembership);
+
+    const { context, request } = makeContext({
+      user: { id: 'u1', organisationId: 'org-claim' },
+      headers: {},
+    });
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(membershipRepo.findByUserAndOrg).toHaveBeenCalledWith('u1', 'org-claim');
+    expect(request.activeOrg).toEqual({ organisationId: 'org-claim', role: OrganisationRole.ATHLETE });
+  });
+
+  it('prefers the token `org` claim over a conflicting X-Organisation-Id header (no spoofing)', async () => {
+    reflector.getAllAndOverride.mockReturnValue(false);
+    membershipRepo.findByUserAndOrg.mockResolvedValue({
+      id: 'm1',
+      organisation_id: 'org-claim',
+      user_id: 'u1',
+      role: OrganisationRole.ATHLETE,
+    } as unknown as OrganisationMembership);
+
+    const { context, request } = makeContext({
+      user: { id: 'u1', organisationId: 'org-claim' },
+      headers: { [ACTIVE_ORG_HEADER]: 'org-attacker-supplied' },
+    });
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    // The header value is ignored entirely — membership is checked against the claim.
+    expect(membershipRepo.findByUserAndOrg).toHaveBeenCalledWith('u1', 'org-claim');
+    expect(request.activeOrg).toEqual({ organisationId: 'org-claim', role: OrganisationRole.ATHLETE });
   });
 
   it('handles array-style header values (Node coerces duplicate headers to string[])', async () => {

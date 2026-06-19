@@ -50,7 +50,15 @@ export class JwtAuthGuard implements CanActivate {
       // can distinguish "acting as" calls from genuine ones.
       const rawImp = (payload as unknown as { imp?: unknown }).imp;
       const imp = typeof rawImp === 'string' ? rawImp : undefined;
-      request['user'] = { id: payload.sub, ...(imp ? { impersonatorId: imp } : {}) } as AuthUser;
+      // `org` scopes the token to one organisation (ReHabit / public OAuth).
+      // Surfaced so ActiveOrgGuard can trust it over the request header.
+      const rawOrg = (payload as unknown as { org?: unknown }).org;
+      const organisationId = typeof rawOrg === 'string' ? rawOrg : undefined;
+      request['user'] = {
+        id: payload.sub,
+        ...(imp ? { impersonatorId: imp } : {}),
+        ...(organisationId ? { organisationId } : {}),
+      } as AuthUser;
     } catch {
       if (jwtIsOptional) {
         return true;

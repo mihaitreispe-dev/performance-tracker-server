@@ -136,7 +136,16 @@ export class AuthApiService {
       if (!user) {
         throw new UnauthorizedException();
       }
-      const tokens = await this.authService.generateTokens(user.id);
+      // Preserve the org-scoping (and impersonation) claims across rotation so
+      // a refreshed token stays bound to the same organisation it was minted
+      // for — otherwise an org-scoped ReHabit session would silently widen on
+      // its first refresh.
+      const orgClaim = (decodedToken as { org?: unknown }).org;
+      const impClaim = (decodedToken as { imp?: unknown }).imp;
+      const tokens = await this.authService.generateTokens(user.id, {
+        organisationId: typeof orgClaim === 'string' ? orgClaim : undefined,
+        impersonatorId: typeof impClaim === 'string' ? impClaim : undefined,
+      });
       const refreshTokens = await this.refreshTokenRepo.findManyByUserId(user.id);
       await this.refreshTokenRepo.create({
         user_id: user.id,

@@ -208,17 +208,19 @@ export class PublicOAuthService {
       throw new UnauthorizedException('Invalid or expired code');
     }
 
-    const tokens = this.authService.generateTokens(user.id);
+    // The org is unambiguous here — it's the org the client_id (API key)
+    // belongs to — so scope the token to it via the `org` claim. ActiveOrgGuard
+    // reads that claim, so the client no longer needs to be trusted to send the
+    // right X-Organisation-Id (the response still echoes organisationId below
+    // for display + backward compatibility).
+    const tokens = this.authService.generateTokens(user.id, {
+      organisationId: codeKey.organisation_id,
+    });
     await this.refreshTokenRepo.create({
       user_id: user.id,
       hash: await this.authService.hash(tokens.refreshToken),
     });
     await this.userRepo.updateById(user.id, { last_sign_in_at: new Date() });
-
-    // Stamp the API key's org id on the response so the third-party
-    // app knows what to put in X-Organisation-Id on subsequent requests.
-    // For the auth flow, the org is unambiguous — it's the org the
-    // client_id (API key) belongs to.
     return {
       ...tokens,
       user: authUserFromUser(user),

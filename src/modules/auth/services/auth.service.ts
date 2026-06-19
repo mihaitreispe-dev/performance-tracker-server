@@ -13,14 +13,25 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  public generateTokens(userId: string, opts?: { impersonatorId?: string | null }) {
+  public generateTokens(
+    userId: string,
+    opts?: { impersonatorId?: string | null; organisationId?: string | null },
+  ) {
     // `imp` (impersonator id) sits alongside the standard `sub` so a platform
     // admin acting as another user can be tracked end-to-end (audit logs read
     // the claim, the client UI surfaces a "you are impersonating X" banner
     // off it). Absent for normal logins. Propagated through refresh too so
     // the impersonation context survives a token rotation.
+    //
+    // `org` (organisation id) scopes a token to a single org for first-party
+    // clients that sign in against one workspace (ReHabit / public OAuth). It
+    // is the trusted, unspoofable source of the active org — ActiveOrgGuard
+    // prefers it over the X-Organisation-Id header. Org-agnostic tokens (the
+    // coach/athlete apps that switch orgs client-side) simply omit it and keep
+    // using the header.
     const baseClaims: Record<string, string> = { sub: userId };
     if (opts?.impersonatorId) baseClaims.imp = opts.impersonatorId;
+    if (opts?.organisationId) baseClaims.org = opts.organisationId;
 
     const accessTokenExpiresIn = this.configService.jwtAccessTokenExpiry;
     let accessTokenExpiresInMs: number | undefined;
