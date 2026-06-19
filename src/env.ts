@@ -70,6 +70,15 @@ export class Env extends BoostrapEnv {
   @Matches('^Y|N$', 'i')
   DB_SSL: string;
 
+  // Row-Level Security backstop. 'Y' makes RlsInterceptor wrap authenticated
+  // tenant requests in a transaction that sets the org GUC so the DB enforces
+  // tenant isolation. Only has teeth when DB_USER is a NON-superuser role
+  // (superusers bypass RLS); defaults to 'N' (off) when absent.
+  @IsString()
+  @IsOptional()
+  @Matches('^Y|N$', 'i')
+  RLS_ENABLED?: string;
+
   // AWS — optional. When set (local MinIO / explicit-key deploys) the
   // SDK clients use them; on ECS/Fargate they're unset and the SDK
   // falls back to the task role (see s3 / mediaconvert services).

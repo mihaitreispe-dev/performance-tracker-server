@@ -56,6 +56,10 @@ export class AppConfigService {
     return this.configService.get('DB_SSL') === 'Y';
   }
 
+  get rlsEnabled(): boolean {
+    return this.configService.get('RLS_ENABLED') === 'Y';
+  }
+
   // AWS
 
   get awsAccessKey(): string {

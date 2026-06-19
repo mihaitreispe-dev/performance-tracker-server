@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { validationErrorFactory } from 'src/lib/errors/validation-error';
 import { AllExceptionsFilter } from 'src/lib/http/filters/all-exceptions-filter';
 import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.interceptor';
+import { RlsInterceptor } from 'src/modules/database/org-context/rls.interceptor';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { ApiKeyAuthGuard, ApiKeyUsageInterceptor } from 'src/modules/auth/api-key';
 import { ActiveOrgGuard } from 'src/modules/auth/guards/active-org.guard';
@@ -144,6 +145,13 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      // Registered last → innermost interceptor: the request transaction it
+      // opens wraps only the route handler's DB work. No-op unless RLS_ENABLED
+      // and the request carries a JWT org claim (see RlsInterceptor).
+      provide: APP_INTERCEPTOR,
+      useClass: RlsInterceptor,
     },
     {
       provide: APP_FILTER,
