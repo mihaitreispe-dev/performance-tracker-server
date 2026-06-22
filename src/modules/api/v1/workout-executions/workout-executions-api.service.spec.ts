@@ -95,7 +95,6 @@ const makeExercise = (id: string, name: string): Exercise =>
     organisation_id: 'org-1',
     name,
     description: null,
-    cues: [],
     visibility: ExerciseVisibility.PRIVATE,
     user_id: userId,
     picture_s3_bucket: null,

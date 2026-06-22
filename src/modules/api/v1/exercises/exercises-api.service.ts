@@ -30,8 +30,10 @@ import { S3Service } from 'src/modules/s3/s3.service';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
 import { TranslationsService } from 'src/modules/translations/translations.service';
 import { VimeoService, type VimeoProgressiveRendition } from 'src/modules/vimeo/vimeo.service';
+import { CategoryRepository } from 'src/repositories/category.repository';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
+import { MovementPatternRepository } from 'src/repositories/movement-pattern.repository';
 import { ExerciseChainMemberWithExercise, ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
@@ -47,6 +49,7 @@ import {
   UpdateExerciseChainBody,
 } from './request.dto';
 import {
+  CategoryRefDTO,
   EquipmentDTO,
   ExerciseChainMemberDTO,
   ExerciseChainResponse,
@@ -57,6 +60,7 @@ import {
   ExerciseTranslationDTO,
   ExerciseUploadUrlResponse,
   MediaAssetDTO,
+  MovementPatternRefDTO,
   MuscleGroupDTO,
 } from './response.dto';
 
@@ -66,6 +70,8 @@ export class ExercisesApiService {
     private readonly exerciseRepo: ExerciseRepository,
     private readonly equipmentRepo: EquipmentRepository,
     private readonly muscleGroupRepo: MuscleGroupRepository,
+    private readonly categoryRepo: CategoryRepository,
+    private readonly movementPatternRepo: MovementPatternRepository,
     private readonly exerciseImageRepo: ExerciseImageRepository,
     private readonly exerciseChainRepo: ExerciseChainRepository,
     private readonly s3Service: S3Service,
@@ -162,8 +168,7 @@ export class ExercisesApiService {
       organisation_id: organisationId,
       name: body.name,
       description: body.description ?? null,
-      cues: body.cues ?? [],
-      category: body.category ?? null,
+      movement_pattern_id: body.movementPatternId ?? null,
       level: body.level ?? null,
       visibility: body.visibility ?? ExerciseVisibility.PRIVATE,
       user_id: req.user.id,
@@ -172,6 +177,13 @@ export class ExercisesApiService {
       video_mime_type: body.videoMimeType,
       status: ExerciseStatus.UPLOAD_PENDING,
     });
+
+    // Link categories
+    if (body.categoryIds && body.categoryIds.length > 0) {
+      for (const categoryId of body.categoryIds) {
+        await this.categoryRepo.linkToExercise(exercise.id, categoryId);
+      }
+    }
 
     // Link equipment
     if (body.equipmentIds && body.equipmentIds.length > 0) {
@@ -219,8 +231,6 @@ export class ExercisesApiService {
       organisation_id: organisationId,
       name: (body.name ?? meta.name).trim() || `Vimeo ${videoId}`,
       description: body.description ?? meta.description ?? null,
-      cues: [],
-      category: null,
       level: null,
       visibility: body.visibility ?? ExerciseVisibility.PRIVATE,
       user_id: req.user.id,
@@ -307,8 +317,7 @@ export class ExercisesApiService {
     const update: Record<string, any> = {};
     if (body.name !== undefined) update.name = body.name;
     if (body.description !== undefined) update.description = body.description;
-    if (body.cues !== undefined) update.cues = body.cues;
-    if (body.category !== undefined) update.category = body.category;
+    if (body.movementPatternId !== undefined) update.movement_pattern_id = body.movementPatternId;
     if (body.level !== undefined) update.level = body.level;
     if (body.visibility !== undefined) update.visibility = body.visibility;
 
@@ -388,9 +397,6 @@ export class ExercisesApiService {
       }
       update.voiceover_mode = body.voiceoverMode;
     }
-    if (body.voiceoverScript !== undefined) {
-      update.voiceover_script = body.voiceoverScript;
-    }
 
     const exercise = await this.exerciseRepo.updateById(id, update);
 
@@ -404,6 +410,14 @@ export class ExercisesApiService {
       // Add new links
       for (const equipmentId of body.equipmentIds) {
         await this.equipmentRepo.linkToExercise(id, equipmentId);
+      }
+    }
+
+    // Update category links if provided (replace entirely)
+    if (body.categoryIds !== undefined) {
+      await this.categoryRepo.deleteByExerciseId(id);
+      for (const categoryId of body.categoryIds) {
+        await this.categoryRepo.linkToExercise(id, categoryId);
       }
     }
 
@@ -770,25 +784,32 @@ export class ExercisesApiService {
     exercise: Exercise,
     opts: { includeTranslations?: boolean } = {},
   ): Promise<ExerciseDTO> {
-    const [assets, picture, equipmentList, primaryMuscles, secondaryMuscles, exerciseImages] = await Promise.all([
-      this.buildMediaAssets(exercise),
-      this.getThumbnailUrl(exercise),
-      this.equipmentRepo.findByExerciseId(exercise.id),
-      this.muscleGroupRepo.findPrimaryByExerciseId(exercise.id),
-      this.muscleGroupRepo.findSecondaryByExerciseId(exercise.id),
-      this.exerciseImageRepo.findByExerciseId(exercise.id),
-    ]);
+    const [assets, picture, equipmentList, primaryMuscles, secondaryMuscles, exerciseImages, categoryList, movementPattern] =
+      await Promise.all([
+        this.buildMediaAssets(exercise),
+        this.getThumbnailUrl(exercise),
+        this.equipmentRepo.findByExerciseId(exercise.id),
+        this.muscleGroupRepo.findPrimaryByExerciseId(exercise.id),
+        this.muscleGroupRepo.findSecondaryByExerciseId(exercise.id),
+        this.exerciseImageRepo.findByExerciseId(exercise.id),
+        this.categoryRepo.findByExerciseId(exercise.id),
+        exercise.movement_pattern_id
+          ? this.movementPatternRepo.findById(exercise.movement_pattern_id)
+          : Promise.resolve(undefined),
+      ]);
 
-    const equipment: EquipmentDTO[] = equipmentList.map((e) => ({ id: e.id, name: e.name }));
+    // Equipment names are free-typed; normalise to Title Case for display.
+    const equipment: EquipmentDTO[] = equipmentList.map((e) => ({ id: e.id, name: toTitleCase(e.name) }));
+    const categories: CategoryRefDTO[] = categoryList.map((c) => ({ id: c.id, name: c.name }));
+    const movementPatternDTO: MovementPatternRefDTO | null = movementPattern
+      ? { id: movementPattern.id, name: movementPattern.name }
+      : null;
     const primaryMusclesDTOs: MuscleGroupDTO[] = primaryMuscles.map((m) => ({ id: m.id, name: m.name }));
     const secondaryMusclesDTOs: MuscleGroupDTO[] = secondaryMuscles.map((m) => ({ id: m.id, name: m.name }));
     const images: ExerciseImageDTO[] = await Promise.all(exerciseImages.map((img) => this.mapExerciseImageToDTO(img)));
 
     // Voice-over URL: only meaningful in 'recorded' mode. We sign the
-    // S3 GET when the pointer trio is present. Generated-from-cues
-    // mode runs entirely client-side via Web Speech API, so no URL
-    // to surface — the client reads the script (or falls back to
-    // cues) directly. Off mode → null.
+    // S3 GET when the pointer trio is present. Off mode → null.
     let voiceoverUrl: string | null = null;
     if (
       exercise.voiceover_mode === ExerciseVoiceoverMode.RECORDED &&
@@ -809,8 +830,8 @@ export class ExercisesApiService {
       id: exercise.id,
       name: exercise.name,
       description: exercise.description,
-      cues: exercise.cues,
-      category: exercise.category,
+      categories,
+      movementPattern: movementPatternDTO,
       level: exercise.level,
       visibility: exercise.visibility,
       status: exercise.status,
@@ -833,7 +854,6 @@ export class ExercisesApiService {
       voiceoverMode: exercise.voiceover_mode,
       voiceoverUrl,
       voiceoverMimeType: exercise.voiceover_mime_type ?? null,
-      voiceoverScript: exercise.voiceover_script ?? null,
       translations,
       createdAt: new Date(exercise.created_at as unknown as string).toISOString(),
       updatedAt: new Date(exercise.updated_at as unknown as string).toISOString(),
@@ -1008,4 +1028,9 @@ export class ExercisesApiService {
     };
     return map[mimeType] || 'mp4';
   }
+}
+
+/** Normalise a free-typed name to Title Case for display (e.g. "resistance band" → "Resistance Band"). */
+function toTitleCase(value: string): string {
+  return value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }

@@ -50,16 +50,16 @@ export class CreateExerciseBody {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Exercise cues' })
+  @ApiPropertyOptional({ type: [String], description: 'Category IDs to link (replaces existing on update)' })
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID('4', { each: true })
   @IsOptional()
-  cues?: string[];
+  categoryIds?: string[];
 
-  @ApiPropertyOptional({ type: String, description: 'Exercise category' })
-  @IsString()
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Movement pattern ID (single). Pass null to clear.' })
+  @IsUUID()
   @IsOptional()
-  category?: string;
+  movementPatternId?: string | null;
 
   @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Exercise level' })
   @IsEnumString(ExerciseLevel)
@@ -111,16 +111,16 @@ export class UpdateExerciseBody {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Exercise cues' })
+  @ApiPropertyOptional({ type: [String], description: 'Category IDs to link (replaces existing on update)' })
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID('4', { each: true })
   @IsOptional()
-  cues?: string[];
+  categoryIds?: string[];
 
-  @ApiPropertyOptional({ type: String, description: 'Exercise category' })
-  @IsString()
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'Movement pattern ID (single). Pass null to clear.' })
+  @IsUUID()
   @IsOptional()
-  category?: string;
+  movementPatternId?: string | null;
 
   @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Exercise level' })
   @IsEnumString(ExerciseLevel)
@@ -199,23 +199,12 @@ export class UpdateExerciseBody {
    * Voice-over mode. Setting to 'off' clears any previously uploaded
    * recording; setting to 'recorded' requires a separate upload via
    * the voice-over upload-URL endpoint OR a previous upload already
-   * on file. Setting to 'generated_from_cues' is free — the client
-   * generates speech locally from cues at playback time.
+   * on file.
    */
   @ApiPropertyOptional({ enum: ExerciseVoiceoverMode })
   @IsEnumString(ExerciseVoiceoverMode)
   @IsOptional()
   voiceoverMode?: ExerciseVoiceoverMode;
-
-  /**
-   * Override script for generated-from-cues mode. Pass null to clear
-   * back to the cues-joined default. Ignored when mode is 'off' or
-   * 'recorded'.
-   */
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @IsString()
-  @IsOptional()
-  voiceoverScript?: string | null;
 }
 
 /**

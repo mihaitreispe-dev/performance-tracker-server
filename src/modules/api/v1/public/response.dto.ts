@@ -74,7 +74,6 @@ export class PublicWorkoutStepDTO {
   @ApiProperty() exerciseId: string;
   @ApiProperty() exerciseName: string;
   @ApiPropertyOptional({ nullable: true }) exerciseDescription: string | null;
-  @ApiProperty({ type: [String] }) cues: string[];
   @ApiProperty({ type: [PublicWorkoutStepEquipmentDTO], description: 'Equipment this step needs.' })
   equipment: PublicWorkoutStepEquipmentDTO[];
   @ApiProperty({ description: 'Position in the workout. Stable across reads.' }) position: number;
@@ -228,9 +227,6 @@ export class PublicExerciseDTO {
 
   @ApiPropertyOptional({ nullable: true })
   level: string | null;
-
-  @ApiProperty({ type: [String] })
-  cues: string[];
 
   @ApiProperty()
   createdAt: string;

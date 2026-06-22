@@ -157,7 +157,6 @@ export class PublicApiService {
         'e.id as ex_id',
         'e.name as ex_name',
         'e.description as ex_description',
-        'e.cues as ex_cues',
       ])
       .execute();
 
@@ -188,7 +187,6 @@ export class PublicApiService {
         'e.id as ex_id',
         'e.name as ex_name',
         'e.description as ex_description',
-        'e.cues as ex_cues',
       ])
       .execute();
 
@@ -216,7 +214,6 @@ export class PublicApiService {
         exerciseId: s.ex_id,
         exerciseName: s.ex_name,
         exerciseDescription: s.ex_description,
-        cues: (s.ex_cues as string[] | null) ?? [],
         equipment: equipByExercise.get(s.ex_id) ?? [],
         position: s.wi_position,
         groupId: null,
@@ -234,7 +231,6 @@ export class PublicApiService {
         exerciseId: g.ex_id,
         exerciseName: g.ex_name,
         exerciseDescription: g.ex_description,
-        cues: (g.ex_cues as string[] | null) ?? [],
         equipment: equipByExercise.get(g.ex_id) ?? [],
         // Synthesise a fractional position so grouped items sort *between*
         // their parent workout_item and the next one without us pulling sort
@@ -437,7 +433,6 @@ function mapExerciseDTO(row: Exercise): PublicExerciseDTO {
     description: row.description,
     category: row.category,
     level: row.level,
-    cues: row.cues ?? [],
     createdAt: isoOf(row.created_at),
   };
 }

@@ -9,7 +9,6 @@ import {
   ExerciseVisibility,
   NewExercise,
 } from 'src/database/interfaces';
-import parseSQLArray from 'src/lib/util/parse-sql-array';
 
 export interface ExerciseFilter {
   visibility?: ExerciseVisibility;
@@ -45,7 +44,7 @@ export class ExerciseRepository {
     if (!result) {
       return result;
     }
-    return { ...result, cues: parseSQLArray(result.cues) };
+    return result;
   }
 
   /**
@@ -57,7 +56,7 @@ export class ExerciseRepository {
 
     const results = await this.db.selectFrom('exercises').where('id', 'in', ids).selectAll().execute();
 
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 
   async findMany(options: ExerciseFindManyOptions): Promise<Exercise[]> {
@@ -111,7 +110,7 @@ export class ExerciseRepository {
     }
 
     const results = await query.execute();
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 
   async countMany(organisationId: string, filter?: ExerciseFilter): Promise<number> {
@@ -153,7 +152,7 @@ export class ExerciseRepository {
 
   async create(data: NewExercise): Promise<Exercise> {
     const result = await this.db.insertInto('exercises').values(data).returningAll().executeTakeFirstOrThrow();
-    return { ...result, cues: parseSQLArray(result.cues) };
+    return result;
   }
 
   async updateById(id: string, data: ExerciseUpdate): Promise<Exercise> {
@@ -163,7 +162,7 @@ export class ExerciseRepository {
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();
-    return { ...result, cues: parseSQLArray(result.cues) };
+    return result;
   }
 
   async deleteById(id: string): Promise<void> {
@@ -180,7 +179,7 @@ export class ExerciseRepository {
       .where('status', '=', ExerciseStatus.ASSETS_PENDING)
       .selectAll()
       .execute();
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 
   /**
@@ -205,7 +204,7 @@ export class ExerciseRepository {
       .selectAll()
       .limit(limit)
       .execute();
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 
   /**
@@ -222,7 +221,7 @@ export class ExerciseRepository {
       .where('media_convert_job_id', 'is', null)
       .selectAll()
       .execute();
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 
   /**
@@ -238,6 +237,6 @@ export class ExerciseRepository {
       query = query.where('status', 'in', statuses);
     }
     const results = await query.execute();
-    return results.map((r) => ({ ...r, cues: parseSQLArray(r.cues) }));
+    return results;
   }
 }

@@ -76,6 +76,26 @@ export class MuscleGroupDTO {
   isPrimary?: boolean;
 }
 
+export class CategoryRefDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+}
+
+export class MovementPatternRefDTO {
+  @ApiProperty()
+  @IsUUID()
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  name: string;
+}
+
 export class ExerciseImageDTO {
   @ApiProperty()
   @IsUUID()
@@ -118,15 +138,15 @@ export class ExerciseDTO {
   @IsOptional()
   description?: string | null;
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [CategoryRefDTO] })
   @IsArray()
-  @IsString({ each: true })
-  cues: string[];
+  @ValidateNested({ each: true })
+  categories: CategoryRefDTO[];
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
+  @ApiPropertyOptional({ type: MovementPatternRefDTO, nullable: true })
+  @IsObject()
   @IsOptional()
-  category?: string | null;
+  movementPattern?: MovementPatternRefDTO | null;
 
   @ApiPropertyOptional({ enum: ExerciseLevel })
   @IsEnumString(ExerciseLevel)
@@ -242,16 +262,6 @@ export class ExerciseDTO {
   @IsString()
   @IsOptional()
   voiceoverMimeType?: string | null;
-
-  /**
-   * Override script for generated-from-cues mode. Null → the client
-   * joins this exercise's `cues` array as the script verbatim. Set →
-   * client speaks this text. Ignored when mode is 'off' or 'recorded'.
-   */
-  @ApiPropertyOptional({ type: String, nullable: true })
-  @IsString()
-  @IsOptional()
-  voiceoverScript?: string | null;
 
   /**
    * Published translations of this exercise's voice-over + intro. Only

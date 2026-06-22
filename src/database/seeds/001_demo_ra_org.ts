@@ -180,7 +180,6 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           user_id: systemUserId,
           name: 'Genuflexiuni cu greutate proprie',
           description: 'Lucrăm întregul lanț posterior — fese, ischiogambieri, cvadriceps.',
-          cues: ['Tălpile la lățimea umerilor', 'Greutatea pe călcâie', 'Spatele drept'],
           status: 'assets_done',
         },
         {
@@ -189,7 +188,6 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           user_id: systemUserId,
           name: 'Flotări',
           description: 'Forță în piept, umeri și triceps.',
-          cues: ['Corpul în linie dreaptă', 'Coatele la 45°', 'Coboară controlat'],
           status: 'assets_done',
         },
         {
@@ -198,7 +196,6 @@ export async function seed(db: Kysely<unknown>): Promise<void> {
           user_id: systemUserId,
           name: 'Plank',
           description: 'Stabilitate pentru întregul trunchi.',
-          cues: ['Contractează abdomenul', 'Şoldurile aliniate', 'Respiră calm'],
           status: 'assets_done',
         },
       ] as never)

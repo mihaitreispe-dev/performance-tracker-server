@@ -443,8 +443,6 @@ export class TranslationsService {
         .select([
           'organisation_id',
           'voiceover_mode',
-          'voiceover_script',
-          'cues',
           'voiceover_s3_bucket',
           'voiceover_s3_key',
           'voiceover_mime_type',
@@ -452,11 +450,6 @@ export class TranslationsService {
         .where('id', '=', targetId)
         .executeTakeFirst();
       if (!ex) throw new NotFoundException('Exercise not found.');
-      if (ex.voiceover_mode === ExerciseVoiceoverMode.GENERATED_FROM_CUES) {
-        const text = (ex.voiceover_script?.trim() || (ex.cues ?? []).join('. ')).trim();
-        if (!text) throw new BadRequestException('Exercise voice-over has no cues or script to translate.');
-        return { text, organisationId: ex.organisation_id };
-      }
       if (ex.voiceover_mode === ExerciseVoiceoverMode.RECORDED) {
         if (!ex.voiceover_s3_bucket || !ex.voiceover_s3_key) {
           throw new BadRequestException('Recorded voice-over has no audio file.');

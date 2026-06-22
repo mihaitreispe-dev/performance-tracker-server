@@ -1659,6 +1659,80 @@
         ]
       }
     },
+    "/v1/categories": {
+      "get": {
+        "operationId": "CategoriesApiController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List all exercise categories (shared reference data)",
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/v1/movement-patterns": {
+      "get": {
+        "operationId": "MovementPatternsApiController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovementPatternListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "summary": "List all movement patterns (shared reference data)",
+        "tags": [
+          "movement-patterns"
+        ]
+      }
+    },
     "/v1/workouts": {
       "get": {
         "operationId": "WorkoutsApiController_list",
@@ -27674,6 +27748,36 @@
           }
         }
       },
+      "CategoryRefDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovementPatternRefDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
       "ExerciseImageDTO": {
         "type": "object",
         "properties": {
@@ -27793,14 +27897,20 @@
           "description": {
             "type": "string"
           },
-          "cues": {
+          "categories": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/CategoryRefDTO"
             }
           },
-          "category": {
-            "type": "string"
+          "movementPattern": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MovementPatternRefDTO"
+              }
+            ]
           },
           "level": {
             "type": "string",
@@ -27895,8 +28005,7 @@
             "type": "string",
             "enum": [
               "off",
-              "recorded",
-              "generated_from_cues"
+              "recorded"
             ]
           },
           "voiceoverUrl": {
@@ -27904,10 +28013,6 @@
             "nullable": true
           },
           "voiceoverMimeType": {
-            "type": "string",
-            "nullable": true
-          },
-          "voiceoverScript": {
             "type": "string",
             "nullable": true
           },
@@ -27927,7 +28032,7 @@
         "required": [
           "id",
           "name",
-          "cues",
+          "categories",
           "visibility",
           "status",
           "userId",
@@ -27995,16 +28100,17 @@
             "type": "string",
             "description": "Exercise description"
           },
-          "cues": {
-            "description": "Exercise cues",
+          "categoryIds": {
+            "description": "Category IDs to link (replaces existing on update)",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "category": {
+          "movementPatternId": {
             "type": "string",
-            "description": "Exercise category"
+            "nullable": true,
+            "description": "Movement pattern ID (single). Pass null to clear."
           },
           "level": {
             "type": "string",
@@ -28093,16 +28199,17 @@
             "type": "string",
             "description": "Exercise description"
           },
-          "cues": {
-            "description": "Exercise cues",
+          "categoryIds": {
+            "description": "Category IDs to link (replaces existing on update)",
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "category": {
+          "movementPatternId": {
             "type": "string",
-            "description": "Exercise category"
+            "nullable": true,
+            "description": "Movement pattern ID (single). Pass null to clear."
           },
           "level": {
             "type": "string",
@@ -28170,13 +28277,8 @@
             "type": "string",
             "enum": [
               "off",
-              "recorded",
-              "generated_from_cues"
+              "recorded"
             ]
-          },
-          "voiceoverScript": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -28313,6 +28415,64 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "CategoryDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CategoryListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "MovementPatternDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "MovementPatternListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MovementPatternDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "CardioCategoryDTO": {

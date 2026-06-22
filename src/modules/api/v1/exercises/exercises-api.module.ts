@@ -7,11 +7,13 @@ import { S3Module } from 'src/modules/s3/s3.module';
 import { SmartCropModule } from 'src/modules/smart-crop/smart-crop.module';
 import { TranslationsModule } from 'src/modules/translations/translations.module';
 import { VimeoModule } from 'src/modules/vimeo/vimeo.module';
+import { CategoryRepository } from 'src/repositories/category.repository';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 import { ExerciseChainRepository } from 'src/repositories/exercise-chain.repository';
 import { ExerciseImageRepository } from 'src/repositories/exercise-image.repository';
+import { MovementPatternRepository } from 'src/repositories/movement-pattern.repository';
 import { MuscleGroupRepository } from 'src/repositories/muscle-group.repository';
 
 import { ExercisesApiController } from './exercises-api.controller';
@@ -39,6 +41,8 @@ export class ExercisesApiModule {
           ExerciseRepository,
           EquipmentRepository,
           MuscleGroupRepository,
+          CategoryRepository,
+          MovementPatternRepository,
           ExerciseImageRepository,
           ExerciseChainRepository,
           ContentItemRepository,

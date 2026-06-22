@@ -167,7 +167,6 @@ export class PopulateExercisesService {
         `Muscle group entries that would be created/linked: ${[...uniqueMuscleGroups].join(', ') || 'None'}\n`,
       );
       for (const exercise of exercisesToCreate) {
-        const cues = this.buildCues(exercise);
         const level = this.mapLevel(exercise.level);
         this.logger.log(`Would create: "${exercise.name}"`);
         this.logger.log(`  - Category: ${exercise.category}`);
@@ -175,14 +174,6 @@ export class PopulateExercisesService {
         this.logger.log(`  - Equipment: ${exercise.equipment || 'None'}`);
         this.logger.log(`  - Primary Muscles: ${exercise.primaryMuscles.join(', ') || 'None'}`);
         this.logger.log(`  - Secondary Muscles: ${exercise.secondaryMuscles.join(', ') || 'None'}`);
-        this.logger.log(`  - Cues (${cues.length} from instructions):`);
-        for (const cue of cues.slice(0, 3)) {
-          const truncated = cue.length > 80 ? cue.substring(0, 77) + '...' : cue;
-          this.logger.log(`      "${truncated}"`);
-        }
-        if (cues.length > 3) {
-          this.logger.log(`      ... and ${cues.length - 3} more`);
-        }
         this.logger.log(`  - Images: ${exercise.images.length} available`);
         this.logger.log('');
       }
@@ -196,7 +187,6 @@ export class PopulateExercisesService {
 
     for (const exercise of exercisesToCreate) {
       try {
-        const cues = this.buildCues(exercise);
         const description = this.buildDescription(exercise);
         const level = this.mapLevel(exercise.level);
         const category = exercise.category || null;
@@ -205,7 +195,6 @@ export class PopulateExercisesService {
           organisation_id: organisationId,
           name: exercise.name,
           description,
-          cues,
           visibility,
           user_id: userId,
           category,
@@ -278,18 +267,6 @@ export class PopulateExercisesService {
     this.logger.log(`Created: ${created}`);
     this.logger.log(`Failed: ${failed}`);
     this.logger.log(`Skipped (duplicates): ${exercises.length - exercisesToCreate.length}`);
-  }
-
-  private buildCues(exercise: FreeExerciseDBExercise): string[] {
-    // Extract cues from instruction sentences
-    if (exercise.instructions.length === 0) {
-      return [];
-    }
-
-    // Use each instruction as a cue, trimming whitespace
-    return exercise.instructions
-      .map((instruction) => instruction.trim())
-      .filter((instruction) => instruction.length > 0);
   }
 
   private buildDescription(exercise: FreeExerciseDBExercise): string | null {

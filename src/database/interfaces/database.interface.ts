@@ -17,10 +17,13 @@ import { DailyNutritionSummariesTable } from './daily-nutrition-summaries-table.
 import { DailyTrainingLoadsTable } from './daily-training-loads-table.interface';
 import { DataExportJobsTable } from './data-export-jobs-table.interface';
 import { DataImportJobsTable } from './data-import-jobs-table.interface';
+import { CategoriesTable } from './categories-table.interface';
 import { EquipmentTable } from './equipment-table.interface';
 import { ExecutionWeatherTable } from './execution-weather-table.interface';
+import { ExerciseCategoriesTable } from './exercise-categories-table.interface';
 import { ExerciseChainMembersTable, ExerciseChainsTable } from './exercise-chains-table.interface';
 import { ExerciseEquipmentTable } from './exercise-equipment-table.interface';
+import { MovementPatternsTable } from './movement-patterns-table.interface';
 import { ExerciseImagesTable } from './exercise-images-table.interface';
 import { ExerciseInstanceGroupItemsTable } from './exercise-instance-group-items-table.interface';
 import { ExerciseInstanceGroupsTable } from './exercise-instance-groups-table.interface';
@@ -128,6 +131,9 @@ export interface Database {
   exercise_equipment: ExerciseEquipmentTable;
   muscle_groups: MuscleGroupsTable;
   exercise_muscle_groups: ExerciseMuscleGroupsTable;
+  categories: CategoriesTable;
+  exercise_categories: ExerciseCategoriesTable;
+  movement_patterns: MovementPatternsTable;
   exercise_images: ExerciseImagesTable;
   exercise_instances: ExerciseInstancesTable;
   exercise_instance_groups: ExerciseInstanceGroupsTable;

@@ -30,15 +30,13 @@ export enum ExerciseStatus {
  *  - 'recorded'             → coach uploaded an audio file; the S3
  *                              pointer trio (bucket/key/mime) is
  *                              guaranteed non-null by a DB CHECK
- *  - 'generated_from_cues'  → client renders the cues (or override
- *                              script) via the browser's
- *                              speechSynthesis API at playback time;
- *                              no server-side TTS, no cost
+ *
+ * (The legacy 'generated_from_cues' mode was retired with the removal of
+ * exercise cues — intros replace coaching cues.)
  */
 export enum ExerciseVoiceoverMode {
   OFF = 'off',
   RECORDED = 'recorded',
-  GENERATED_FROM_CUES = 'generated_from_cues',
 }
 
 export interface ExercisesTable {
@@ -46,7 +44,6 @@ export interface ExercisesTable {
   organisation_id: string;
   name: string;
   description: string | null;
-  cues: ColumnType<string[], string[] | undefined, string[]>;
   visibility: ExerciseVisibility;
   user_id: string;
   /**
@@ -66,7 +63,13 @@ export interface ExercisesTable {
   video_s3_bucket: string | null;
   video_s3_key: string | null;
   video_mime_type: string | null;
+  /**
+   * Legacy free-text category. Superseded by the m2m `exercise_categories`
+   * join; the API no longer reads/writes it. Kept so old values survive.
+   */
   category: string | null;
+  /** Single biomechanical movement pattern (FK → movement_patterns). */
+  movement_pattern_id: string | null;
   level: ExerciseLevel | null;
   status: ExerciseStatus;
   media_convert_job_id: string | null;
@@ -113,10 +116,8 @@ export interface ExercisesTable {
   voiceover_s3_key: string | null;
   voiceover_mime_type: string | null;
   /**
-   * Optional override script for generated-from-cues mode. Null →
-   * the client joins the exercise's `cues` array as the script. Set
-   * → the client speaks this text verbatim (lets coaches author a
-   * different narration without losing the on-screen cue chips).
+   * Legacy override script for the retired generated-from-cues mode.
+   * Orphaned (no current reader) — kept to avoid a column drop.
    */
   voiceover_script: string | null;
   created_at: Generated<Timestamp>;
