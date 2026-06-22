@@ -30,6 +30,7 @@ import { S3Service } from 'src/modules/s3/s3.service';
 import { SmartCropService } from 'src/modules/smart-crop/smart-crop.service';
 import { TranslationsService } from 'src/modules/translations/translations.service';
 import { VimeoService, type VimeoProgressiveRendition } from 'src/modules/vimeo/vimeo.service';
+import { toTitleCase } from 'src/lib/util/title-case';
 import { CategoryRepository } from 'src/repositories/category.repository';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
@@ -1028,9 +1029,4 @@ export class ExercisesApiService {
     };
     return map[mimeType] || 'mp4';
   }
-}
-
-/** Normalise a free-typed name to Title Case for display (e.g. "resistance band" → "Resistance Band"). */
-function toTitleCase(value: string): string {
-  return value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }

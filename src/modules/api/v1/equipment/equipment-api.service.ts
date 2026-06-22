@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { toTitleCase } from 'src/lib/util/title-case';
 import { EquipmentRepository } from 'src/repositories/equipment.repository';
 
 import { CreateEquipmentBody } from './request.dto';
@@ -12,13 +13,13 @@ export class EquipmentApiService {
   // every tenant so the same "Dumbbells"/"Barbell" tags can be reused.
   async list(): Promise<EquipmentListResponse> {
     const equipment = await this.equipmentRepo.findAll();
-    return { data: equipment.map((e) => ({ id: e.id, name: e.name })) };
+    return { data: equipment.map((e) => ({ id: e.id, name: toTitleCase(e.name) })) };
   }
 
   async create(body: CreateEquipmentBody): Promise<EquipmentDTO> {
     // Idempotent: reuse an existing equipment row with the same name
     // rather than creating duplicates.
     const equipment = await this.equipmentRepo.findOrCreate(body.name.trim());
-    return { id: equipment.id, name: equipment.name };
+    return { id: equipment.id, name: toTitleCase(equipment.name) };
   }
 }
