@@ -223,9 +223,6 @@ export class PublicExerciseDTO {
   description: string | null;
 
   @ApiPropertyOptional({ nullable: true })
-  category: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
   level: string | null;
 
   @ApiProperty()

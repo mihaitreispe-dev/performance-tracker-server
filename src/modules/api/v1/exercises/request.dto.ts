@@ -14,10 +14,10 @@ export class ListExercisesQuery extends SearchableQuery {
   @IsOptional()
   visibility?: ExerciseVisibility;
 
-  @ApiPropertyOptional({ type: String, description: 'Filter by category' })
-  @IsString()
+  @ApiPropertyOptional({ type: String, description: 'Filter by category id (exercises linked to it).' })
+  @IsUUID()
   @IsOptional()
-  category?: string;
+  categoryId?: string;
 
   @ApiPropertyOptional({ enum: ExerciseLevel, description: 'Filter by level' })
   @IsEnumString(ExerciseLevel)

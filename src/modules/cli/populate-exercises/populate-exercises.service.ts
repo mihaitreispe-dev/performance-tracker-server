@@ -189,7 +189,6 @@ export class PopulateExercisesService {
       try {
         const description = this.buildDescription(exercise);
         const level = this.mapLevel(exercise.level);
-        const category = exercise.category || null;
 
         const createdExercise = await this.exerciseRepo.create({
           organisation_id: organisationId,
@@ -197,7 +196,6 @@ export class PopulateExercisesService {
           description,
           visibility,
           user_id: userId,
-          category,
           level,
           status: ExerciseStatus.DRAFT,
         });

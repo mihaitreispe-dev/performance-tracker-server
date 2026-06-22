@@ -63,11 +63,6 @@ export interface ExercisesTable {
   video_s3_bucket: string | null;
   video_s3_key: string | null;
   video_mime_type: string | null;
-  /**
-   * Legacy free-text category. Superseded by the m2m `exercise_categories`
-   * join; the API no longer reads/writes it. Kept so old values survive.
-   */
-  category: string | null;
   /** Single biomechanical movement pattern (FK → movement_patterns). */
   movement_pattern_id: string | null;
   level: ExerciseLevel | null;
@@ -115,11 +110,6 @@ export interface ExercisesTable {
   voiceover_s3_bucket: string | null;
   voiceover_s3_key: string | null;
   voiceover_mime_type: string | null;
-  /**
-   * Legacy override script for the retired generated-from-cues mode.
-   * Orphaned (no current reader) — kept to avoid a column drop.
-   */
-  voiceover_script: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }

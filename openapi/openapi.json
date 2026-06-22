@@ -612,10 +612,10 @@
             }
           },
           {
-            "name": "category",
+            "name": "categoryId",
             "required": false,
             "in": "query",
-            "description": "Filter by category",
+            "description": "Filter by category id (exercises linked to it).",
             "schema": {
               "type": "string"
             }

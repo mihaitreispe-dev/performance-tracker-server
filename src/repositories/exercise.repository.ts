@@ -16,6 +16,8 @@ export interface ExerciseFilter {
   search?: string;
   /** Match exercises linked to ANY of these equipment ids. */
   equipmentIds?: string[];
+  /** Match exercises linked to this category. */
+  categoryId?: string;
 }
 
 export interface ExerciseSort {
@@ -93,6 +95,18 @@ export class ExerciseRepository {
         ),
       );
     }
+    if (filter?.categoryId) {
+      const categoryId = filter.categoryId;
+      query = query.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('exercise_categories as ec')
+            .select('ec.exercise_id')
+            .whereRef('ec.exercise_id', '=', 'exercises.id')
+            .where('ec.category_id', '=', categoryId),
+        ),
+      );
+    }
 
     if (sort && sort.length > 0) {
       for (const s of sort) {
@@ -142,6 +156,18 @@ export class ExerciseRepository {
             .select('ee.exercise_id')
             .whereRef('ee.exercise_id', '=', 'exercises.id')
             .where('ee.equipment_id', 'in', equipmentIds),
+        ),
+      );
+    }
+    if (filter?.categoryId) {
+      const categoryId = filter.categoryId;
+      query = query.where((eb) =>
+        eb.exists(
+          eb
+            .selectFrom('exercise_categories as ec')
+            .select('ec.exercise_id')
+            .whereRef('ec.exercise_id', '=', 'exercises.id')
+            .where('ec.category_id', '=', categoryId),
         ),
       );
     }

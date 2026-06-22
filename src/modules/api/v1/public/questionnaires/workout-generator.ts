@@ -314,18 +314,14 @@ function budgetExerciseCount(timePerSessionMin: number | null, template: SetsRep
   return Math.max(3, Math.min(10, raw));
 }
 
-function filterByEquipmentAndAvoid(rows: Exercise[], parsed: ParsedTags): Exercise[] {
-  if (parsed.equipment.size === 0 && parsed.avoid.size === 0) return rows;
-  return rows.filter((ex) => {
-    if (parsed.avoid.size > 0 && ex.category && parsed.avoid.has(ex.category.toLowerCase())) {
-      return false;
-    }
-    // We don't have a first-class equipment column to match against the parsed
-    // equipment tags (it lives on the exercise_equipment join table). Until the
-    // generator grows that join, equipment filtering is a soft signal: rows are
-    // kept unless they explicitly conflict, never excluded for missing equipment.
-    return true;
-  });
+function filterByEquipmentAndAvoid(rows: Exercise[], _parsed: ParsedTags): Exercise[] {
+  // Equipment + avoid both live on join tables not loaded here
+  // (exercise_equipment / exercise_categories), so this is currently a
+  // pass-through. Avoid-by-category used the legacy free-text `category`
+  // column, dropped in the exercise model rework — repoint it to the m2m
+  // `exercise_categories` (or movement_patterns) join when the generator grows
+  // those lookups.
+  return rows;
 }
 
 function difficultyFor(level: ParsedTags['level']): WorkoutDifficulty {

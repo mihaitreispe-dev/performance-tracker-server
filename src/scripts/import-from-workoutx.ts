@@ -261,7 +261,6 @@ async function ingestOne({ db, s3, exercise, organisationId, ownerUserId }: Inge
           // so we surface it as public — the catalogue is browsable by every
           // member of every org without each one having to mint their own.
           visibility: 'public',
-          category: exercise.bodyPart ?? null,
           level: null,
           video_s3_bucket: UPLOAD_BUCKET,
           video_s3_key: uploadKey,

@@ -431,7 +431,6 @@ function mapExerciseDTO(row: Exercise): PublicExerciseDTO {
     id: row.id,
     name: row.name,
     description: row.description,
-    category: row.category,
     level: row.level,
     createdAt: isoOf(row.created_at),
   };
