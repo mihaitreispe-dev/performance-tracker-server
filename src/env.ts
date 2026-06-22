@@ -178,6 +178,23 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   FIREBASE_PRIVATE_KEY?: string;
 
+  // SendGrid email. Optional — when unset (or EMAIL_FROM unset) EmailService is
+  // dormant (same posture as Firebase): the deploy boots fine and email-channel
+  // notification rules record a "not configured" delivery instead of crashing.
+  @IsString()
+  @IsOptional()
+  SENDGRID_API_KEY?: string;
+
+  // Verified SendGrid sender address (e.g. notifications@step-zero.co).
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM?: string;
+
+  // Optional display name for the From header (e.g. "Step Zero").
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM_NAME?: string;
+
   // MediaConvert
 
   @IsString()

@@ -30,6 +30,9 @@ export class NotificationRuleDTO {
   @ApiProperty({ type: 'object', additionalProperties: true })
   audienceFilter: Record<string, unknown>;
 
+  @ApiProperty({ enum: ['push', 'email'], isArray: true })
+  channels: ('push' | 'email')[];
+
   @ApiProperty()
   title: string;
 
@@ -38,6 +41,12 @@ export class NotificationRuleDTO {
 
   @ApiPropertyOptional({ nullable: true })
   clickAction: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  emailSubject: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  emailBody: string | null;
 
   @ApiProperty()
   createdAt: string;
@@ -97,8 +106,8 @@ export class NotificationRuleDeliveryDTO {
   @ApiProperty()
   sentAt: string;
 
-  @ApiProperty({ enum: ['fcm', 'external_app'] })
-  route: 'fcm' | 'external_app';
+  @ApiProperty({ enum: ['fcm', 'external_app', 'email'] })
+  route: 'fcm' | 'external_app' | 'email';
 
   @ApiProperty()
   ok: boolean;

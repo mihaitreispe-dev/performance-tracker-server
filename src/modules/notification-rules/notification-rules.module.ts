@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 
+import { EmailModule } from 'src/modules/email/email.module';
 import { FirebaseModule } from 'src/modules/firebase/firebase.module';
 import { NotificationRuleRepository } from 'src/repositories/notification-rule.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -28,7 +29,7 @@ export class NotificationRulesModule {
     if (!this.instance) {
       this.instance = {
         module: NotificationRulesModule,
-        imports: [FirebaseModule.register()],
+        imports: [FirebaseModule.register(), EmailModule.register()],
         providers: [
           NotificationRulesService,
           NotificationRulesCronService,

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -79,13 +80,23 @@ export class CreateNotificationRuleBody {
   @IsObject()
   audienceFilter: AudienceFilterDto;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    enum: ['push', 'email'],
+    isArray: true,
+    description: "Delivery channels. Defaults to ['push']. 'email' requires emailSubject + emailBody.",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['push', 'email'], { each: true })
+  channels?: ('push' | 'email')[];
+
+  @ApiProperty({ description: 'Push notification title (also email subject fallback).' })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
   title: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Push notification body.' })
   @IsString()
   @MinLength(1)
   @MaxLength(500)
@@ -96,6 +107,20 @@ export class CreateNotificationRuleBody {
   @IsString()
   @MaxLength(500)
   clickAction?: string;
+
+  @ApiPropertyOptional({ description: 'Email subject — required when channels includes email.' })
+  @ValidateIf((o: CreateNotificationRuleBody) => !!o.channels?.includes('email'))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  emailSubject?: string;
+
+  @ApiPropertyOptional({ description: 'Email body, HTML allowed — required when channels includes email.' })
+  @ValidateIf((o: CreateNotificationRuleBody) => !!o.channels?.includes('email'))
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  emailBody?: string;
 }
 
 export class UpdateNotificationRuleBody {
@@ -131,6 +156,12 @@ export class UpdateNotificationRuleBody {
   @IsObject()
   audienceFilter?: AudienceFilterDto;
 
+  @ApiPropertyOptional({ enum: ['push', 'email'], isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(['push', 'email'], { each: true })
+  channels?: ('push' | 'email')[];
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -150,6 +181,20 @@ export class UpdateNotificationRuleBody {
   @IsString()
   @MaxLength(500)
   clickAction?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  emailSubject?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10000)
+  emailBody?: string;
 }
 
 export class NotificationRuleIdParam {

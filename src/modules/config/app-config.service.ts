@@ -194,6 +194,20 @@ export class AppConfigService {
     return this.configService.get('FIREBASE_PRIVATE_KEY')!;
   }
 
+  // SendGrid email
+
+  get sendgridApiKey(): string | undefined {
+    return this.configService.get('SENDGRID_API_KEY');
+  }
+
+  get emailFrom(): string | undefined {
+    return this.configService.get('EMAIL_FROM');
+  }
+
+  get emailFromName(): string | undefined {
+    return this.configService.get('EMAIL_FROM_NAME');
+  }
+
   // MediaConvert
 
   get mediaConvertRegion(): string {

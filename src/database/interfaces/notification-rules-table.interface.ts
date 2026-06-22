@@ -26,6 +26,13 @@ export type NotificationAudienceFilter =
   | { type: 'specific'; userIds: string[] }
   | { type: 'coach'; coachId: string };
 
+/**
+ * Delivery channels a rule can fire on. `push` is the existing FCM /
+ * external-app path (uses `title`/`body`); `email` sends via SendGrid (uses
+ * `email_subject`/`email_body`). A rule may carry both.
+ */
+export type NotificationChannel = 'push' | 'email';
+
 export interface NotificationRulesTable {
   id: Generated<string>;
   organisation_id: string;
@@ -38,10 +45,16 @@ export interface NotificationRulesTable {
   event_filter: ColumnType<Record<string, unknown>, Record<string, unknown> | undefined, Record<string, unknown> | undefined>;
   condition_params: ColumnType<Record<string, unknown>, Record<string, unknown> | undefined, Record<string, unknown> | undefined>;
   audience_filter: ColumnType<NotificationAudienceFilter, NotificationAudienceFilter, NotificationAudienceFilter>;
+  /** Channels this rule fires on. DB default ARRAY['push']. */
+  channels: Generated<NotificationChannel[]>;
+  /** Push notification text. */
   title: string;
   body: string;
   /** Optional deep-link (`/library`, `/workouts/uuid`) the client opens on tap. */
   click_action: string | null;
+  /** Email content — required (NOT NULL enforced by CHECK) when 'email' is in channels. */
+  email_subject: string | null;
+  email_body: string | null;
   created_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp>;
 }
@@ -52,7 +65,7 @@ export type NotificationRuleUpdate = Updateable<NotificationRulesTable>;
 
 // --- deliveries (append-only log) ----------------------------------
 
-export type NotificationDeliveryRoute = 'fcm' | 'external_app';
+export type NotificationDeliveryRoute = 'fcm' | 'external_app' | 'email';
 
 export interface NotificationRuleDeliveriesTable {
   id: Generated<string>;

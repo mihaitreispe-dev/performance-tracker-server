@@ -6,10 +6,13 @@ import {
   ClientType,
   CoachAthleteStatus,
   Database,
+  NewNotificationRuleDelivery,
   NotificationAudienceFilter,
+  NotificationChannel,
   NotificationRule,
   OrganisationRole,
 } from 'src/database/interfaces';
+import { EmailService } from 'src/modules/email/email.service';
 import { FirebaseService } from 'src/modules/firebase/firebase.service';
 import { NotificationRuleRepository } from 'src/repositories/notification-rule.repository';
 import { UserRepository } from 'src/repositories/user.repository';
@@ -41,6 +44,7 @@ export class NotificationRulesService {
     private readonly ruleRepo: NotificationRuleRepository,
     private readonly userRepo: UserRepository,
     private readonly firebase: FirebaseService,
+    private readonly email: EmailService,
   ) {}
 
   // --------------------------------------------------------------------------
@@ -155,86 +159,129 @@ export class NotificationRulesService {
       return { delivered: 0, deduped, failed: 0 };
     }
 
-    // Route — read the org once per dispatch (rule.organisation_id),
-    // not per-user. uses_external_app determines fcm vs external_app.
-    const org = await this.db
-      .selectFrom('organisations')
-      .where('id', '=', rule.organisation_id)
-      .select('uses_external_app')
-      .executeTakeFirst();
-    const usesExternal = !!org?.uses_external_app;
+    // Fetch the recipient rows once (id, email, fcm tokens) — shared by both
+    // channels so we avoid an N+1 over the audience.
+    const recipients = await this.db
+      .selectFrom('users')
+      .where('id', 'in', userIds)
+      .select(['id', 'email', 'fcm_tokens'])
+      .execute();
+    const byId = new Map(recipients.map((r) => [r.id, r]));
 
-    if (usesExternal) {
-      // No FCM call — just record delivery rows so the integrator can
-      // poll them. The integrator's app sees the queued items via the
-      // public-API polling endpoint (Phase 7b follow-up).
-      const rows = userIds.map((uid) => ({
-        rule_id: rule.id,
-        user_id: uid,
-        organisation_id: rule.organisation_id,
-        route: 'external_app' as const,
-        ok: true,
-        error: null,
-      }));
-      await this.ruleRepo.recordDeliveriesBatch(rows);
-      return { delivered: userIds.length, deduped, failed: 0 };
-    }
+    // A rule fires on one or both channels. channels has a DB default of
+    // ['push'], so older rules keep their push-only behaviour.
+    const channels: NotificationChannel[] = rule.channels?.length
+      ? (rule.channels as NotificationChannel[])
+      : ['push'];
 
-    // FCM path — for each user, gather tokens, fan-out send.
     let delivered = 0;
     let failed = 0;
-    const deliveryRows: Array<{
-      rule_id: string;
-      user_id: string;
-      organisation_id: string;
-      route: 'fcm';
-      ok: boolean;
-      error: string | null;
-    }> = [];
+    const deliveryRows: NewNotificationRuleDelivery[] = [];
 
-    for (const uid of userIds) {
-      const user = await this.userRepo.findById(uid);
-      const tokens = user?.fcm_tokens ?? [];
-      if (tokens.length === 0) {
-        deliveryRows.push({
-          rule_id: rule.id,
-          user_id: uid,
-          organisation_id: rule.organisation_id,
-          route: 'fcm',
-          ok: false,
-          error: 'no device tokens',
-        });
-        failed += 1;
-        continue;
-      }
-      const results = await this.firebase.sendToTokens({
-        tokens,
-        title: rule.title,
-        body: rule.body,
-        clickAction: rule.click_action ?? undefined,
-        data: { ruleId: rule.id },
-      });
-      const anyOk = results.some((r) => r.ok);
-      // Prune invalid tokens fire-and-forget. Don't block the send.
-      for (const r of results) {
-        if (r.invalidToken) {
-          void this.userRepo.removeFcmToken(uid, r.token).catch(() => undefined);
+    // ---- PUSH channel --------------------------------------------------------
+    if (channels.includes('push')) {
+      // Route — read the org once per dispatch. uses_external_app determines
+      // fcm (first-party app, incl. ReHabit once it registers tokens) vs
+      // external_app (third-party integrator polls the delivery rows).
+      const org = await this.db
+        .selectFrom('organisations')
+        .where('id', '=', rule.organisation_id)
+        .select('uses_external_app')
+        .executeTakeFirst();
+      const usesExternal = !!org?.uses_external_app;
+
+      if (usesExternal) {
+        for (const uid of userIds) {
+          deliveryRows.push({
+            rule_id: rule.id,
+            user_id: uid,
+            organisation_id: rule.organisation_id,
+            route: 'external_app',
+            ok: true,
+            error: null,
+          });
+          delivered += 1;
+        }
+      } else {
+        for (const uid of userIds) {
+          const tokens = byId.get(uid)?.fcm_tokens ?? [];
+          if (tokens.length === 0) {
+            deliveryRows.push({
+              rule_id: rule.id,
+              user_id: uid,
+              organisation_id: rule.organisation_id,
+              route: 'fcm',
+              ok: false,
+              error: 'no device tokens',
+            });
+            failed += 1;
+            continue;
+          }
+          const results = await this.firebase.sendToTokens({
+            tokens,
+            title: rule.title,
+            body: rule.body,
+            clickAction: rule.click_action ?? undefined,
+            data: { ruleId: rule.id },
+          });
+          const anyOk = results.some((r) => r.ok);
+          // Prune invalid tokens fire-and-forget. Don't block the send.
+          for (const r of results) {
+            if (r.invalidToken) {
+              void this.userRepo.removeFcmToken(uid, r.token).catch(() => undefined);
+            }
+          }
+          if (anyOk) delivered += 1;
+          else failed += 1;
+          deliveryRows.push({
+            rule_id: rule.id,
+            user_id: uid,
+            organisation_id: rule.organisation_id,
+            route: 'fcm',
+            ok: anyOk,
+            error: anyOk ? null : (results.find((r) => !r.ok)?.error ?? 'all sends failed'),
+          });
         }
       }
-      if (anyOk) delivered += 1;
-      else failed += 1;
-      deliveryRows.push({
-        rule_id: rule.id,
-        user_id: uid,
-        organisation_id: rule.organisation_id,
-        route: 'fcm',
-        ok: anyOk,
-        error: anyOk ? null : (results.find((r) => !r.ok)?.error ?? 'all sends failed'),
-      });
     }
+
+    // ---- EMAIL channel -------------------------------------------------------
+    // App-independent: SendGrid sends to users.email regardless of the org's
+    // push routing, so it reaches ReHabit and Step Zero users alike.
+    if (channels.includes('email')) {
+      const subject = rule.email_subject ?? rule.title;
+      const html = rule.email_body ?? rule.body;
+      const targets = userIds
+        .map((uid) => ({ uid, email: byId.get(uid)?.email }))
+        .filter((t): t is { uid: string; email: string } => !!t.email);
+
+      if (targets.length > 0) {
+        const results = await this.email.sendToEmails({
+          to: targets.map((t) => t.email),
+          subject,
+          html,
+        });
+        // results align with targets by input order.
+        results.forEach((res, i) => {
+          const t = targets[i];
+          if (res.ok) delivered += 1;
+          else failed += 1;
+          deliveryRows.push({
+            rule_id: rule.id,
+            user_id: t.uid,
+            organisation_id: rule.organisation_id,
+            route: 'email',
+            ok: res.ok,
+            error: res.ok ? null : (res.error ?? 'email send failed'),
+          });
+        });
+      }
+    }
+
     await this.ruleRepo.recordDeliveriesBatch(deliveryRows);
     this.logger.log(
-      `Rule ${rule.id} (${rule.trigger_type}) fired: delivered=${delivered} deduped=${deduped} failed=${failed}`,
+      `Rule ${rule.id} (${rule.trigger_type}) fired [${channels.join('+')}]: ` +
+        `delivered=${delivered} deduped=${deduped} failed=${failed}`,
     );
     return { delivered, deduped, failed };
   }

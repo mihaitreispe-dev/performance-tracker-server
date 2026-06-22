@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -26,6 +27,7 @@ import { Request } from 'express';
 
 import {
   NotificationAudienceFilter,
+  NotificationChannel,
   NotificationRule,
   OrganisationRole,
 } from 'src/database/interfaces';
@@ -98,9 +100,12 @@ export class NotificationRulesApiController {
       event_filter: body.eventFilter ?? {},
       condition_params: body.conditionParams ?? {},
       audience_filter: body.audienceFilter as NotificationAudienceFilter,
+      ...(body.channels ? { channels: body.channels } : {}),
       title: body.title,
       body: body.body,
       click_action: body.clickAction ?? null,
+      email_subject: body.emailSubject ?? null,
+      email_body: body.emailBody ?? null,
     });
     return { data: toDTO(created) };
   }
@@ -116,6 +121,18 @@ export class NotificationRulesApiController {
     const orgId = this.requireAdminOrg(req);
     const existing = await this.repo.findByIdInOrg(params.id, orgId);
     if (!existing) throw new NotFoundException('Rule not found');
+
+    // Guard the email channel's content invariant before hitting the DB CHECK,
+    // so a partial update that turns on email without content gives a clean 400.
+    const effectiveChannels = (body.channels ?? existing.channels) as NotificationChannel[];
+    if (effectiveChannels.includes('email')) {
+      const subject = body.emailSubject ?? existing.email_subject;
+      const emailBody = body.emailBody ?? existing.email_body;
+      if (!subject || !emailBody) {
+        throw new BadRequestException('Email channel requires emailSubject and emailBody');
+      }
+    }
+
     const updated = await this.repo.update(params.id, {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.enabled !== undefined ? { enabled: body.enabled } : {}),
@@ -125,9 +142,12 @@ export class NotificationRulesApiController {
       ...(body.audienceFilter !== undefined
         ? { audience_filter: body.audienceFilter as NotificationAudienceFilter }
         : {}),
+      ...(body.channels !== undefined ? { channels: body.channels } : {}),
       ...(body.title !== undefined ? { title: body.title } : {}),
       ...(body.body !== undefined ? { body: body.body } : {}),
       ...(body.clickAction !== undefined ? { click_action: body.clickAction } : {}),
+      ...(body.emailSubject !== undefined ? { email_subject: body.emailSubject } : {}),
+      ...(body.emailBody !== undefined ? { email_body: body.emailBody } : {}),
     });
     return { data: toDTO(updated) };
   }
@@ -221,9 +241,12 @@ function toDTO(r: NotificationRule): NotificationRuleDTO {
     eventFilter: r.event_filter as Record<string, unknown>,
     conditionParams: r.condition_params as Record<string, unknown>,
     audienceFilter: r.audience_filter as Record<string, unknown>,
+    channels: r.channels as NotificationChannel[],
     title: r.title,
     body: r.body,
     clickAction: r.click_action,
+    emailSubject: r.email_subject,
+    emailBody: r.email_body,
     createdAt:
       r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
     updatedAt:

@@ -46946,6 +46946,16 @@
             "type": "object",
             "additionalProperties": true
           },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "push",
+                "email"
+              ]
+            }
+          },
           "title": {
             "type": "string"
           },
@@ -46953,6 +46963,14 @@
             "type": "string"
           },
           "clickAction": {
+            "type": "object",
+            "nullable": true
+          },
+          "emailSubject": {
+            "type": "object",
+            "nullable": true
+          },
+          "emailBody": {
             "type": "object",
             "nullable": true
           },
@@ -46972,6 +46990,7 @@
           "eventFilter",
           "conditionParams",
           "audienceFilter",
+          "channels",
           "title",
           "body",
           "createdAt",
@@ -47055,15 +47074,36 @@
           "audienceFilter": {
             "$ref": "#/components/schemas/AudienceFilterDto"
           },
+          "channels": {
+            "type": "array",
+            "description": "Delivery channels. Defaults to ['push']. 'email' requires emailSubject + emailBody.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "push",
+                "email"
+              ]
+            }
+          },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Push notification title (also email subject fallback)."
           },
           "body": {
-            "type": "string"
+            "type": "string",
+            "description": "Push notification body."
           },
           "clickAction": {
             "type": "string",
             "description": "Optional deep-link to open on tap (e.g. /library)."
+          },
+          "emailSubject": {
+            "type": "string",
+            "description": "Email subject — required when channels includes email."
+          },
+          "emailBody": {
+            "type": "string",
+            "description": "Email body, HTML allowed — required when channels includes email."
           }
         },
         "required": [
@@ -47106,6 +47146,16 @@
           "audienceFilter": {
             "$ref": "#/components/schemas/AudienceFilterDto"
           },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "push",
+                "email"
+              ]
+            }
+          },
           "title": {
             "type": "string"
           },
@@ -47113,6 +47163,12 @@
             "type": "string"
           },
           "clickAction": {
+            "type": "string"
+          },
+          "emailSubject": {
+            "type": "string"
+          },
+          "emailBody": {
             "type": "string"
           }
         }
@@ -47142,7 +47198,8 @@
             "type": "string",
             "enum": [
               "fcm",
-              "external_app"
+              "external_app",
+              "email"
             ]
           },
           "ok": {
