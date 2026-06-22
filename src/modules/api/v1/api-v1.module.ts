@@ -4,6 +4,7 @@ import { validationErrorFactory } from 'src/lib/errors/validation-error';
 import { AllExceptionsFilter } from 'src/lib/http/filters/all-exceptions-filter';
 import { LoggingInterceptor } from 'src/lib/http/interceptors/logging.interceptor';
 import { RlsInterceptor } from 'src/modules/database/org-context/rls.interceptor';
+import { AppConfigModule } from 'src/modules/config/app-config.module';
 import { AuthModule } from 'src/modules/auth/auth.module';
 import { ApiKeyAuthGuard, ApiKeyUsageInterceptor } from 'src/modules/auth/api-key';
 import { ActiveOrgGuard } from 'src/modules/auth/guards/active-org.guard';
@@ -60,6 +61,10 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
 
 @Module({
   imports: [
+    // RlsInterceptor (a provider below) injects AppConfigService directly, so
+    // ApiV1Module must have it in scope (register() exports it; forRoot() does
+    // not). Without this the global APP_INTERCEPTOR fails to resolve at boot.
+    AppConfigModule.register(),
     HealthApiModule.register(),
     InlineImagesApiModule.register(),
     HookApiModule.register(),
