@@ -349,6 +349,11 @@ export class ExercisesApiService {
     if (body.introEndSeconds !== undefined) {
       update.intro_end_seconds = body.introEndSeconds;
     }
+    if (body.executionStartSeconds !== undefined) {
+      // Intentionally NOT constrained against intro_end_seconds — execution
+      // starting before the intro ends IS the overlap this feature enables.
+      update.execution_start_seconds = body.executionStartSeconds;
+    }
     // Defensive: if both are set, start must be < end.
     if (
       update.intro_start_seconds !== undefined &&
@@ -823,6 +828,7 @@ export class ExercisesApiService {
       introContentItemId: exercise.intro_content_item_id ?? null,
       introStartSeconds: exercise.intro_start_seconds ?? null,
       introEndSeconds: exercise.intro_end_seconds ?? null,
+      executionStartSeconds: exercise.execution_start_seconds ?? null,
       vimeoVideoId: exercise.vimeo_video_id ?? null,
       voiceoverMode: exercise.voiceover_mode,
       voiceoverUrl,

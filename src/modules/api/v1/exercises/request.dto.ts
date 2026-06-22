@@ -184,6 +184,17 @@ export class UpdateExerciseBody {
   @IsOptional()
   introEndSeconds?: number | null;
 
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description:
+      'Where the execution (demonstration) begins, in seconds into the main video. May be earlier than introEndSeconds to overlap the explanation. Skip-intro seeks here. Pass null to clear (execution then starts at introEndSeconds).',
+  })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  executionStartSeconds?: number | null;
+
   /**
    * Voice-over mode. Setting to 'off' clears any previously uploaded
    * recording; setting to 'recorded' requires a separate upload via

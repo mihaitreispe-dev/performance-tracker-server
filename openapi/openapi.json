@@ -27881,6 +27881,11 @@
             "nullable": true,
             "description": "Inline intro end marker (seconds)."
           },
+          "executionStartSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Execution (demonstration) start, seconds. May overlap the intro; Skip-intro seeks here. Null = starts at introEndSeconds."
+          },
           "vimeoVideoId": {
             "type": "string",
             "nullable": true,
@@ -28155,6 +28160,11 @@
             "type": "number",
             "nullable": true,
             "description": "Inline intro end marker (seconds into the main video). The Skip-intro button skips to this point."
+          },
+          "executionStartSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Where the execution (demonstration) begins, in seconds into the main video. May be earlier than introEndSeconds to overlap the explanation. Skip-intro seeks here. Pass null to clear (execution then starts at introEndSeconds)."
           },
           "voiceoverMode": {
             "type": "string",

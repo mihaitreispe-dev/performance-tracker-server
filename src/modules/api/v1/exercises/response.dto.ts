@@ -199,6 +199,14 @@ export class ExerciseDTO {
   introEndSeconds?: number | null;
 
   @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Execution (demonstration) start, seconds. May overlap the intro; Skip-intro seeks here. Null = starts at introEndSeconds.',
+  })
+  @IsOptional()
+  executionStartSeconds?: number | null;
+
+  @ApiPropertyOptional({
     type: String,
     nullable: true,
     description: 'Vimeo source video id, if imported from Vimeo.',

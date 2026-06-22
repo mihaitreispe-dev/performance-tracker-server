@@ -94,6 +94,12 @@ export interface ExercisesTable {
   /** Inline intro markers on the exercise's main demo video — used by the player's Skip-intro affordance. */
   intro_start_seconds: number | null;
   intro_end_seconds: number | null;
+  /**
+   * Where the EXECUTION (demonstration) begins, independent of intro_end_seconds
+   * so the two can overlap. Skip-intro seeks here when set; NULL falls back to
+   * intro_end_seconds (today's behaviour). Whole seconds into the main video.
+   */
+  execution_start_seconds: number | null;
   /** Vimeo source video id, when this exercise was imported via the Vimeo flow. */
   vimeo_video_id: string | null;
   /**
