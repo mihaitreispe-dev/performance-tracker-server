@@ -94,7 +94,15 @@ async function transcodeOrientation(opts: {
     'main',
     '-pix_fmt',
     'yuv420p',
-    '-an', // HLS variant is video-only; audio ships as a separate track
+    // Mux the source audio into the HLS segments so the demo plays with its
+    // original sound (e.g. a talking-head intro) — matching prod MediaConvert,
+    // whose HLS outputs carry AudioDescriptions. A silent source just yields
+    // video-only segments (ffmpeg has no audio stream to encode). The separate
+    // video_audio.mp4 below is still emitted for the translation/STT pipeline.
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
     '-start_number',
     '0',
     '-hls_time',
