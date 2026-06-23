@@ -452,6 +452,15 @@ export class ExercisesApiService {
     this.requireWriteRole(req);
     const organisationId = assertActiveOrg(req);
     await this.loadEditable(id, organisationId);
+    // exercise_instances.exercise_id is ON DELETE RESTRICT, so deleting an
+    // exercise that's used in any workout would throw a raw FK error. Pre-check
+    // and surface a clear, actionable message instead.
+    const usageCount = await this.exerciseRepo.countInstances(id);
+    if (usageCount > 0) {
+      throw new UnprocessableEntityException(
+        "This exercise is used in one or more workouts and can't be deleted. Remove it from those workouts first.",
+      );
+    }
     await this.exerciseRepo.deleteById(id);
   }
 

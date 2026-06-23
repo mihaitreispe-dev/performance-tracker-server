@@ -196,6 +196,20 @@ export class ExerciseRepository {
   }
 
   /**
+   * How many exercise_instances reference this exercise. The FK is ON DELETE
+   * RESTRICT, so a non-zero count means deleting the exercise would fail —
+   * callers pre-check this to surface a clean error instead of a raw FK throw.
+   */
+  async countInstances(id: string): Promise<number> {
+    const row = await this.db
+      .selectFrom('exercise_instances')
+      .select((eb) => eb.fn.countAll().as('count'))
+      .where('exercise_id', '=', id)
+      .executeTakeFirst();
+    return Number(row?.count ?? 0);
+  }
+
+  /**
    * System / background-worker path: returns rows across all tenants whose assets are still
    * being processed. Do NOT use from request paths.
    */
