@@ -23,8 +23,14 @@ export class ElevenLabsTtsService {
     return !!this.configService.elevenLabsApiKey;
   }
 
-  /** Synthesise `text` in `voiceId`; returns the MP3 bytes. */
-  async synthesize(text: string, voiceId: string): Promise<Buffer> {
+  /**
+   * Synthesise `text` in `voiceId`; returns the MP3 bytes. `languageCode`
+   * (ISO 639-1, e.g. 'es') pins the spoken language — but only the newer
+   * models (turbo v2.5 / flash v2.5 / v3) accept the `language_code` param;
+   * `eleven_multilingual_v2` infers language from the text and 400s if it's
+   * sent, so we only forward it when the configured model supports it.
+   */
+  async synthesize(text: string, voiceId: string, languageCode?: string): Promise<Buffer> {
     const apiKey = this.configService.elevenLabsApiKey;
     if (!apiKey) {
       throw new ServiceUnavailableException('ElevenLabs is not configured (set ELEVENLABS_API_KEY).');
@@ -32,16 +38,20 @@ export class ElevenLabsTtsService {
     const trimmed = text.trim();
     if (!trimmed) throw new Error('Cannot synthesise empty text.');
 
+    const model = this.configService.elevenLabsTtsModel;
+    const supportsLanguageCode = /turbo_v2_5|flash_v2_5|_v3\b/.test(model);
+
     const res = await fetch(`${ELEVENLABS_TTS_URL}/${encodeURIComponent(voiceId)}`, {
       method: 'POST',
       headers: {
         'xi-api-key': apiKey,
         'Content-Type': 'application/json',
-        Accept: 'audio/mpeg',
+        'Accept': 'audio/mpeg',
       },
       body: JSON.stringify({
         text: trimmed,
-        model_id: this.configService.elevenLabsTtsModel,
+        model_id: model,
+        ...(languageCode && supportsLanguageCode ? { language_code: languageCode } : {}),
       }),
     });
 

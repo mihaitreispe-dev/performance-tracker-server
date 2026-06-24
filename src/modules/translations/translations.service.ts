@@ -248,7 +248,7 @@ export class TranslationsService {
           .execute();
         return;
       }
-      const mp3 = await this.elevenLabsTts.synthesize(text, voiceId);
+      const mp3 = await this.elevenLabsTts.synthesize(text, voiceId, claimed.locale);
       const key = s3Keys.content.translation({
         targetType: claimed.target_type,
         targetId: claimed.target_id,
