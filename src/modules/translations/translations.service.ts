@@ -366,6 +366,18 @@ export class TranslationsService {
           })
           .where('id', '=', row.id)
           .execute();
+
+        // Exercise voice-overs are fully automatic — no human review gate.
+        // Publish the caption + queue the cloned-voice dub immediately so the
+        // translated narration is ready for playback without any admin action.
+        if (targetType === 'exercise_voiceover' && translated) {
+          await this.publishRowAuto({
+            ...row,
+            source_text: trimmed,
+            translated_text: translated,
+            review_status: 'machine_translated',
+          });
+        }
       }
     } catch (e) {
       await this.db
@@ -524,6 +536,28 @@ export class TranslationsService {
     await this.db
       .updateTable('content_translations')
       .set({ caption_vtt_s3_bucket: bucket, caption_vtt_s3_key: key, updated_at: sql`now()` })
+      .where('id', '=', row.id)
+      .execute();
+  }
+
+  /**
+   * Auto-publish a just-machine-translated row, bypassing the review gate.
+   * Used for exercise voice-overs (fully automatic): renders the caption and
+   * queues the cloned-voice dub, mirroring setReviewStatus('published') minus
+   * the reviewer stamp. The dub cron then produces the translated narration.
+   */
+  private async publishRowAuto(row: ContentTranslation): Promise<void> {
+    if (!row.translated_text?.trim()) return;
+    await this.publishCaption(row);
+    const queueDub = this.elevenLabsTts.enabled;
+    await this.db
+      .updateTable('content_translations')
+      .set({
+        review_status: 'published',
+        published_at: sql`now()`,
+        ...(queueDub ? { dub_provider: 'elevenlabs', dub_status: 'queued' as const } : {}),
+        updated_at: sql`now()`,
+      })
       .where('id', '=', row.id)
       .execute();
   }
