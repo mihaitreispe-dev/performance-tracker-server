@@ -458,6 +458,9 @@ export class TranslationsService {
           'voiceover_s3_bucket',
           'voiceover_s3_key',
           'voiceover_mime_type',
+          'video_s3_bucket',
+          'video_s3_key',
+          'video_mime_type',
         ])
         .where('id', '=', targetId)
         .executeTakeFirst();
@@ -471,7 +474,17 @@ export class TranslationsService {
           organisationId: ex.organisation_id,
         };
       }
-      throw new BadRequestException('Exercise has no voice-over to translate (mode is off).');
+      // 'off' = the narration lives in the demo video's own audio track. Point
+      // STT at the source video directly (ElevenLabs Scribe extracts the audio)
+      // so video-audio exercises translate just like a separate recording. A
+      // clip with no speech transcribes to empty text → no translation (no-op).
+      if (ex.video_s3_bucket && ex.video_s3_key) {
+        return {
+          media: { bucket: ex.video_s3_bucket, key: ex.video_s3_key, mime: ex.video_mime_type },
+          organisationId: ex.organisation_id,
+        };
+      }
+      throw new BadRequestException('Exercise has no audio to translate.');
     }
 
     if (targetType === 'exercise_intro') {
