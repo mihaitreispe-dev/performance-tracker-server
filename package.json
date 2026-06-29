@@ -60,7 +60,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "express-basic-auth": "^1.2.1",
-    "firebase-admin": "^13.6.0",
+    "firebase-admin": "^13.10.0",
     "fit-file-parser": "^2.3.3",
     "helmet": "^8.1.0",
     "json2csv": "^6.0.0-alpha.2",
