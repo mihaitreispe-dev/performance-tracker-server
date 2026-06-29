@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { ContentItemKind, Course, CourseStatus, OrganisationRole } from 'src/database/interfaces';
 import { assertActiveOrg } from 'src/lib/util/active-org';
 import type { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
+import { EntitlementsService } from 'src/modules/entitlements/entitlements.service';
 import { S3Service } from 'src/modules/s3/s3.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { CourseRepository } from 'src/repositories/course.repository';
@@ -38,6 +39,7 @@ export class CoursesApiService {
     private readonly contentRepo: ContentItemRepository,
     private readonly contentItemsService: ContentItemsApiService,
     private readonly s3Service: S3Service,
+    private readonly entitlementsService: EntitlementsService,
   ) {}
 
   async list(req: AuthedRequest, query: ListCoursesQuery): Promise<CoursesListResponse> {
@@ -50,8 +52,17 @@ export class CoursesApiService {
       { status: statusFilter },
       { limit: query.limit, offset: query.offset },
     );
+    // Stamp per-caller lock status in one batched query (no N+1) so clients
+    // never have to derive it from /me/entitlements (which omits free items).
+    const lockMap = await this.entitlementsService.getLockStatusMap(
+      req.user.id,
+      'course',
+      courses.map((c) => c.id),
+    );
     const data = await Promise.all(
-      courses.map(async (c) => this.mapToDTO(c, (await this.courseRepo.listLessons(c.id)).length)),
+      courses.map(async (c) =>
+        this.mapToDTO(c, (await this.courseRepo.listLessons(c.id)).length, lockMap.get(c.id)?.locked ?? false),
+      ),
     );
     return { data };
   }
@@ -82,8 +93,9 @@ export class CoursesApiService {
       }),
     );
 
+    const lock = await this.entitlementsService.getLockStatus(req.user.id, 'course', id);
     const withLessons: CourseWithLessonsDTO = {
-      ...(await this.mapToDTO(course, lessons.length)),
+      ...(await this.mapToDTO(course, lessons.length, lock.locked)),
       lessons: lessonDTOs,
     };
     return { data: withLessons };
@@ -239,7 +251,9 @@ export class CoursesApiService {
     return !!role && WRITE_ROLES.includes(role);
   }
 
-  private async mapToDTO(course: Course, lessonCount: number): Promise<CourseDTO> {
+  /** `locked` defaults false — authoring paths (create/update) skip the lock
+   *  check; list/getById compute + pass the per-caller status. */
+  private async mapToDTO(course: Course, lessonCount: number, locked = false): Promise<CourseDTO> {
     return {
       id: course.id,
       organisationId: course.organisation_id,
@@ -255,6 +269,7 @@ export class CoursesApiService {
         : null,
       status: course.status,
       lessonCount,
+      locked,
       featuredFrom: course.featured_from ? this.toISO(course.featured_from) : null,
       featuredUntil: course.featured_until ? this.toISO(course.featured_until) : null,
       createdAt: this.toISO(course.created_at),

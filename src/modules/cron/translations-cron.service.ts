@@ -4,10 +4,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { TranslationsService } from 'src/modules/translations/translations.service';
 
 /**
- * Advances in-flight AWS Transcribe jobs for the content-translation
- * pipeline. Mirrors CronService's MediaConvert/Rekognition pollers: the
- * job handle lives on the content_translations row, so a process restart
- * resumes cleanly. No-ops when Transcribe is disabled.
+ * Drives the ElevenLabs Dubbing pipeline for content translations. Phase 1
+ * creates a dubbing job per queued locale; phase 2 polls in-flight jobs and
+ * publishes finished ones. The job handle (`dub_job_id`) lives on the
+ * content_translations row, so a process restart resumes cleanly. No-ops
+ * when ElevenLabs is disabled.
  */
 @Injectable()
 export class TranslationsCronService {
@@ -16,20 +17,20 @@ export class TranslationsCronService {
   constructor(private readonly translationsService: TranslationsService) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
-  async syncTranscriptionJobs() {
+  async createDubbingJobs() {
     try {
-      await this.translationsService.advanceTranscriptionJobs();
+      await this.translationsService.createPendingDubbingJobs();
     } catch (error) {
-      this.logger.error('Failed to advance translation transcription jobs', error as Error);
+      this.logger.error('Failed to create translation dubbing jobs', error as Error);
     }
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
-  async syncDubJobs() {
+  async finalizeDubbingJobs() {
     try {
-      await this.translationsService.advanceDubJobs();
+      await this.translationsService.finalizeDubbingJobs();
     } catch (error) {
-      this.logger.error('Failed to advance translation dub jobs', error as Error);
+      this.logger.error('Failed to finalize translation dubbing jobs', error as Error);
     }
   }
 }

@@ -18,6 +18,7 @@ import { WorkoutRouteRepository } from 'src/repositories/workout-route.repositor
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
 import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
+import { ProgressionApiModule } from '../progression/progression-api.module';
 import { WorkoutExecutionsApiController } from './workout-executions-api.controller';
 import { WorkoutExecutionsApiService } from './workout-executions-api.service';
 
@@ -29,7 +30,7 @@ export class WorkoutExecutionsApiModule {
     if (!this.instance) {
       this.instance = {
         module: WorkoutExecutionsApiModule,
-        imports: [NotificationRulesModule.register()],
+        imports: [NotificationRulesModule.register(), ProgressionApiModule.register()],
         providers: [
           WorkoutExecutionsApiService,
           WorkoutExecutionRepository,

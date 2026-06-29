@@ -7,6 +7,7 @@ import { ContentItem, Exercise, ExerciseStatus } from 'src/database/interfaces';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { TranslationsService } from 'src/modules/translations/translations.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ExerciseRepository } from 'src/repositories/exercise.repository';
 
@@ -33,6 +34,7 @@ export class LocalTranscodeService {
     private readonly s3Service: S3Service,
     private readonly exerciseRepo: ExerciseRepository,
     private readonly contentItemRepo: ContentItemRepository,
+    private readonly translations: TranslationsService,
   ) {}
 
   get enabled(): boolean {
@@ -95,6 +97,15 @@ export class LocalTranscodeService {
       this.logger.log(
         `Local transcode complete for exercise ${exercise.id} (${artifacts.length} artifacts, wide-mode ${this.wideMode})`,
       );
+
+      // The audio is now ready — kick off voice-over translation server-side
+      // so it doesn't depend on the browser firing the request. Best-effort:
+      // a translation hiccup must never fail the (already-done) transcode.
+      try {
+        await this.translations.autoTranslateExerciseVoiceover(exercise.id);
+      } catch (e) {
+        this.logger.warn(`Auto-translate request failed for exercise ${exercise.id}: ${String(e)}`);
+      }
     } catch (err) {
       await this.exerciseRepo
         .updateById(exercise.id, {

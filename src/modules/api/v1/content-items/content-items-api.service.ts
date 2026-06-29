@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ContentItem,
   ContentItemKind,
@@ -11,6 +17,7 @@ import { s3Keys } from 'src/lib/util/s3-keys';
 import { AuthedRequest } from 'src/modules/auth/types/request-with-active-org';
 import { AppConfigService } from 'src/modules/config/app-config.service';
 import { S3Service } from 'src/modules/s3/s3.service';
+import { ProgressionApiService } from '../progression/progression-api.service';
 import { ContentItemRepository } from 'src/repositories/content-item.repository';
 import { ResourceEntitlementsRepository } from 'src/repositories/resource-entitlements.repository';
 import { SnackCompletionRepository } from 'src/repositories/snack-completion.repository';
@@ -60,6 +67,8 @@ const THUMBNAIL_MIME = 'image/jpeg';
 
 @Injectable()
 export class ContentItemsApiService {
+  private readonly logger = new Logger(ContentItemsApiService.name);
+
   constructor(
     private readonly contentRepo: ContentItemRepository,
     private readonly s3Service: S3Service,
@@ -68,6 +77,7 @@ export class ContentItemsApiService {
     private readonly billingRepo: StripeBillingRepository,
     private readonly snackCompletionRepo: SnackCompletionRepository,
     private readonly snackScheduleRepo: SnackScheduleRepository,
+    private readonly progressionService: ProgressionApiService,
   ) {}
 
   async list(req: AuthedRequest, query: ListContentItemsQuery): Promise<ContentItemsListResponse> {
@@ -289,7 +299,7 @@ export class ContentItemsApiService {
     if (item.kind !== ContentItemKind.SNACK) {
       throw new BadRequestException('Only snack items can have completions logged');
     }
-    await this.snackCompletionRepo.create({
+    const completion = await this.snackCompletionRepo.create({
       user_id: req.user.id,
       content_item_id: item.id,
       organisation_id: organisationId,
@@ -298,6 +308,14 @@ export class ContentItemsApiService {
           ? Math.round(durationSeconds)
           : null,
     });
+
+    // Gamified "Journey" — award XP + advance the streak/goals. Best-effort:
+    // a progression hiccup must never block the completion response.
+    this.progressionService
+      .awardForSnack(req.user.id, organisationId, completion.id, {})
+      .catch((error) => {
+        this.logger.error(`Failed to award progression for snack ${completion.id}:`, error);
+      });
   }
 
   /**

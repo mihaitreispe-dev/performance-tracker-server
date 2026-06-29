@@ -231,15 +231,9 @@ export class Env extends BoostrapEnv {
   @IsOptional()
   LOCAL_TRANSCODE_WIDE_MODE?: string;
 
-  // Content translation pipeline (voice-over + intro translation).
-  // AWS Translate (machine translation) is opt-in; off by default so the
-  // feature ships dark until an org turns it on. Speech-to-text + the
-  // cloned-voice dub run on ElevenLabs (enabled by ELEVENLABS_API_KEY).
-  @IsString()
-  @Matches('^Y|N$', 'i')
-  @IsOptional()
-  ENABLE_AWS_TRANSLATE?: string;
-
+  // Content translation pipeline (voice-over + intro translation). Runs
+  // entirely on ElevenLabs Dubbing (transcribe + translate + re-voice in
+  // one job), enabled by ELEVENLABS_API_KEY.
   @IsString()
   @IsOptional()
   ELEVENLABS_API_KEY?: string;

@@ -11,7 +11,8 @@
  *   crop : centre-crop to fill (approximates a smart-crop result)
  */
 import { spawn } from 'node:child_process';
-import { mkdir, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 export type WideMode = 'pad' | 'crop';
@@ -299,4 +300,24 @@ export async function transcodeSnackPortrait(opts: {
     opts.outPath,
   ]);
   return opts.outPath;
+}
+
+/**
+ * Extract the audio track of a clip as MP3 bytes. Accepts video OR audio
+ * input (`-vn` drops any video stream) — used by the translation/dubbing
+ * pipeline to feed ElevenLabs an audio file, which guarantees an MP3 dub
+ * back (a video input would dub to MP4). Writes to a temp dir and cleans
+ * up; throws if the source has no audio stream.
+ */
+export async function extractAudioMp3(input: Buffer): Promise<Buffer> {
+  const dir = await mkdtemp(join(tmpdir(), 'dub-audio-'));
+  const inPath = join(dir, 'source');
+  const outPath = join(dir, 'audio.mp3');
+  try {
+    await writeFile(inPath, input);
+    await runFfmpeg(['-y', '-i', inPath, '-vn', '-acodec', 'libmp3lame', '-q:a', '4', outPath]);
+    return await readFile(outPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }

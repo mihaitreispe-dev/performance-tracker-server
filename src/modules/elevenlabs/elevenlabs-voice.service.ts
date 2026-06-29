@@ -22,12 +22,7 @@ export class ElevenLabsVoiceService {
   }
 
   /** Create an Instant Voice Clone from one sample; returns the voice id. */
-  async cloneVoice(opts: {
-    name: string;
-    audio: Buffer;
-    filename: string;
-    mimeType: string;
-  }): Promise<string> {
+  async cloneVoice(opts: { name: string; audio: Buffer; filename: string; mimeType: string }): Promise<string> {
     const apiKey = this.configService.elevenLabsApiKey;
     if (!apiKey) {
       throw new ServiceUnavailableException('ElevenLabs is not configured (set ELEVENLABS_API_KEY).');
@@ -35,11 +30,7 @@ export class ElevenLabsVoiceService {
 
     const form = new FormData();
     form.append('name', opts.name);
-    form.append(
-      'files',
-      new Blob([new Uint8Array(opts.audio)], { type: opts.mimeType }),
-      opts.filename,
-    );
+    form.append('files', new Blob([new Uint8Array(opts.audio)], { type: opts.mimeType }), opts.filename);
 
     const res = await fetch(`${ELEVENLABS_VOICES_URL}/add`, {
       method: 'POST',

@@ -97,3 +97,10 @@ export * from './player-qoe-events-table.interface';
 export * from './outbound-sync-jobs-table.interface';
 
 export * from './notification-rules-table.interface';
+export * from './user-progression-table.interface';
+export * from './user-goals-table.interface';
+export * from './user-progression-events-table.interface';
+export * from './quests-table.interface';
+export * from './quest-assignments-table.interface';
+export * from './seasons-table.interface';
+export * from './user-unlocks-table.interface';

@@ -38,6 +38,7 @@ import { OutboundSyncApiService } from '../outbound-sync/outbound-sync-api.servi
 import { NotificationRulesService } from 'src/modules/notification-rules/notification-rules.service';
 
 import { PersonalRecordsDetectionService } from '../personal-records/personal-records-detection.service';
+import { ProgressionApiService } from '../progression/progression-api.service';
 import { WorkoutInfoDTO } from '../workout-schedules/response.dto';
 import {
   BatchUploadMetricsBody,
@@ -105,6 +106,7 @@ export class WorkoutExecutionsApiService {
     // athlete is a member of. Best-effort: failures inside the
     // engine never block the completion response.
     private readonly notificationRulesService: NotificationRulesService,
+    private readonly progressionService: ProgressionApiService,
   ) {}
 
   // Workout Executions
@@ -701,6 +703,18 @@ export class WorkoutExecutionsApiService {
         })
         .catch((error) => {
           this.logger.error(`Failed to fire on_action_completion for ${id}:`, error);
+        });
+
+      // Gamified "Journey" — award XP + advance the streak/goals. This
+      // controller is @SkipActiveOrg, so the org comes from the JWT claim
+      // (req.user.organisationId); the XP ledger makes it exactly-once.
+      // Best-effort: a progression hiccup must never block the finish.
+      this.progressionService
+        .awardForWorkout(req.user.id, req.user.organisationId, id, {
+          partial: updatedExecution.partial ?? false,
+        })
+        .catch((error) => {
+          this.logger.error(`Failed to award progression for execution ${id}:`, error);
         });
     }
 

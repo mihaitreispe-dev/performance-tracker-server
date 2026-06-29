@@ -50,6 +50,16 @@ import { WorkoutResponse } from '../workouts/response.dto';
 import { CoachingApiService } from './coaching-api.service';
 import { CoachAthleteRelationshipGuard } from './guards/coach-athlete-relationship.guard';
 import {
+  AssignQuestBody,
+  AssignQuestResultResponse,
+  CoachQuestListResponse,
+  CoachQuestResponse,
+  CreateQuestBody,
+  QuestAssignmentListResponse,
+  QuestIdParam,
+  UpdateQuestBody,
+} from './quest.dto';
+import {
   AssignedWorkoutIdParam,
   AssignWorkoutBody,
   AthleteIdParam,
@@ -329,6 +339,94 @@ export class CoachingApiController {
     @Param() params: AthleteIdParam,
   ): Promise<AssignedWorkoutListResponse> {
     return this.service.getAssignedWorkouts(req, params.athleteId);
+  }
+
+  // Quests (coach-authored)
+  @Version('1')
+  @ApiOperation({ summary: 'Create a quest (COACH only)' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: CoachQuestResponse })
+  @Roles(UserRole.COACH)
+  @Post('quests')
+  async createQuest(
+    @Req() req: Request & { user: AuthUser },
+    @Body() body: CreateQuestBody,
+  ): Promise<CoachQuestResponse> {
+    return this.service.createQuest(req, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'List my quests (COACH only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: CoachQuestListResponse })
+  @Roles(UserRole.COACH)
+  @Get('quests')
+  async listQuests(@Req() req: Request & { user: AuthUser }): Promise<CoachQuestListResponse> {
+    return this.service.listQuests(req);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Update a quest (COACH only)' })
+  @ApiResponse({ status: HttpStatus.OK, type: CoachQuestResponse })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, type: ErrorResponse })
+  @Roles(UserRole.COACH)
+  @Patch('quests/:questId')
+  async updateQuest(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: QuestIdParam,
+    @Body() body: UpdateQuestBody,
+  ): Promise<CoachQuestResponse> {
+    return this.service.updateQuest(req, params.questId, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Archive a quest (COACH only)' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
+  @Roles(UserRole.COACH)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('quests/:questId')
+  async archiveQuest(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: QuestIdParam,
+  ): Promise<void> {
+    return this.service.archiveQuest(req, params.questId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Assign a quest to all my active athletes (COACH only)' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: AssignQuestResultResponse })
+  @Roles(UserRole.COACH)
+  @Post('quests/:questId/assign-all')
+  async assignQuestToAll(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: QuestIdParam,
+  ): Promise<AssignQuestResultResponse> {
+    return this.service.assignQuestToAll(req, params.questId);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: 'Assign a quest to an athlete (COACH only)' })
+  @ApiResponse({ status: HttpStatus.CREATED, type: AssignQuestResultResponse })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Post('athletes/:athleteId/assign-quest')
+  async assignQuest(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AthleteIdParam,
+    @Body() body: AssignQuestBody,
+  ): Promise<AssignQuestResultResponse> {
+    return this.service.assignQuestToAthlete(req, params.athleteId, body);
+  }
+
+  @Version('1')
+  @ApiOperation({ summary: "List an athlete's quests (COACH only)" })
+  @ApiResponse({ status: HttpStatus.OK, type: QuestAssignmentListResponse })
+  @Roles(UserRole.COACH)
+  @UseGuards(CoachAthleteRelationshipGuard)
+  @Get('athletes/:athleteId/quests')
+  async getAthleteQuests(
+    @Req() req: Request & { user: AuthUser },
+    @Param() params: AthleteIdParam,
+  ): Promise<QuestAssignmentListResponse> {
+    return this.service.getAthleteQuests(req, params.athleteId);
   }
 
   @Version('1')

@@ -8,6 +8,7 @@ import { SnackCompletionRepository } from 'src/repositories/snack-completion.rep
 import { SnackScheduleRepository } from 'src/repositories/snack-schedule.repository';
 import { StripeBillingRepository } from 'src/repositories/stripe-billing.repository';
 
+import { ProgressionApiModule } from '../progression/progression-api.module';
 import { ContentItemsApiController } from './content-items-api.controller';
 import { ContentItemsApiService } from './content-items-api.service';
 
@@ -19,7 +20,12 @@ export class ContentItemsApiModule {
     if (!this.instance) {
       this.instance = {
         module: ContentItemsApiModule,
-        imports: [AuthModule.register(), AppConfigModule.register(), S3Module.register()],
+        imports: [
+          AuthModule.register(),
+          AppConfigModule.register(),
+          S3Module.register(),
+          ProgressionApiModule.register(),
+        ],
         providers: [
           ContentItemsApiService,
           ContentItemRepository,

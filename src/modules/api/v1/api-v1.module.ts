@@ -44,6 +44,7 @@ import { NutritionApiModule } from './nutrition/nutrition-api.module';
 import { OrganisationsApiModule } from './organisations/organisations-api.module';
 import { PainLogsApiModule } from './pain-logs/pain-logs-api.module';
 import { PersonalRecordsApiModule } from './personal-records/personal-records-api.module';
+import { ProgressionApiModule } from './progression/progression-api.module';
 import { PlayerTelemetryApiModule } from './player-telemetry/player-telemetry-api.module';
 import { OutboundSyncApiModule } from './outbound-sync/outbound-sync-api.module';
 import { PublicApiModule } from './public/public-api.module';
@@ -89,6 +90,7 @@ import { StripeWebhookModule } from './webhooks/stripe/stripe-webhook.module';
     IntegrationsApiModule.register(),
     WorkoutPlansApiModule.register(),
     PersonalRecordsApiModule.register(),
+    ProgressionApiModule.register(),
     PlayerTelemetryApiModule.register(),
     OutboundSyncApiModule.register(),
     SleepApiModule.register(),

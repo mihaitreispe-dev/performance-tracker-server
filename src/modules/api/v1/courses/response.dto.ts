@@ -28,6 +28,15 @@ export class CourseDTO {
   @ApiProperty()
   lessonCount: number;
 
+  /**
+   * True iff the course has ≥1 configured entitlement AND the caller lacks
+   * access. False when free OR already unlocked. Computed server-side per-
+   * caller — clients must NOT derive lock state from /me/entitlements (free
+   * items aren't listed in unlockedResources, which makes them flash locked).
+   */
+  @ApiProperty()
+  locked: boolean;
+
   @ApiPropertyOptional({ nullable: true, type: String })
   featuredFrom: string | null;
 

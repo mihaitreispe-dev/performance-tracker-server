@@ -18,16 +18,14 @@ import { Database } from 'src/database/interfaces/database.interface';
 import { ExerciseVoiceoverMode } from 'src/database/interfaces/exercises-table.interface';
 import { s3Keys } from 'src/lib/util/s3-keys';
 import { AppConfigService } from 'src/modules/config/app-config.service';
-import { AwsTranslateService } from 'src/modules/aws-translate/aws-translate.service';
-import { ElevenLabsSttService } from 'src/modules/elevenlabs/elevenlabs-stt.service';
-import { ElevenLabsTtsService } from 'src/modules/elevenlabs/elevenlabs-tts.service';
+import { ElevenLabsDubbingService } from 'src/modules/elevenlabs/elevenlabs-dubbing.service';
+import { extractAudioMp3 } from 'src/modules/local-transcode/ffmpeg-pipeline';
 import { S3Service } from 'src/modules/s3/s3.service';
 
 import { buildVttFromText } from './vtt';
 
-/** Where a target's words come from. Either known text or media to transcribe. */
+/** Where a target's words come from — media to transcribe/dub. */
 interface ResolvedSource {
-  text?: string;
   media?: { bucket: string; key: string; mime: string | null };
   organisationId: string | null;
   /** Media duration if known — paces the generated caption track. */
@@ -38,11 +36,24 @@ interface ResolvedSource {
 export class TranslationsService {
   private readonly logger = new Logger(TranslationsService.name);
 
+  /**
+   * Cap on ElevenLabs dubbing jobs in flight at once — their account has a
+   * concurrent-dubbing limit, and an upload fans out to ~7 languages. Excess
+   * queued locales wait for a later cron tick (they auto-retry once in-flight
+   * jobs finish) rather than bursting the limit and failing.
+   */
+  private readonly maxConcurrentDubs = 3;
+
+  /**
+   * Playback languages an exercise auto-translates into on upload (mirrors
+   * the client PLAYER_LANGUAGES). English is a target; Romanian is the
+   * source, so it isn't listed.
+   */
+  private readonly playbackLocales = ['en', 'es', 'fr', 'de', 'it', 'pt', 'nl'];
+
   constructor(
     @InjectKysely() private readonly db: Kysely<Database>,
-    private readonly translate: AwsTranslateService,
-    private readonly elevenLabsStt: ElevenLabsSttService,
-    private readonly elevenLabsTts: ElevenLabsTtsService,
+    private readonly elevenLabsDubbing: ElevenLabsDubbingService,
     private readonly s3Service: S3Service,
     private readonly configService: AppConfigService,
   ) {}
@@ -69,12 +80,12 @@ export class TranslationsService {
   /**
    * Kick off translation of a target into one or more locales.
    *
-   * When the source words are already authored (a generated-from-cues
-   * voice-over), we translate immediately and land each row at
-   * `machine_translated`. When the words live only in audio (a recorded
-   * voice-over or a talking-head intro), we fire a single Transcribe job
-   * (the transcript is language-independent) and the rows sit at
-   * `transcribing` until the cron poller completes them.
+   * Every target's words live in media (a recorded voice-over, the demo
+   * video's own audio, or a talking-head intro). We queue one ElevenLabs
+   * Dubbing job per locale — Dubbing transcribes, translates AND re-voices
+   * (cloning the source speaker) in a single async operation — and the rows
+   * sit at `transcribing` until the cron poller finishes them. There is no
+   * separate text-translation step, so AWS Translate is not involved.
    */
   async requestTranslations(opts: {
     targetType: TranslationTargetType;
@@ -91,6 +102,7 @@ export class TranslationsService {
       throw new BadRequestException('No target locales (after removing the source language).');
     }
 
+    // Validates the target has media to dub before we queue anything.
     const source = await this.resolveSource(targetType, targetId);
 
     // Ensure a row exists per locale (idempotent — re-requesting reuses rows).
@@ -104,16 +116,36 @@ export class TranslationsService {
       });
     }
 
-    if (source.text !== undefined) {
-      await this.translateKnownText({ targetType, targetId, locales, sourceLocale, text: source.text });
-    } else if (source.media) {
-      await this.startTranscription({ targetType, targetId, locales });
-    }
-
+    await this.queueDubbing({ targetType, targetId, locales });
     return this.listForTarget(targetType, targetId);
   }
 
-  /** Coach edits the machine translation → moves to in_review. */
+  /**
+   * Auto-translate a freshly-processed exercise's voice-over into the app's
+   * playback languages. Called server-side when the transcode completes, so
+   * it never depends on the browser firing the request. Idempotent: skips if
+   * the exercise already has translation rows (so it doesn't clobber
+   * in-progress dubs or re-dub on every re-transcode). Best-effort — callers
+   * ignore failures so a translation hiccup never blocks asset processing.
+   */
+  async autoTranslateExerciseVoiceover(exerciseId: string): Promise<void> {
+    if (!this.elevenLabsDubbing.enabled) return;
+    const existing = await this.db
+      .selectFrom('content_translations')
+      .select('id')
+      .where('target_type', '=', 'exercise_voiceover')
+      .where('target_id', '=', exerciseId)
+      .limit(1)
+      .executeTakeFirst();
+    if (existing) return; // already requested — leave it alone
+    await this.requestTranslations({
+      targetType: 'exercise_voiceover',
+      targetId: exerciseId,
+      locales: this.playbackLocales,
+    });
+  }
+
+  /** Coach edits a caption → moves to in_review (the dubbed audio is unchanged). */
   async editTranslation(id: string, translatedText: string): Promise<ContentTranslation> {
     const row = await this.requireRow(id);
     return this.db
@@ -129,9 +161,10 @@ export class TranslationsService {
   }
 
   /**
-   * Advance a translation's review status. Publishing renders the
-   * approved text into a caption track (WebVTT) and stamps the row so
-   * the player can pick it up by locale.
+   * Advance a translation's review status. Publishing (re)renders the
+   * caption track from the current text and stamps the row so the player
+   * can pick it up by locale. The dubbed audio is produced by the Dubbing
+   * pipeline, not here, so publishing never re-dubs.
    */
   async setReviewStatus(opts: {
     id: string;
@@ -146,11 +179,6 @@ export class TranslationsService {
       }
       await this.publishCaption(row);
     }
-    // Queue a cloned-voice dub on publish (regenerated on each re-publish
-    // so an edited translation gets fresh audio). The cron synthesises it
-    // — TTS of a paragraph is too slow to do inline. No-op when ElevenLabs
-    // TTS isn't configured.
-    const queueDub = publishing && this.elevenLabsTts.enabled;
     return this.db
       .updateTable('content_translations')
       .set({
@@ -158,7 +186,6 @@ export class TranslationsService {
         reviewed_by: opts.reviewerUserId,
         reviewed_at: sql`now()`,
         ...(publishing ? { published_at: sql`now()` } : {}),
-        ...(queueDub ? { dub_provider: 'elevenlabs', dub_status: 'queued' as const } : {}),
         updated_at: sql`now()`,
       })
       .where('id', '=', row.id)
@@ -167,275 +194,238 @@ export class TranslationsService {
   }
 
   /**
-   * Cron entrypoint: transcribe + translate every row queued for STT.
-   * ElevenLabs Scribe is synchronous, so we run it here (a background
-   * worker) — claim a target, transcribe its media once, then
-   * machine-translate each waiting locale. No-ops when ElevenLabs isn't
+   * Cron entrypoint (phase 1): create an ElevenLabs Dubbing job for every
+   * row queued for dubbing. We resolve + extract the source audio once per
+   * target, then fire one job per locale. No-ops when ElevenLabs isn't
    * configured.
    */
-  async advanceTranscriptionJobs(): Promise<void> {
-    if (!this.elevenLabsStt.enabled) return;
+  async createPendingDubbingJobs(): Promise<void> {
+    if (!this.elevenLabsDubbing.enabled) return;
+
+    // Only start enough new jobs to top up to maxConcurrentDubs; leftover
+    // queued rows are picked up on later ticks as in-flight jobs finish.
+    const runningRes = await this.db
+      .selectFrom('content_translations')
+      .select((eb) => eb.fn.countAll().as('c'))
+      .where('dub_status', '=', 'running')
+      .where('dub_job_id', 'is not', null)
+      .executeTakeFirst();
+    let slots = this.maxConcurrentDubs - Number(runningRes?.c ?? 0);
+    if (slots <= 0) return;
 
     const targets = await this.db
       .selectFrom('content_translations')
       .select(['target_type', 'target_id'])
-      .where('transcribe_status', '=', 'queued')
+      .where('dub_status', '=', 'queued')
       .groupBy(['target_type', 'target_id'])
       .execute();
 
     for (const t of targets) {
+      if (slots <= 0) break;
       try {
-        await this.runElevenLabsForTarget(t.target_type, t.target_id);
+        slots -= await this.createDubbingJobsForTarget(t.target_type, t.target_id, slots);
       } catch (e) {
-        this.logger.error(`ElevenLabs STT failed for ${t.target_type}/${t.target_id}: ${String(e)}`);
+        this.logger.error(`Dubbing create failed for ${t.target_type}/${t.target_id}: ${String(e)}`);
       }
     }
   }
 
   /**
-   * Cron entrypoint: render the cloned-voice dub for every published
-   * translation queued for it. Synthesises the approved text with the
-   * coach's voice (or the default), uploads the MP3, and stamps
-   * `dubbed_audio_s3_*` so the player can play translated narration.
+   * Cron entrypoint (phase 2): poll every in-flight Dubbing job; when one
+   * is `dubbed`, download the MP3 (+ transcript caption), store them, and
+   * publish the row so the player offers the language. No-ops when
+   * ElevenLabs isn't configured.
    */
-  async advanceDubJobs(): Promise<void> {
-    if (!this.elevenLabsTts.enabled) return;
+  async finalizeDubbingJobs(): Promise<void> {
+    if (!this.elevenLabsDubbing.enabled) return;
 
-    const queued = await this.db
+    const running = await this.db
       .selectFrom('content_translations')
       .selectAll()
-      .where('dub_status', '=', 'queued')
+      .where('dub_status', '=', 'running')
+      .where('dub_job_id', 'is not', null)
       .execute();
 
-    for (const row of queued) {
+    for (const row of running) {
       try {
-        await this.runDubForRow(row);
+        await this.finalizeDubbingRow(row);
       } catch (e) {
-        this.logger.error(`Dub failed for translation ${row.id}: ${String(e)}`);
+        this.logger.error(`Dubbing finalize failed for ${row.id}: ${String(e)}`);
       }
     }
   }
 
-  private async runDubForRow(row: ContentTranslation): Promise<void> {
-    // Claim so a concurrent tick skips it.
-    const claimed = await this.db
-      .updateTable('content_translations')
-      .set({ dub_status: 'running', updated_at: sql`now()` })
-      .where('id', '=', row.id)
-      .where('dub_status', '=', 'queued')
-      .returningAll()
-      .executeTakeFirst();
-    if (!claimed) return;
-
-    const text = claimed.translated_text?.trim();
-    if (!text) {
-      await this.db
-        .updateTable('content_translations')
-        .set({ dub_status: 'failed', updated_at: sql`now()` })
-        .where('id', '=', row.id)
-        .execute();
-      return;
-    }
-
-    try {
-      const voiceId = await this.resolveDubVoiceId(claimed.target_type, claimed.target_id);
-      if (!voiceId) {
-        // No coach voice + no default configured — nothing to dub with.
-        await this.db
-          .updateTable('content_translations')
-          .set({ dub_status: 'failed', updated_at: sql`now()` })
-          .where('id', '=', row.id)
-          .execute();
-        return;
-      }
-      const mp3 = await this.elevenLabsTts.synthesize(text, voiceId, claimed.locale);
-      const key = s3Keys.content.translation({
-        targetType: claimed.target_type,
-        targetId: claimed.target_id,
-        locale: claimed.locale,
-      }).dubbedAudio;
-      const bucket = this.configService.s3ContentBucket;
-      await this.s3Service.uploadFile({
-        bucket,
-        key,
-        data: mp3,
-        additionalParams: { ContentType: 'audio/mpeg' },
-      });
-      await this.db
-        .updateTable('content_translations')
-        .set({
-          dubbed_audio_s3_bucket: bucket,
-          dubbed_audio_s3_key: key,
-          dubbed_audio_mime_type: 'audio/mpeg',
-          dub_status: 'done',
-          updated_at: sql`now()`,
-        })
-        .where('id', '=', row.id)
-        .execute();
-    } catch (e) {
-      await this.db
-        .updateTable('content_translations')
-        .set({ dub_status: 'failed', updated_at: sql`now()` })
-        .where('id', '=', row.id)
-        .execute();
-      throw e;
-    }
-  }
-
-  /**
-   * Pick the voice to dub a target with: the owning coach's enrolled +
-   * consented cloned voice, else the configured default. Null when
-   * neither is available (the dub is skipped).
-   */
-  private async resolveDubVoiceId(
+  private async createDubbingJobsForTarget(
     targetType: TranslationTargetType,
     targetId: string,
-  ): Promise<string | null> {
-    const ownerId =
-      targetType === 'content_item'
-        ? (
-            await this.db
-              .selectFrom('content_items')
-              .select('owner_user_id')
-              .where('id', '=', targetId)
-              .executeTakeFirst()
-          )?.owner_user_id
-        : (
-            await this.db
-              .selectFrom('exercises')
-              .select('user_id')
-              .where('id', '=', targetId)
-              .executeTakeFirst()
-          )?.user_id;
-
-    if (ownerId) {
-      const owner = await this.db
-        .selectFrom('users')
-        .select(['elevenlabs_voice_id', 'voice_clone_consent_at'])
-        .where('id', '=', ownerId)
-        .executeTakeFirst();
-      if (owner?.elevenlabs_voice_id && owner.voice_clone_consent_at) {
-        return owner.elevenlabs_voice_id;
-      }
-    }
-    return this.configService.elevenLabsDefaultVoiceId ?? null;
-  }
-
-  private async runElevenLabsForTarget(
-    targetType: TranslationTargetType,
-    targetId: string,
-  ): Promise<void> {
-    // Claim the target's queued rows so a concurrent tick skips them.
-    const claimed = await this.db
-      .updateTable('content_translations')
-      .set({ transcribe_status: 'running', updated_at: sql`now()` })
+    limit: number,
+  ): Promise<number> {
+    // Claim up to `limit` of this target's queued rows (staying under the
+    // dubbing concurrency cap) so a concurrent tick skips them.
+    const queuedIds = await this.db
+      .selectFrom('content_translations')
+      .select('id')
       .where('target_type', '=', targetType)
       .where('target_id', '=', targetId)
-      .where('transcribe_status', '=', 'queued')
+      .where('dub_status', '=', 'queued')
+      .limit(limit)
+      .execute();
+    if (queuedIds.length === 0) return 0;
+
+    const claimed = await this.db
+      .updateTable('content_translations')
+      .set({ dub_provider: 'elevenlabs', dub_status: 'running', updated_at: sql`now()` })
+      .where(
+        'id',
+        'in',
+        queuedIds.map((r) => r.id),
+      )
+      .where('dub_status', '=', 'queued')
       .returningAll()
       .execute();
-    if (claimed.length === 0) return; // another worker took it
+    if (claimed.length === 0) return 0; // another worker took it
 
+    let audio: Buffer;
     try {
       const source = await this.resolveSource(targetType, targetId);
-      if (!source.media) {
-        // Authored-text sources are never queued; defensive guard.
-        throw new Error('Queued transcription target has no media.');
-      }
+      if (!source.media) throw new Error('Queued dubbing target has no media.');
       const url = await this.s3Service.getSignedUrlGET({
         bucket: source.media.bucket,
         key: source.media.key,
         expires: 3600,
       });
-      const sourceLocale = claimed[0].source_locale ?? 'en';
-      const { text } = await this.elevenLabsStt.transcribe(url, sourceLocale);
-      const trimmed = (text ?? '').trim();
-
-      for (const row of claimed) {
-        const translated = trimmed
-          ? await this.safeTranslate(trimmed, row.locale, row.source_locale)
-          : '';
-        await this.db
-          .updateTable('content_translations')
-          .set({
-            source_text: trimmed,
-            translated_text: translated,
-            transcribe_status: 'done',
-            review_status: 'machine_translated',
-            updated_at: sql`now()`,
-          })
-          .where('id', '=', row.id)
-          .execute();
-
-        // Exercise voice-overs are fully automatic — no human review gate.
-        // Publish the caption + queue the cloned-voice dub immediately so the
-        // translated narration is ready for playback without any admin action.
-        if (targetType === 'exercise_voiceover' && translated) {
-          await this.publishRowAuto({
-            ...row,
-            source_text: trimmed,
-            translated_text: translated,
-            review_status: 'machine_translated',
-          });
-        }
-      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch source media (status ${res.status}).`);
+      const sourceBytes = Buffer.from(await res.arrayBuffer());
+      // Extract audio → MP3 once; dubbing audio (not video) guarantees an
+      // MP3 dub back, which fits the player's audio-overlay model.
+      audio = await extractAudioMp3(sourceBytes);
     } catch (e) {
+      // Resolve/fetch/extract failed before any job was created — fail the
+      // claimed rows (none have a dub_job_id yet).
       await this.db
         .updateTable('content_translations')
-        .set({ transcribe_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
-        .where('target_type', '=', targetType)
-        .where('target_id', '=', targetId)
-        .where('transcribe_status', '=', 'running')
+        .set({ dub_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
+        .where(
+          'id',
+          'in',
+          claimed.map((r) => r.id),
+        )
+        .where('dub_job_id', 'is', null)
         .execute();
       throw e;
     }
+
+    let created = 0;
+    for (const row of claimed) {
+      try {
+        const dubbingId = await this.elevenLabsDubbing.createDub({
+          audio,
+          filename: 'voiceover.mp3',
+          sourceLang: row.source_locale,
+          targetLang: row.locale,
+        });
+        await this.db
+          .updateTable('content_translations')
+          .set({ dub_job_id: dubbingId, updated_at: sql`now()` })
+          .where('id', '=', row.id)
+          .execute();
+        created += 1;
+      } catch (e) {
+        this.logger.error(`Dubbing create failed for ${row.id} (${row.locale}): ${String(e)}`);
+        await this.db
+          .updateTable('content_translations')
+          .set({ dub_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
+          .where('id', '=', row.id)
+          .execute();
+      }
+    }
+    return created;
+  }
+
+  private async finalizeDubbingRow(row: ContentTranslation): Promise<void> {
+    if (!row.dub_job_id) return;
+
+    const { status } = await this.elevenLabsDubbing.getStatus(row.dub_job_id);
+    if (status === 'failed') {
+      await this.db
+        .updateTable('content_translations')
+        .set({ dub_status: 'failed', review_status: 'failed', updated_at: sql`now()` })
+        .where('id', '=', row.id)
+        .execute();
+      return;
+    }
+    if (status !== 'dubbed') return; // still dubbing — pick it up next tick
+
+    const bucket = this.configService.s3ContentBucket;
+    const keys = s3Keys.content.translation({
+      targetType: row.target_type,
+      targetId: row.target_id,
+      locale: row.locale,
+    });
+
+    const mp3 = await this.elevenLabsDubbing.getDubbedAudio(row.dub_job_id, row.locale);
+    await this.s3Service.uploadFile({
+      bucket,
+      key: keys.dubbedAudio,
+      data: mp3,
+      additionalParams: { ContentType: 'audio/mpeg' },
+    });
+
+    // Best-effort caption: ElevenLabs gives us a timed WebVTT transcript;
+    // store it as the caption track and derive plain text for display.
+    let caption: { bucket: string; key: string } | null = null;
+    let translatedText = row.translated_text ?? '';
+    const vtt = await this.elevenLabsDubbing.getTranscriptVtt(row.dub_job_id, row.locale);
+    if (vtt) {
+      await this.s3Service.uploadFile({
+        bucket,
+        key: keys.captionVtt,
+        data: Buffer.from(vtt, 'utf8'),
+        additionalParams: { ContentType: 'text/vtt; charset=utf-8' },
+      });
+      caption = { bucket, key: keys.captionVtt };
+      translatedText = this.plainTextFromVtt(vtt) || translatedText;
+    }
+
+    await this.db
+      .updateTable('content_translations')
+      .set({
+        dubbed_audio_s3_bucket: bucket,
+        dubbed_audio_s3_key: keys.dubbedAudio,
+        dubbed_audio_mime_type: 'audio/mpeg',
+        ...(caption ? { caption_vtt_s3_bucket: caption.bucket, caption_vtt_s3_key: caption.key } : {}),
+        ...(translatedText ? { translated_text: translatedText } : {}),
+        dub_status: 'done',
+        review_status: 'published',
+        published_at: sql`now()`,
+        updated_at: sql`now()`,
+      })
+      .where('id', '=', row.id)
+      .execute();
   }
 
   // ---- internals ------------------------------------------------------
 
-  private async translateKnownText(opts: {
-    targetType: TranslationTargetType;
-    targetId: string;
-    locales: string[];
-    sourceLocale: string;
-    text: string;
-  }): Promise<void> {
-    const { targetType, targetId, sourceLocale, text } = opts;
-    for (const locale of opts.locales) {
-      const translated = await this.safeTranslate(text, locale, sourceLocale);
-      await this.db
-        .updateTable('content_translations')
-        .set({
-          source_text: text,
-          translated_text: translated,
-          review_status: 'machine_translated',
-          transcribe_status: null,
-          transcribe_job_name: null,
-          updated_at: sql`now()`,
-        })
-        .where('target_type', '=', targetType)
-        .where('target_id', '=', targetId)
-        .where('locale', '=', locale)
-        .execute();
-    }
-  }
-
-  private async startTranscription(opts: {
+  /** Queue the locales' rows for the per-minute Dubbing cron to create jobs. */
+  private async queueDubbing(opts: {
     targetType: TranslationTargetType;
     targetId: string;
     locales: string[];
   }): Promise<void> {
-    if (!this.elevenLabsStt.enabled) {
+    if (!this.elevenLabsDubbing.enabled) {
       throw new ServiceUnavailableException(
-        'Speech-to-text is not configured on this server (set ELEVENLABS_API_KEY).',
+        'Dubbing is not configured on this server (set ELEVENLABS_API_KEY).',
       );
     }
-    // ElevenLabs Scribe is a synchronous call — queue the rows and let the
-    // per-minute cron transcribe + translate so the request returns fast.
     await this.db
       .updateTable('content_translations')
       .set({
-        transcribe_status: 'queued',
+        dub_provider: 'elevenlabs',
+        dub_status: 'queued',
+        dub_job_id: null,
+        transcribe_status: null,
+        transcribe_job_name: null,
         review_status: 'transcribing',
         updated_at: sql`now()`,
       })
@@ -475,9 +465,9 @@ export class TranslationsService {
         };
       }
       // 'off' = the narration lives in the demo video's own audio track. Point
-      // STT at the source video directly (ElevenLabs Scribe extracts the audio)
-      // so video-audio exercises translate just like a separate recording. A
-      // clip with no speech transcribes to empty text → no translation (no-op).
+      // dubbing at the source video (we extract its audio first) so video-audio
+      // exercises translate just like a separate recording. A clip with no
+      // speech transcribes to empty text → no usable dub.
       if (ex.video_s3_bucket && ex.video_s3_key) {
         return {
           media: { bucket: ex.video_s3_bucket, key: ex.video_s3_key, mime: ex.video_mime_type },
@@ -497,7 +487,7 @@ export class TranslationsService {
       if (ex.intro_content_item_id) {
         return this.contentItemMedia(ex.intro_content_item_id);
       }
-      // Inline intro on the main demo video — transcribe the source video.
+      // Inline intro on the main demo video — dub the source video.
       if (!ex.video_s3_bucket || !ex.video_s3_key) {
         throw new BadRequestException('Exercise has no intro media to translate.');
       }
@@ -521,8 +511,8 @@ export class TranslationsService {
     if (!ci.video_s3_bucket || !ci.video_s3_key) {
       throw new BadRequestException('Content item has no video to transcribe.');
     }
-    // Course lessons can be long; we still transcribe the whole clip in
-    // Layer 1 (time-bounded transcription is a refinement).
+    // Course lessons can be long; we still dub the whole clip in Layer 1
+    // (time-bounded dubbing is a refinement).
     void (ci.kind as ContentItemKind);
     return {
       media: { bucket: ci.video_s3_bucket, key: ci.video_s3_key, mime: ci.video_mime_type },
@@ -553,35 +543,22 @@ export class TranslationsService {
       .execute();
   }
 
-  /**
-   * Auto-publish a just-machine-translated row, bypassing the review gate.
-   * Used for exercise voice-overs (fully automatic): renders the caption and
-   * queues the cloned-voice dub, mirroring setReviewStatus('published') minus
-   * the reviewer stamp. The dub cron then produces the translated narration.
-   */
-  private async publishRowAuto(row: ContentTranslation): Promise<void> {
-    if (!row.translated_text?.trim()) return;
-    await this.publishCaption(row);
-    const queueDub = this.elevenLabsTts.enabled;
-    await this.db
-      .updateTable('content_translations')
-      .set({
-        review_status: 'published',
-        published_at: sql`now()`,
-        ...(queueDub ? { dub_provider: 'elevenlabs', dub_status: 'queued' as const } : {}),
-        updated_at: sql`now()`,
+  /** Strip WebVTT structure to plain text (for display / the translated_text column). */
+  private plainTextFromVtt(vtt: string): string {
+    return vtt
+      .split(/\r?\n/)
+      .filter((line) => {
+        const l = line.trim();
+        if (!l) return false;
+        if (l.startsWith('WEBVTT')) return false;
+        if (l.startsWith('NOTE')) return false;
+        if (l.includes('-->')) return false; // timestamp line
+        if (/^\d+$/.test(l)) return false; // cue index
+        return true;
       })
-      .where('id', '=', row.id)
-      .execute();
-  }
-
-  private async safeTranslate(text: string, targetLocale: string, sourceLocale: string): Promise<string> {
-    try {
-      return await this.translate.translateText(text, targetLocale, sourceLocale);
-    } catch (e) {
-      this.logger.error(`Translate ${sourceLocale}->${targetLocale} failed: ${String(e)}`);
-      return '';
-    }
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async upsertRow(opts: {

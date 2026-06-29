@@ -122,6 +122,13 @@ import {
   NotificationRuleDeliveriesTable,
   NotificationRulesTable,
 } from './notification-rules-table.interface';
+import { UserProgressionTable } from './user-progression-table.interface';
+import { UserGoalsTable } from './user-goals-table.interface';
+import { UserProgressionEventsTable } from './user-progression-events-table.interface';
+import { QuestsTable } from './quests-table.interface';
+import { QuestAssignmentsTable } from './quest-assignments-table.interface';
+import { SeasonsTable } from './seasons-table.interface';
+import { UserUnlocksTable } from './user-unlocks-table.interface';
 
 export interface Database {
   users: UsersTable;
@@ -277,4 +284,18 @@ export interface Database {
   // Phase 11 — Push notification rules + delivery log
   notification_rules: NotificationRulesTable;
   notification_rule_deliveries: NotificationRuleDeliveriesTable;
+
+  // Gamified "Journey" progression — XP/levels, self-selected goals, idempotent
+  // XP ledger. Per-user-per-org. See migration 1774404900000.
+  user_progression: UserProgressionTable;
+  user_goals: UserGoalsTable;
+  user_progression_events: UserProgressionEventsTable;
+
+  // Phase 2 — coach-authored quests + per-athlete assignments. Migration 1774405100000.
+  quests: QuestsTable;
+  quest_assignments: QuestAssignmentsTable;
+
+  // Phase 3 — seasons (global ref) + earned-cosmetic unlock ledger. Migration 1774405200000.
+  seasons: SeasonsTable;
+  user_unlocks: UserUnlocksTable;
 }

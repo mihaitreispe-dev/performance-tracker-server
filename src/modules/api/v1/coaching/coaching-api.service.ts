@@ -7,6 +7,10 @@ import {
   CoachAthleteStatus,
   CoachingMessage,
   NotificationType,
+  Quest,
+  QuestPeriod,
+  QuestStatus,
+  QuestUpdate,
   User,
   UserRole,
   Workout,
@@ -20,6 +24,20 @@ import { AthleteIntakeRepository } from 'src/repositories/athlete-intake.reposit
 import { AthletePrivacySettingsRepository } from 'src/repositories/athlete-privacy-settings.repository';
 import { CoachAssignedWorkoutRepository } from 'src/repositories/coach-assigned-workout.repository';
 import { CoachAthleteLabelRepository } from 'src/repositories/coach-athlete-label.repository';
+import { QuestRepository } from 'src/repositories/quest.repository';
+import { QuestAssignmentRepository } from 'src/repositories/quest-assignment.repository';
+import { toDayString } from '../progression/progression.math';
+import { currentWeekWindow, todayString } from '../progression/quest-window';
+import {
+  AssignQuestBody,
+  AssignQuestResultResponse,
+  CoachQuestDTO,
+  CoachQuestListResponse,
+  CoachQuestResponse,
+  CreateQuestBody,
+  QuestAssignmentListResponse,
+  UpdateQuestBody,
+} from './quest.dto';
 import { CoachAthleteRelationshipRepository } from 'src/repositories/coach-athlete-relationship.repository';
 import { CoachingMessageRepository } from 'src/repositories/coaching-message.repository';
 import { IllnessLogRepository } from 'src/repositories/illness-log.repository';
@@ -152,7 +170,143 @@ export class CoachingApiService {
     private readonly analyticsService: AnalyticsApiService,
     private readonly advancedMetricsService: AdvancedMetricsApiService,
     private readonly raceCalendarService: RaceCalendarApiService,
+    private readonly questRepo: QuestRepository,
+    private readonly questAssignmentRepo: QuestAssignmentRepository,
   ) {}
+
+  // ---- Quests (coach-authored) -------------------------------------------
+
+  async createQuest(req: AuthedRequest, body: CreateQuestBody): Promise<CoachQuestResponse> {
+    const organisationId = assertActiveOrg(req);
+    const quest = await this.questRepo.create({
+      organisation_id: organisationId,
+      coach_id: req.user.id,
+      title: body.title,
+      description: body.description ?? null,
+      objective_type: body.objectiveType,
+      target_value: body.targetValue,
+      period: body.period ?? QuestPeriod.ONE_OFF,
+      reward_xp: body.rewardXp ?? 0,
+      due_date: body.dueDate ?? null,
+    });
+    return new CoachQuestResponse({ data: this.mapQuest(quest) });
+  }
+
+  async listQuests(req: AuthedRequest): Promise<CoachQuestListResponse> {
+    const organisationId = assertActiveOrg(req);
+    const quests = await this.questRepo.listForCoach(organisationId, req.user.id);
+    return new CoachQuestListResponse({ data: quests.map((q) => this.mapQuest(q)) });
+  }
+
+  async updateQuest(req: AuthedRequest, questId: string, body: UpdateQuestBody): Promise<CoachQuestResponse> {
+    const organisationId = assertActiveOrg(req);
+    const patch: QuestUpdate = {};
+    if (body.title !== undefined) patch.title = body.title;
+    if (body.description !== undefined) patch.description = body.description || null;
+    if (body.targetValue !== undefined) patch.target_value = body.targetValue;
+    if (body.rewardXp !== undefined) patch.reward_xp = body.rewardXp;
+    if (body.status !== undefined) patch.status = body.status;
+    const quest = await this.questRepo.updateForCoach(questId, req.user.id, organisationId, patch);
+    if (!quest) throw new NotFoundException('Quest not found.');
+    return new CoachQuestResponse({ data: this.mapQuest(quest) });
+  }
+
+  async archiveQuest(req: AuthedRequest, questId: string): Promise<void> {
+    const organisationId = assertActiveOrg(req);
+    const quest = await this.questRepo.updateForCoach(questId, req.user.id, organisationId, {
+      status: QuestStatus.ARCHIVED,
+    });
+    if (!quest) throw new NotFoundException('Quest not found.');
+  }
+
+  async assignQuestToAthlete(
+    req: AuthedRequest,
+    athleteId: string,
+    body: AssignQuestBody,
+  ): Promise<AssignQuestResultResponse> {
+    const quest = await this.requireOwnedActiveQuest(req, body.questId);
+    const created = (await this.assignQuestRow(quest, athleteId, req.user.id)) ? 1 : 0;
+    return new AssignQuestResultResponse({ data: { assignmentsCreated: created } });
+  }
+
+  async assignQuestToAll(req: AuthedRequest, questId: string): Promise<AssignQuestResultResponse> {
+    const organisationId = assertActiveOrg(req);
+    const quest = await this.requireOwnedActiveQuest(req, questId);
+    const relationships = await this.relationshipRepo.findMany({
+      organisationId,
+      coachId: req.user.id,
+      status: [CoachAthleteStatus.ACTIVE],
+    });
+    let created = 0;
+    for (const rel of relationships) {
+      if (await this.assignQuestRow(quest, rel.athlete_id, req.user.id)) created += 1;
+    }
+    return new AssignQuestResultResponse({ data: { assignmentsCreated: created } });
+  }
+
+  async getAthleteQuests(req: AuthedRequest, athleteId: string): Promise<QuestAssignmentListResponse> {
+    const organisationId = assertActiveOrg(req);
+    const rows = await this.questAssignmentRepo.listForAthleteWithQuest(athleteId, organisationId);
+    return new QuestAssignmentListResponse({
+      data: rows.map((r) => ({
+        id: r.id,
+        questId: r.questId,
+        title: r.title,
+        objectiveType: r.objectiveType,
+        targetValue: r.targetValue,
+        progressValue: r.progressValue,
+        rewardXp: r.rewardXp,
+        period: r.period,
+        status: r.status,
+        windowEnd: toDayString(r.windowEnd),
+      })),
+    });
+  }
+
+  private async requireOwnedActiveQuest(req: AuthedRequest, questId: string): Promise<Quest> {
+    const organisationId = assertActiveOrg(req);
+    const quest = await this.questRepo.findByIdInOrg(questId, organisationId);
+    if (!quest || quest.coach_id !== req.user.id || quest.status !== QuestStatus.ACTIVE) {
+      throw new NotFoundException('Quest not found.');
+    }
+    return quest;
+  }
+
+  /** Insert an assignment for the current window; returns false if one already exists. */
+  private async assignQuestRow(quest: Quest, athleteId: string, coachId: string): Promise<boolean> {
+    const window =
+      quest.period === QuestPeriod.WEEKLY
+        ? currentWeekWindow()
+        : { start: todayString(), end: toDayString(quest.due_date) };
+    const row = await this.questAssignmentRepo.assign({
+      quest_id: quest.id,
+      organisation_id: quest.organisation_id,
+      user_id: athleteId,
+      assigned_by_coach_id: coachId,
+      objective_type: quest.objective_type,
+      target_value: quest.target_value,
+      reward_xp: quest.reward_xp,
+      period: quest.period,
+      window_start: window.start,
+      window_end: window.end,
+    });
+    return !!row;
+  }
+
+  private mapQuest(q: Quest): CoachQuestDTO {
+    return {
+      id: q.id,
+      title: q.title,
+      description: q.description,
+      objectiveType: q.objective_type,
+      targetValue: q.target_value,
+      period: q.period,
+      rewardXp: q.reward_xp,
+      dueDate: toDayString(q.due_date),
+      status: q.status,
+      createdAt: new Date(q.created_at as unknown as string).toISOString(),
+    };
+  }
 
   // Become Coach
   async becomeCoach(req: Request & { user: AuthUser }): Promise<BecomeCoachResponse> {

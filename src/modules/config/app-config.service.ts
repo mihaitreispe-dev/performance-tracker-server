@@ -245,15 +245,6 @@ export class AppConfigService {
   // Content translation pipeline
 
   /**
-   * AWS Translate opt-in (machine translation of voice-over scripts +
-   * transcripts). Off by default — when off, the translate endpoints
-   * return 503. Uses the same AWS credentials as S3/MediaConvert.
-   */
-  get enableAwsTranslate(): boolean {
-    return this.configService.get('ENABLE_AWS_TRANSLATE') === 'Y';
-  }
-
-  /**
    * ElevenLabs API key for the Scribe speech-to-text model (Layer 1) AND
    * the cloned-voice dub (Layer 2). Speech-to-text is enabled whenever
    * this is present; absent until the org provisions it.
@@ -322,5 +313,4 @@ export class AppConfigService {
   get openwearablesApiKey(): string | undefined {
     return this.configService.get('OPENWEARABLES_API_KEY');
   }
-
 }

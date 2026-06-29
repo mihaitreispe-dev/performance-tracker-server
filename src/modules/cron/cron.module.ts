@@ -28,11 +28,19 @@ import { WearableProviderConnectionRepository } from 'src/repositories/wearable-
 import { WeatherForecastRepository } from 'src/repositories/weather-forecast.repository';
 import { WorkoutScheduleRepository } from 'src/repositories/workout-schedule.repository';
 
+import { QuestRepository } from 'src/repositories/quest.repository';
+import { QuestAssignmentRepository } from 'src/repositories/quest-assignment.repository';
+import { SeasonRepository } from 'src/repositories/season.repository';
+import { UserProgressionRepository } from 'src/repositories/user-progression.repository';
+import { UserProgressionEventRepository } from 'src/repositories/user-progression-event.repository';
+
 import { CoachAlertsCronService } from './coach-alerts-cron.service';
 import { CronService } from './cron.service';
 import { LoadModelingCronService } from './load-modeling-cron.service';
 import { PredictionCronService } from './prediction-cron.service';
+import { QuestsCronService } from './quests-cron.service';
 import { ScheduledPromptsCronService } from './scheduled-prompts-cron.service';
+import { SeasonsCronService } from './seasons-cron.service';
 import { TranslationsCronService } from './translations-cron.service';
 import { WeatherRefreshCronService } from './weather-refresh-cron.service';
 
@@ -59,6 +67,13 @@ import { WeatherRefreshCronService } from './weather-refresh-cron.service';
     PredictionCronService,
     WeatherRefreshCronService,
     TranslationsCronService,
+    QuestsCronService,
+    SeasonsCronService,
+    QuestRepository,
+    QuestAssignmentRepository,
+    SeasonRepository,
+    UserProgressionRepository,
+    UserProgressionEventRepository,
     AthleteIntakeRepository,
     AthleteRaceRepository,
     CoachAthleteRelationshipRepository,
